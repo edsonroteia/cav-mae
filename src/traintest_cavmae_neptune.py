@@ -18,9 +18,6 @@ from torch import nn
 import numpy as np
 import pickle
 from torch.cuda.amp import autocast,GradScaler
-import neptune
-import wandb
-
 
 def train(audio_model, train_loader, test_loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -81,10 +78,11 @@ def train(audio_model, train_loader, test_loader, args):
         print('current masking ratio is {:.3f} for both modalities; audio mask mode {:s}'.format(args.masking_ratio, args.mask_mode))
 
         for i, (a_input, v_input, _) in enumerate(train_loader):
-            import pdb; pdb.set_trace()
+
             B = a_input.size(0)
             a_input = a_input.to(device, non_blocking=True)
             v_input = v_input.to(device, non_blocking=True)
+
             data_time.update(time.time() - end_time)
             per_sample_data_time.update((time.time() - end_time) / a_input.shape[0])
             dnn_start_time = time.time()
@@ -98,7 +96,7 @@ def train(audio_model, train_loader, test_loader, args):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-            
+
             # loss_av is the main loss
             loss_av_meter.update(loss.item(), B)
             loss_a_meter.update(loss_mae_a.item(), B)
@@ -107,8 +105,6 @@ def train(audio_model, train_loader, test_loader, args):
             batch_time.update(time.time() - end_time)
             per_sample_time.update((time.time() - end_time)/a_input.shape[0])
             per_sample_dnn_time.update((time.time() - dnn_start_time)/a_input.shape[0])
-
-            wandb.log({"Train Total Loss": loss_av_meter.val, "Train MAE Loss Audio": loss_a_meter.val, "Train MAE Loss Visual": loss_v_meter.val, "Train Contrastive Loss": loss_c_meter.val, "Train Contrastive Acc": c_acc}, step=global_step)
 
             print_step = global_step % args.n_print_steps == 0
             early_print_step = epoch == 0 and global_step % (args.n_print_steps/10) == 0
@@ -147,8 +143,6 @@ def train(audio_model, train_loader, test_loader, args):
         print("Train Visual MAE Loss: {:.6f}".format(loss_v_meter.avg))
         print("Train Contrastive Loss: {:.6f}".format(loss_c_meter.avg))
         print("Train Total Loss: {:.6f}".format(loss_av_meter.avg))
-
-        wandb.log({"Eval Total Loss": eval_loss_av, "Eval MAE Loss Audio": eval_loss_mae_a, "Eval MAE Loss Visual": eval_loss_mae_v, "Eval Contrastive Loss": eval_loss_c, "Eval Contrastive Acc": eval_c_acc}, step=global_step)
 
         # train audio mae loss, train visual mae loss, train contrastive loss, train total loss
         # eval audio mae loss, eval visual mae loss, eval contrastive loss, eval total loss, eval contrastive accuracy, lr

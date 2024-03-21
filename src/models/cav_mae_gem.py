@@ -10,10 +10,13 @@ os.environ['TORCH_HOME'] = './pretrained_models'
 import random
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import timm
 from timm.models.layers import to_2tuple, trunc_normal_, DropPath
 from timm.models.vision_transformer import Attention, Mlp, PatchEmbed, Block
 from .pos_embed import get_2d_sincos_pos_embed
+# from src.models.pos_embed import get_2d_sincos_pos_embed
+import copy
 
 class PatchEmbed(nn.Module):
     def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768):
@@ -31,6 +34,94 @@ class PatchEmbed(nn.Module):
     def forward(self, x):
         x = self.proj(x).flatten(2).transpose(1, 2)
         return x
+
+
+
+class SelfSelfAttention(nn.Module):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., ss_attn_iter=1,
+                 ss_attn_temp=None):
+        super().__init__()
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        self.scale = qk_scale or head_dim ** -0.5
+        self.ss_attn_iter = ss_attn_iter
+        self.ss_attn_temp = ss_attn_temp
+
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+    def forward(self, x, attn_bias=None, prev_attn=None):
+        # x = x.transpose(0, 1)
+        B, N, C = x.shape
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv[0], qkv[1], qkv[2]
+        self.v_values = v
+        # original self-attention for the original path
+        attn_ori_return = (q @ k.transpose(-2, -1)) * self.scale
+        attn_ori = attn_ori_return.softmax(dim=-1)
+        attn_ori = self.attn_drop(attn_ori)
+
+        x_ori = (attn_ori @ v).transpose(1, 2).reshape(B, N, C)
+        x_ori = self.proj_drop(self.proj(x_ori))
+
+        # GEM
+        xs1 = v
+        xs2 = v
+        xs3 = v
+        # xs2 = k
+        # xs3 = q
+
+
+        if self.ss_attn_temp is None:
+            pre_norm = torch.norm(x, dim=-1).mean(dim=-1, keepdim=True).unsqueeze(1).unsqueeze(-1)
+            inv_temp = pre_norm * self.scale
+        else:
+            inv_temp = self.ss_attn_temp
+
+        # for it in range(self.ss_attn_iter):
+        #     xs1 = F.normalize(xs1, dim=-1)
+        #     xs2 = F.normalize(xs2, dim=-1)
+        #     xs3 = F.normalize(xs3, dim=-1)
+
+        #     attn_return1 = (xs1 @ xs1.transpose(-2, -1)) * inv_temp
+        #     attn_return2 = (xs2 @ xs2.transpose(-2, -1)) * inv_temp
+        #     attn_return3 = (xs3 @ xs3.transpose(-2, -1)) * inv_temp
+
+        #     attn1 = (attn_return1).softmax(dim=-1)
+        #     attn2 = (attn_return2).softmax(dim=-1)
+        #     attn3 = (attn_return3).softmax(dim=-1)
+
+        #     xs1 = attn1 @ xs1
+        #     xs2 = attn2 @ xs2
+        #     xs3 = attn3 @ xs3
+
+        # Assigment to V
+        xs1 = F.normalize(xs1, dim=-1)
+        xs2 = F.normalize(xs2, dim=-1)
+        xs3 = F.normalize(xs3, dim=-1)
+
+        inv_temp = self.scale
+
+        attn_return1 = (xs1 @ xs1.transpose(-2, -1)) * inv_temp
+        attn_return2 = (xs2 @ xs2.transpose(-2, -1)) * inv_temp
+        attn_return3 = (xs3 @ xs3.transpose(-2, -1)) * inv_temp
+
+        attn1 = (attn_return1).softmax(dim=-1)
+        attn2 = (attn_return2).softmax(dim=-1)
+        attn3 = (attn_return3).softmax(dim=-1)
+
+        xs1 = attn1 @ v
+        xs2 = attn2 @ v
+        xs3 = attn3 @ v
+        xs = (xs1 + xs2 + xs3) / 3
+
+        x = xs.transpose(1, 2).reshape(B, N, C)
+        x = self.proj_drop(self.proj(x))
+
+        return [x, x_ori]
+
 
 class Block(nn.Module):
     def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
@@ -51,12 +142,40 @@ class Block(nn.Module):
 
     def forward(self, x, modality=None):
         if modality == None:
-            x = x + self.drop_path(self.attn(self.norm1(x)))
-            x = x + self.drop_path(self.mlp(self.norm2(x)))
+            if isinstance(self.attn, SelfSelfAttention):
+                if isinstance(x, list):
+                    x_gem, x = x
+                else:
+                    x_gem = x
+
+                x_gem_res, x_ori_res = self.attn(x=self.norm1(x))
+                # Original
+                x_ori = x + x_ori_res
+                x_ori = x_ori + self.mlp(self.norm2(x_ori))
+                # GEM
+                x_gem = x_gem + x_gem_res
+                return [x_gem, x_ori]
+            else:
+                x = x + self.drop_path(self.attn(self.norm1(x)))
+                x = x + self.drop_path(self.mlp(self.norm2(x)))
         elif modality == 'a':
             x = x + self.drop_path(self.attn(self.norm1_a(x)))
             x = x + self.drop_path(self.mlp(self.norm2_a(x)))
         elif modality == 'v':
+            if isinstance(self.attn, SelfSelfAttention):
+                if isinstance(x, list):
+                    x_gem, x = x
+                else:
+                    x_gem = x
+
+                x_gem_res, x_ori_res = self.attn(x=self.norm1_v(x))
+                # Original
+                x_ori = x + x_ori_res
+                x_ori = x_ori + self.mlp(self.norm2_v(x_ori))
+                # GEM
+                x_gem = x_gem + x_gem_res
+                return [x_gem, x_ori]
+
             x = x + self.drop_path(self.attn(self.norm1_v(x)))
             x = x + self.drop_path(self.mlp(self.norm2_v(x)))
         return x
@@ -94,10 +213,17 @@ class CAVMAE(nn.Module):
         # audio-branch
         self.blocks_a = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
         # visual-branch
-        self.blocks_v = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
+        self.blocks_v = nn.ModuleList([
+            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer)
+             for i in range(modality_specific_depth)
+        ])
         # unified branch
-        self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(12-modality_specific_depth)])
+        self.blocks_u = nn.ModuleList([
+            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer)
+            for i in range(12-modality_specific_depth)
+        ])
 
+        self.attn_change = None
         # independent normalization layer for audio, visual, and audio-visual
         self.norm_a, self.norm_v, self.norm = norm_layer(embed_dim), norm_layer(embed_dim), norm_layer(embed_dim)
 
@@ -124,18 +250,10 @@ class CAVMAE(nn.Module):
 
         self.norm_pix_loss = norm_pix_loss
 
-        self.intermediate_outputs = {}
-
         self.initialize_weights()
 
         print('Audio Positional Embedding Shape:', self.pos_embed_a.shape)
         print('Visual Positional Embedding Shape:', self.pos_embed_v.shape)
-
-    def register_hooks(self, blocks, block_type):
-        def hook_fn(m, i, o):
-            self.intermediate_outputs[block_type + str(m)] = o
-        for idx, block in enumerate(blocks):
-            block.register_forward_hook(hook_fn)
 
     def initialize_weights(self):
         # initialize (and freeze) pos_embed by sin-cos embedding, opt the cls token, add by myself
@@ -276,6 +394,39 @@ class CAVMAE(nn.Module):
         return x_masked, mask, ids_restore
 
     def forward_encoder(self, a, v, mask_ratio_a, mask_ratio_v, mask_mode='unstructured'):
+        # Apply GEM
+        depth = 7
+
+        if self.attn_change == None:
+            # # Change joint Encoder
+            self.attn_change = SelfSelfAttention(dim=768, num_heads=12, qkv_bias=True)
+
+            # Copy necessary weights
+            self.attn_change.qkv.weight.data = self.blocks_u[0].attn.qkv.weight.clone()
+            self.attn_change.qkv.bias.data = self.blocks_u[0].attn.qkv.bias.clone()
+            self.attn_change.proj.weight.data = self.blocks_u[0].attn.proj.weight.clone()
+            self.attn_change.proj.bias.data = self.blocks_u[0].attn.proj.bias.clone()
+            # Swap the original Attention with our SelfSelfAttention
+
+            # self.blocks_u_gem = nn.ModuleList([bu_module.clone() for bu_module in self.blocks_u])
+            # self.blocks_u_gem.attn = nn.ModuleList([self.attn_change])
+            # self.blocks_u_gem = nn.ModuleList([Block(dim=768, num_heads=12, qkv_bias=True)])
+            self.blocks_u_gem = copy.deepcopy(self.blocks_u)
+            self.blocks_u_gem[0].attn = self.attn_change
+            # for ori_param, gem_param in zip()
+
+            for i in range(1, depth):
+                self.attn_change = SelfSelfAttention(dim=768, num_heads=12, qkv_bias=True)
+
+                # Copy necessary weights
+                self.attn_change.qkv.weight.data = self.blocks_v[-i].attn.qkv.weight.clone()
+                self.attn_change.qkv.bias.data = self.blocks_v[-i].attn.qkv.bias.clone()
+                self.attn_change.proj.weight.data = self.blocks_v[-i].attn.proj.weight.clone()
+                self.attn_change.proj.bias.data = self.blocks_v[-i].attn.proj.bias.clone()
+                # Swap the original Attention with our SelfSelfAttention
+                self.blocks_v[-i].attn = self.attn_change
+
+
         # embed patches
         a = a.unsqueeze(1)
         a = a.transpose(2, 3)
@@ -287,15 +438,15 @@ class CAVMAE(nn.Module):
         v = v + self.pos_embed_v
         v = v + self.modality_v
 
-        # by default, we always use unstructured masking
-        if mask_mode == 'unstructured':
-            a, mask_a, ids_restore_a = self.random_masking_unstructured(a, mask_ratio_a)
-        # in ablation study, we tried time/freq/tf masking. mode in ['freq', 'time', 'tf']
-        else:
-            a, mask_a, ids_restore_a = self.random_masking_structured(a, mask_ratio_a, t=64, f=8, mode=mask_mode)
+        # # by default, we always use unstructured masking
+        # if mask_mode == 'unstructured':
+        #     a, mask_a, ids_restore_a = self.random_masking_unstructured(a, mask_ratio_a)
+        # # in ablation study, we tried time/freq/tf masking. mode in ['freq', 'time', 'tf']
+        # else:
+        #     a, mask_a, ids_restore_a = self.random_masking_structured(a, mask_ratio_a, t=64, f=8, mode=mask_mode)
 
-        # visual branch always use unstructured masking
-        v, mask_v, ids_restore_v = self.random_masking_unstructured(v, mask_ratio_v)
+        # # visual branch always use unstructured masking
+        # v, mask_v, ids_restore_v = self.random_masking_unstructured(v, mask_ratio_v)
 
         # audio and visual stream, independent blocks
         for blk in self.blocks_a:
@@ -303,6 +454,11 @@ class CAVMAE(nn.Module):
 
         for blk in self.blocks_v:
             v = blk(v)
+
+        if isinstance(v, list):
+            v_gem, v = v
+
+        v = v_gem
 
         x = torch.cat((a, v), dim=1)
 
@@ -315,12 +471,19 @@ class CAVMAE(nn.Module):
             ca = blk(a, 'a')
         ca = self.norm_a(ca)
 
-        for blk in self.blocks_u:
+        for blk in self.blocks_u_gem:
+        # for blk in self.blocks_u:
             cv = blk(v, 'v')
+
+        if isinstance(cv, list):
+            cv_gem, cv = cv
+
+        cv = cv_gem
         cv = self.norm_v(cv)
 
-        return x, mask_a, ids_restore_a, mask_v, ids_restore_v, ca, cv
+        return x, 0, 0, 0, 0, ca, cv
 
+        
     def forward_decoder(self, x, mask_a, ids_restore_a, mask_v, ids_restore_v):
 
         x = self.decoder_embed(x)
@@ -434,11 +597,7 @@ class CAVMAE(nn.Module):
         return pred_a, pred_v, mask_a, mask_v, loss_pixel_a, loss_pixel_v
 
     # used for retrieval, ignore if retrieval is not of interest
-    def forward_feat(self, a, v, register_hook=False):
-        if register_hook:
-            self.register_hooks(self.blocks_a, "blocks_a_")
-            self.register_hooks(self.blocks_v, "blocks_v_")
-            self.register_hooks(self.blocks_u, "blocks_u_")
+    def forward_feat(self, a, v):
         # embed patches
         a = a.unsqueeze(1)
         a = a.transpose(2, 3)
@@ -659,12 +818,7 @@ class CAVMAEFT(nn.Module):
             return x
 
     # for retrieval
-    def forward_feat(self, a, v, mode='av', register_hook=False):
-        if register_hook:
-            self.register_hooks(self.blocks_a, "blocks_a_")
-            self.register_hooks(self.blocks_v, "blocks_v_")
-            self.register_hooks(self.blocks_u, "blocks_u_")
-
+    def forward_feat(self, a, v, mode='av'):
         # return both audio and visual
         if mode == 'av':
             a = a.unsqueeze(1)
@@ -709,3 +863,17 @@ class CAVMAEFT(nn.Module):
 
             a = self.norm_a(a)
             return a
+
+if __name__ == '__main__':
+    device = "cuda" if torch.cuda.is_available() else 'cpu'
+
+    image = torch.randn((1, 3, 224, 224)).to(device)
+    audio = torch.randn((1, 1024, 128)).to(device)
+
+    model = CAVMAE(img_size=224, audio_length=1024, patch_size=16, in_chans=3,
+                 embed_dim=768)
+    model.to(device)
+
+    with torch.no_grad():
+        output = model.forward_encoder(a=audio, v=image, mask_ratio_a=0., mask_ratio_v=0.)
+        print(output)

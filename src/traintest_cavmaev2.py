@@ -18,9 +18,7 @@ from torch import nn
 import numpy as np
 import pickle
 from torch.cuda.amp import autocast,GradScaler
-import neptune
 import wandb
-
 
 def train(audio_model, train_loader, test_loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,6 +32,8 @@ def train(audio_model, train_loader, test_loader, args):
     best_epoch, best_loss = 0, np.inf
     global_step, epoch = 0, 0
     start_time = time.time()
+    estimated_finish_time = 0  # Initialize estimated finish time
+
     exp_dir = args.exp_dir
 
     def _save_progress():
@@ -81,10 +81,12 @@ def train(audio_model, train_loader, test_loader, args):
         print('current masking ratio is {:.3f} for both modalities; audio mask mode {:s}'.format(args.masking_ratio, args.mask_mode))
 
         for i, (a_input, v_input, _) in enumerate(train_loader):
-            import pdb; pdb.set_trace()
+
+
             B = a_input.size(0)
             a_input = a_input.to(device, non_blocking=True)
             v_input = v_input.to(device, non_blocking=True)
+
             data_time.update(time.time() - end_time)
             per_sample_data_time.update((time.time() - end_time) / a_input.shape[0])
             dnn_start_time = time.time()
@@ -98,7 +100,7 @@ def train(audio_model, train_loader, test_loader, args):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-            
+
             # loss_av is the main loss
             loss_av_meter.update(loss.item(), B)
             loss_a_meter.update(loss_mae_a.item(), B)
@@ -109,6 +111,7 @@ def train(audio_model, train_loader, test_loader, args):
             per_sample_dnn_time.update((time.time() - dnn_start_time)/a_input.shape[0])
 
             wandb.log({"Train Total Loss": loss_av_meter.val, "Train MAE Loss Audio": loss_a_meter.val, "Train MAE Loss Visual": loss_v_meter.val, "Train Contrastive Loss": loss_c_meter.val, "Train Contrastive Acc": c_acc}, step=global_step)
+
 
             print_step = global_step % args.n_print_steps == 0
             early_print_step = epoch == 0 and global_step % (args.n_print_steps/10) == 0
@@ -178,6 +181,18 @@ def train(audio_model, train_loader, test_loader, args):
 
         finish_time = time.time()
         print('epoch {:d} training time: {:.3f}'.format(epoch, finish_time-begin_time))
+
+        # Calculate elapsed time and estimate remaining time
+        elapsed_time = time.time() - start_time
+        estimated_total_time = elapsed_time / epoch * args.n_epochs
+        estimated_finish_time = start_time + estimated_total_time
+        remaining_time = estimated_finish_time - time.time()
+        # Convert remaining_time from seconds to a readable format (e.g., hours, minutes, seconds)
+        remaining_hrs, remaining_min = divmod(remaining_time, 3600)
+        remaining_min, remaining_sec = divmod(remaining_min, 60)
+        # Print the estimated finish time and remaining time
+        print(f'Current time: {time.ctime()}')
+        print(f'Estimated finish time: {time.ctime(estimated_finish_time)} (in {int(remaining_hrs)}h {int(remaining_min)}m {int(remaining_sec)}s)')
 
         epoch += 1
 

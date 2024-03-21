@@ -14,9 +14,17 @@ import timm
 from timm.models.layers import to_2tuple, trunc_normal_, DropPath
 from timm.models.vision_transformer import Attention, Mlp, PatchEmbed, Block
 from .pos_embed import get_2d_sincos_pos_embed
+from .modeling_pretrain import PretrainVisionTransformerEncoder, PretrainVisionTransformerDecoder
+from .modeling_finetune import VisionTransformer
+from .modeling_finetune import PatchEmbed as VMAEPatchEmbed
+from .modeling_finetune import get_sinusoid_encoding_table
 
 class PatchEmbed(nn.Module):
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768):
+    def __init__(self, 
+                 img_size=224, 
+                 patch_size=16, 
+                 in_chans=3, 
+                 embed_dim=768):
         super().__init__()
 
         img_size = to_2tuple(img_size)
@@ -62,12 +70,12 @@ class Block(nn.Module):
         return x
 
 # our main proposed model, for pretraining only, for finetuning, use CAVMAEFT class
-class CAVMAE(nn.Module):
-    """ CAV-MAE Model
+class CAVMAEv2(nn.Module):
+    """ CAV-MAEv2 Model
     """
     def __init__(self, img_size=224, audio_length=1024, patch_size=16, in_chans=3,
                  embed_dim=768, modality_specific_depth=11, num_heads=12,
-                 decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
+                 decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, num_frames=16,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=False):
         super().__init__()
         print('A CAV-MAE Model')
@@ -79,8 +87,10 @@ class CAVMAE(nn.Module):
         timm.models.vision_transformer.PatchEmbed = PatchEmbed
         timm.models.vision_transformer.Block = Block
 
+        self.num_frames = num_frames
+
         self.patch_embed_a = PatchEmbed(img_size, patch_size, 1, embed_dim)
-        self.patch_embed_v = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
+        self.patch_embed_v = VMAEPatchEmbed(img_size, patch_size, in_chans, embed_dim)
 
         self.patch_embed_a.num_patches = int(audio_length * 128 / 256)
         print('Number of Audio Patches: {:d}, Visual Patches: {:d}'.format(self.patch_embed_a.num_patches, self.patch_embed_v.num_patches))
@@ -94,7 +104,10 @@ class CAVMAE(nn.Module):
         # audio-branch
         self.blocks_a = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
         # visual-branch
-        self.blocks_v = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
+        # self.blocks_v = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
+        # self.blocks_v = PretrainVisionTransformerEncoder(embed_dim=int(embed_dim), num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer, depth=modality_specific_depth, init_values=0., all_frames=8)
+        self.blocks_v = VisionTransformer(embed_dim=int(embed_dim), num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer, depth=modality_specific_depth, init_values=0., all_frames=8)
+
         # unified branch
         self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(12-modality_specific_depth)])
 
@@ -120,7 +133,17 @@ class CAVMAE(nn.Module):
 
         # project channel is different for two modality, use two projection head
         self.decoder_pred_a = nn.Linear(decoder_embed_dim, patch_size ** 2 * 1, bias=True)  # decoder to patch
-        self.decoder_pred_v = nn.Linear(decoder_embed_dim, patch_size ** 2 * in_chans, bias=True)  # decoder to patch
+        self.decoder_pred_v = nn.Linear(decoder_embed_dim, patch_size ** 2 * in_chans * 2, bias=True)  # decoder to patch 
+#         self.decoder_pred_v = nn.ConvTranspose2d( ### TEMP FIX!!!   
+#             in_channels=decoder_embed_dim,  # Input feature depth
+#             out_channels=in_chans,          # Typically 3 for RGB images
+#             kernel_size=patch_size,         # Size of the kernel
+#             stride=patch_size,              # Stride: Upsample factor (often set equal to kernel size)
+#             padding=0,                      # Padding
+#             bias=True                       # Include a bias term
+#         )
+        # Gets output from "torch.Size([24, 784, 768])" to "torch.Size([24, 784 * 2, 768])""
+        # self.decoder_head_v = nn.Linear(decoder_embed_dim, patch_size ** 2 * in_chans, bias=True)
 
         self.norm_pix_loss = norm_pix_loss
 
@@ -142,14 +165,21 @@ class CAVMAE(nn.Module):
         pos_embed_a = get_2d_sincos_pos_embed(self.pos_embed_a.shape[-1], 8, int(self.patch_embed_a.num_patches/8), cls_token=False)
         self.pos_embed_a.data.copy_(torch.from_numpy(pos_embed_a).float().unsqueeze(0))
 
-        pos_embed_v = get_2d_sincos_pos_embed(self.pos_embed_v.shape[-1], int(self.patch_embed_v.num_patches ** .5), int(self.patch_embed_v.num_patches ** .5), cls_token=False)
-        self.pos_embed_v.data.copy_(torch.from_numpy(pos_embed_v).float().unsqueeze(0))
+        # pos_embed_v = get_2d_sincos_pos_embed(self.pos_embed_v.shape[-1], int(self.patch_embed_v.num_patches ** .5), int(self.patch_embed_v.num_patches ** .5), cls_token=False)
+        print("NUM PATCHES: ", self.patch_embed_v.num_patches)
+        pos_embed_v = get_sinusoid_encoding_table(self.patch_embed_v.num_patches, self.pos_embed_v.shape[-1])
+        # self.pos_embed_v.data.copy_(torch.from_numpy(pos_embed_v).float().unsqueeze(0))
+        self.pos_embed_v.data.copy_(pos_embed_v.float())
+
 
         decoder_pos_embed_a = get_2d_sincos_pos_embed(self.decoder_pos_embed_a.shape[-1], 8, int(self.patch_embed_a.num_patches/8), cls_token=False)
         self.decoder_pos_embed_a.data.copy_(torch.from_numpy(decoder_pos_embed_a).float().unsqueeze(0))
 
-        decoder_pos_embed_v = get_2d_sincos_pos_embed(self.decoder_pos_embed_v.shape[-1], int(self.patch_embed_v.num_patches ** .5), int(self.patch_embed_v.num_patches ** .5), cls_token=False)
-        self.decoder_pos_embed_v.data.copy_(torch.from_numpy(decoder_pos_embed_v).float().unsqueeze(0))
+        # decoder_pos_embed_v = get_2d_sincos_pos_embed(self.decoder_pos_embed_v.shape[-1], int(self.patch_embed_v.num_patches ** .5), int(self.patch_embed_v.num_patches ** .5), cls_token=False)
+        # self.decoder_pos_embed_v.data.copy_(torch.from_numpy(decoder_pos_embed_v).float().unsqueeze(0))
+        decoder_pos_embed_v = get_sinusoid_encoding_table(self.patch_embed_v.num_patches, self.decoder_pos_embed_v.shape[-1])
+        self.decoder_pos_embed_v.data.copy_(decoder_pos_embed_v.float())
+
 
         # initialize patch_embed like nn.Linear (instead of nn.Conv2d)
         w = self.patch_embed_a.proj.weight.data
@@ -177,15 +207,43 @@ class CAVMAE(nn.Module):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
 
-    def patchify(self, imgs, c, h, w, p=16):
+    # def patchify(self, imgs, c, h, w, p=16):
+    #     """
+    #     imgs: (N, 3, H, W)
+    #     x: (N, L, patch_size**2 *3)
+    #     """
+    #     import pdb ; pdb.set_trace()
+    #     x = imgs.reshape(shape=(imgs.shape[0], c, h, p, w, p))
+    #     x = torch.einsum('nchpwq->nhwpqc', x)
+    #     x = x.reshape(shape=(imgs.shape[0], h * w, p ** 2 * c))
+    #     return x
+    
+    def patchify(self, imgs, c, t, h, w, p=16):
         """
-        imgs: (N, 3, H, W)
-        x: (N, L, patch_size**2 *3)
+        Adapted for imgs with an extra dimension for time (or frames): (N, C, T, H, W).
+        Args:
+            imgs: input images of shape (N, C, T, H, W)
+            c: number of channels
+            t: number of time frames or similar (additional dimension)
+            h: number of vertical patches (not pixels)
+            w: number of horizontal patches (not pixels)
+            p: size of each patch in pixels (assuming square patches for simplicity)
+
+        Returns:
+            Patchified images of shape (N, T * H * W, P^2 * C)
         """
-        x = imgs.reshape(shape=(imgs.shape[0], c, h, p, w, p))
-        x = torch.einsum('nchpwq->nhwpqc', x)
-        x = x.reshape(shape=(imgs.shape[0], h * w, p ** 2 * c))
+        # Reshape to separate the patches, now correctly accounting for the number of patches and patch size
+        # Note: imgs originally of shape (N, C, T, H*P, W*P) assuming H, W are in patches now
+        # We reshape considering the real height and width in pixels are H*p and W*p
+        x = imgs.reshape(shape=(imgs.shape[0], c, t, h, p, w, p))
+        # Rearrange the patches to put all patches from all frames into the batch dimension
+        x = torch.einsum('ncthpwq->nthwpqc', x)
+        # Combine the time, patch height, and patch width dimensions into a single dimension,
+        # preserving the batch dimension separate. Now each patch's contents are flattened.
+        x = x.reshape(shape=(imgs.shape[0], t * h * w, p ** 2 * c))
         return x
+
+
 
     def unpatchify(self, x, c, h, w, p=16):
         """
@@ -287,6 +345,9 @@ class CAVMAE(nn.Module):
         v = v + self.pos_embed_v
         v = v + self.modality_v
 
+        # print("Shape of audio and visual: ", a.shape, v.shape)
+        # print("Shape of pos embed: ", self.pos_embed_a.shape, self.pos_embed_v.shape)
+
         # by default, we always use unstructured masking
         if mask_mode == 'unstructured':
             a, mask_a, ids_restore_a = self.random_masking_unstructured(a, mask_ratio_a)
@@ -301,9 +362,14 @@ class CAVMAE(nn.Module):
         for blk in self.blocks_a:
             a = blk(a)
 
-        for blk in self.blocks_v:
-            v = blk(v)
+        # for blk in self.blocks_v:
+        #     v = blk(v)
+        v = self.blocks_v(v)
 
+        # print("Shape of audio and visual after blocks: ", a.shape, v.shape)
+        # print("Shape of mask a and mask v: ", mask_a.shape, mask_v.shape)
+
+        # concatenate audio and visual tokens
         x = torch.cat((a, v), dim=1)
 
         # unified stream, shared blocks_u, but independent normalization layers
@@ -311,7 +377,7 @@ class CAVMAE(nn.Module):
             x = blk(x)
         x = self.norm(x)
 
-        for blk in self.blocks_u:
+        for blk in self.blocks_u: 
             ca = blk(a, 'a')
         ca = self.norm_a(ca)
 
@@ -322,7 +388,7 @@ class CAVMAE(nn.Module):
         return x, mask_a, ids_restore_a, mask_v, ids_restore_v, ca, cv
 
     def forward_decoder(self, x, mask_a, ids_restore_a, mask_v, ids_restore_v):
-
+        # print("Shape of x (latent) at decoder: ", x.shape)
         x = self.decoder_embed(x)
 
         # append mask tokens to sequence
@@ -353,8 +419,13 @@ class CAVMAE(nn.Module):
 
         # predictor projection
         x_a = self.decoder_pred_a(x[:, :self.patch_embed_a.num_patches, :])
+        # print("DEBUG: Shape of x: ", x.shape)
+        # print("DEBUG: Number of audio patches: ", self.patch_embed_a.num_patches)
+        # x_v_reshaped = x[:, self.patch_embed_a.num_patches:, :].transpose(1, 2).view(x.shape[0], -1, H, W)  # Adjust H and W based on expected output size
+        # x_v = self.decoder_pred_v(x_v_reshaped)
+        original_x_v_shape = (x.shape[0], x.shape[1] - self.patch_embed_a.num_patches, x.shape[2])
         x_v = self.decoder_pred_v(x[:, self.patch_embed_a.num_patches:, :])
-
+        x_v = x_v.reshape(x_v.shape[0], original_x_v_shape[1] * 2, -1)
         # return audio and video tokens
         return x_a, x_v
 
@@ -382,12 +453,17 @@ class CAVMAE(nn.Module):
 
     def forward_mae_loss(self, input, pred, mask, modality):
         if modality == 'a':
-            # for audio, need to adjust the shape
+            # For audio, adjust the shape as needed
             input = input.unsqueeze(1)
             input = input.transpose(2, 3)
-            target = self.patchify(input, 1, int(input.shape[2]/self.patch_embed_a.patch_size[0]), int(input.shape[3]/self.patch_embed_a.patch_size[1]), 16)
+            target = self.patchify(input, 1, 1, int(input.shape[2]/self.patch_embed_a.patch_size[0]), int(input.shape[3]/self.patch_embed_a.patch_size[1]), 16)
         elif modality == 'v':
-            target = self.patchify(input, 3, int(input.shape[2]/self.patch_embed_v.patch_size[0]), int(input.shape[3]/self.patch_embed_v.patch_size[1]), 16)
+            # print("Input shape: ", input.shape)
+            # Now correctly handle the additional time (or frames) dimension for video
+            target = self.patchify(input, 3, input.shape[2], int(input.shape[3]/self.patch_embed_v.patch_size[0]), int(input.shape[4]/self.patch_embed_v.patch_size[1]), 16)
+        
+        # print("Target shape after patchify: ", target.shape)
+        # print("Pred shape: ", pred.shape)
 
         # patch-wise normalization might minorly improve the classification performance, but will make the model lose inpainting function
         if self.norm_pix_loss:
@@ -397,16 +473,28 @@ class CAVMAE(nn.Module):
 
         loss = (pred - target) ** 2
         loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
-
+        # print("LAST DEBUG?", loss.shape, mask.shape)
+        if modality == 'v':
+            mask = mask.repeat(1,2)
         loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
         return loss
 
     def forward(self, audio, imgs, mask_ratio_a=0.75, mask_ratio_v=0.75, mae_loss_weight=1., contrast_loss_weight=0.01, mask_mode='unstructured'):
+        # print("Shape before forward: ", audio.shape, imgs.shape)
         # latent is used for reconstruction (mae), latent_c_{a,v} are used for contrastive learning
         latent, mask_a, ids_restore_a, mask_v, ids_restore_v, latent_c_a, latent_c_v = self.forward_encoder(audio, imgs, mask_ratio_a, mask_ratio_v, mask_mode=mask_mode)
+        # print("Latent shape: ", latent.shape)
+        # print("Mask a shape: ", mask_a.shape)
+        # print("Mask v shape: ", mask_v.shape)
+        # print("Ids restore a shape: ", ids_restore_a.shape)
+        # print("Ids restore v shape: ", ids_restore_v.shape)
         # if mae loss is used
         if mae_loss_weight != 0:
             pred_a, pred_v = self.forward_decoder(latent, mask_a, ids_restore_a, mask_v, ids_restore_v)
+            # print("Pred a shape (after decoder): ", pred_a.shape)
+            # print("Pred v shape (after decoder): ", pred_v.shape)
+            # print("audio shape: ", audio.shape)
+            # print("imgs shape: ", imgs.shape)
             loss_mae_a = self.forward_mae_loss(audio, pred_a, mask_a, 'a')
             loss_mae_v = self.forward_mae_loss(imgs, pred_v, mask_v, 'v')
             loss_mae = mae_loss_weight * (loss_mae_a + loss_mae_v)
@@ -437,7 +525,7 @@ class CAVMAE(nn.Module):
     def forward_feat(self, a, v, register_hook=False):
         if register_hook:
             self.register_hooks(self.blocks_a, "blocks_a_")
-            self.register_hooks(self.blocks_v, "blocks_v_")
+            self.register_hooks(self.blocks_v.blocks, "blocks_v_")
             self.register_hooks(self.blocks_u, "blocks_u_")
         # embed patches
         a = a.unsqueeze(1)
@@ -454,7 +542,7 @@ class CAVMAE(nn.Module):
         for blk in self.blocks_a:
             a = blk(a)
 
-        for blk in self.blocks_v:
+        for blk in self.blocks_v.blocks:
             v = blk(v)
 
         # use modality specific normalization,
@@ -468,9 +556,11 @@ class CAVMAE(nn.Module):
         return a, v
 
 # the finetuned CAV-MAE model
-class CAVMAEFT(nn.Module):
+class CAVMAEv2FT(nn.Module):
     def __init__(self, label_dim, img_size=224, audio_length=1024, patch_size=16, in_chans=3,
-                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True):
+                 embed_dim=768, modality_specific_depth=11, num_heads=12, 
+                 mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, 
+                 tr_pos=True, num_frames=16):
         super().__init__()
         timm.models.vision_transformer.Block = Block
         print('Use norm_pix_loss: ', norm_pix_loss)
@@ -478,8 +568,10 @@ class CAVMAEFT(nn.Module):
         timm.models.vision_transformer.PatchEmbed = PatchEmbed
         timm.models.vision_transformer.Block = Block
 
+        self.num_frames = num_frames
+
         self.patch_embed_a = PatchEmbed(img_size, patch_size, 1, embed_dim)
-        self.patch_embed_v = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
+        self.patch_embed_v = VMAEPatchEmbed(img_size, patch_size, in_chans, embed_dim)
 
         self.patch_embed_a.num_patches = int(audio_length * 128 / 256)
         print('Number of Audio Patches: {:d}, Visual Patches: {:d}'.format(self.patch_embed_a.num_patches, self.patch_embed_v.num_patches))
@@ -491,7 +583,9 @@ class CAVMAEFT(nn.Module):
         self.pos_embed_v = nn.Parameter(torch.zeros(1, self.patch_embed_v.num_patches, embed_dim), requires_grad=tr_pos)  # fixed sin-cos embedding
 
         self.blocks_a = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
-        self.blocks_v = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
+        self.blocks_v = VisionTransformer(embed_dim=int(embed_dim), num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer, depth=modality_specific_depth, init_values=0., all_frames=8)
+
+        # self.blocks_v = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
         self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(12 - modality_specific_depth)])
 
         self.norm_a = norm_layer(embed_dim)
@@ -509,7 +603,6 @@ class CAVMAEFT(nn.Module):
         test_input = torch.zeros(1, 1, input_shape[0], input_shape[1])
         test_proj = torch.nn.Conv2d(1, 4, kernel_size=(16, 16), stride=(stride, stride))
         test_output = test_proj(test_input)
-        print(test_output.shape)
         return test_output.shape[2], test_output[3], test_output[2] * test_output[2]
 
     def initialize_weights(self):
@@ -555,8 +648,10 @@ class CAVMAEFT(nn.Module):
             for blk in self.blocks_a:
                 a = blk(a)
 
-            for blk in self.blocks_v:
-                v = blk(v)
+            # for blk in self.blocks_v:
+            #     v = blk(v)
+                
+            v = self.blocks_v(v)
 
             x = torch.cat((a, v), dim=1)
 
@@ -593,8 +688,10 @@ class CAVMAEFT(nn.Module):
             v = v + self.pos_embed_v
             v = v + self.modality_v
 
-            for blk in self.blocks_v:
-                v = blk(v)
+            # for blk in self.blocks_v:
+            #     v = blk(v)
+
+            v = self.blocks_v(v)
 
             # note here uses the 'v' normalization, it is used in both training and inference, so it is fine
             for blk in self.blocks_u:
@@ -638,8 +735,10 @@ class CAVMAEFT(nn.Module):
             v = v + self.pos_embed_v
             v = v + self.modality_v
 
-            for blk in self.blocks_v:
-                v = blk(v)
+            # for blk in self.blocks_v:
+            #     v = blk(v)
+
+            v = self.blocks_v(v)
 
             # two forward passes to the block_u, one with modality-specific normalization, another with unified normalization
             u = v
@@ -680,8 +779,10 @@ class CAVMAEFT(nn.Module):
             for blk in self.blocks_a:
                 a = blk(a)
 
-            for blk in self.blocks_v:
-                v = blk(v)
+            # for blk in self.blocks_v:
+            #     v = blk(v)
+
+            v = self.blocks_v(v)
 
             for blk in self.blocks_u:
                 a = blk(a, 'a')

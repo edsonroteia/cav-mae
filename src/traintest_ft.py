@@ -16,8 +16,10 @@ from torch import nn
 import numpy as np
 import pickle
 from torch.cuda.amp import autocast,GradScaler
+import wandb
 
-def train(audio_model, train_loader, test_loader, args):
+
+def train(audio_model, train_loader, test_loader, args, run):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print('running on ' + str(device))
     torch.set_grad_enabled(True)
@@ -106,7 +108,7 @@ def train(audio_model, train_loader, test_loader, args):
             B = a_input.size(0)
             a_input, v_input = a_input.to(device, non_blocking=True), v_input.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
-
+            import pdb ; pdb.set_trace()
             data_time.update(time.time() - end_time)
             per_sample_data_time.update((time.time() - end_time) / a_input.shape[0])
             dnn_start_time = time.time()
@@ -114,11 +116,15 @@ def train(audio_model, train_loader, test_loader, args):
             with autocast():
                 audio_output = audio_model(a_input, v_input, args.ftmode)
                 loss = loss_fn(audio_output, labels)
-
+            
             optimizer.zero_grad()
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
+
+            run['train/loss'].log(loss.item())
+            run['train/batch_time'].log(time.time() - end_time)
+            wandb.log({'train/loss': loss.item(), 'train/batch_time': time.time() - end_time})
 
             loss_meter.update(loss.item(), B)
             batch_time.update(time.time() - end_time)
@@ -160,7 +166,13 @@ def train(audio_model, train_loader, test_loader, args):
         print("d_prime: {:.6f}".format(d_prime(mAUC)))
         print("train_loss: {:.6f}".format(loss_meter.avg))
         print("valid_loss: {:.6f}".format(valid_loss))
-
+        run['valid/mAP'].log(mAP)
+        run['valid/acc'].log(acc)
+        run['valid/auc'].log(mAUC)
+        run['valid/d_prime'].log(d_prime(mAUC))
+        run['valid/loss'].log(valid_loss)
+        wandb.log({'valid/mAP': mAP, 'valid/acc': acc, 'valid/auc': mAUC, 'valid/d_prime': d_prime(mAUC), 'valid/loss': valid_loss})
+        
         result[epoch-1, :] = [acc, mAP, mAUC, optimizer.param_groups[0]['lr']]
         np.savetxt(exp_dir + '/result.csv', result, delimiter=',')
         print('validation finished')

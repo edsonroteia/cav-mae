@@ -16,12 +16,32 @@ import torch
 from torch.utils.data import WeightedRandomSampler
 basepath = os.path.dirname(os.path.dirname(sys.path[0]))
 sys.path.append(basepath)
-import dataloader as dataloader
+import dataloaderv2 as dataloader
 import models
 import numpy as np
-from traintest_cavmae import train
+from traintest_cavmaev2 import train
 import neptune
 import wandb
+from torchviz import make_dot
+
+
+def load_partial_state_dict(model, state_dict):
+    own_state = model.state_dict()
+    missing_keys = []
+    unexpected_keys = []
+
+    for name, param in state_dict.items():
+        if name in own_state:
+            if own_state[name].shape == param.shape:
+                own_state[name].copy_(param)
+            else:
+                missing_keys.append(name)
+                print(f"Shape mismatch for {name}: checkpoint {param.shape}, model {own_state[name].shape}")
+        else:
+            unexpected_keys.append(name)
+            print(f"Skipping {name} as it's not in the model.")
+
+    return missing_keys, unexpected_keys
 
 # pretrain cav-mae model
 
@@ -135,7 +155,7 @@ if args.data_eval != None:
 
 if args.model == 'cav-mae':
     print('pretrain a cav-mae model with 11 modality-specific layers and 1 modality-sharing layers')
-    audio_model = models.CAVMAE(audio_length=args.target_length, norm_pix_loss=args.norm_pix_loss, modality_specific_depth=11, tr_pos=args.tr_pos)
+    audio_model = models.CAVMAEv2(audio_length=args.target_length, norm_pix_loss=args.norm_pix_loss, modality_specific_depth=11, tr_pos=args.tr_pos)
 else:
     raise ValueError('model not supported')
 
@@ -144,7 +164,8 @@ if args.pretrain_path != 'None':
     mdl_weight = torch.load(args.pretrain_path, map_location=torch.device('cpu'))
     if not isinstance(audio_model, torch.nn.DataParallel):
         audio_model = torch.nn.DataParallel(audio_model)
-    miss, unexpected = audio_model.load_state_dict(mdl_weight, strict=False)
+    # miss, unexpected = audio_model.load_state_dict(mdl_weight, strict=False)
+    miss, unexpected = load_partial_state_dict(audio_model, mdl_weight)
     print('now load mae pretrained weights from ', args.pretrain_path)
     print(miss, unexpected)
 
