@@ -28,3 +28,8 @@ src/gen_audio_embedding_ltue.py
 src/gen_audio_embedding_esc.py
 egs/audioset/run_cavmae_ft_bal_audioonly_internal.sh
 egs/vggsound/run_cavmae_ft_audioonly_internal.sh
+egs/audioset/.neptune/*
+egs/audioset/wandb/*
+src/__pycache__/*
+src/models/__pycache__/*
+src/utilities/__pycache__/*
