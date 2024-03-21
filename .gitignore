@@ -4,7 +4,6 @@
 *.pptx
 *.mp4
 *.wav
-*.json
 *.npy
 *.pth
 venv/*
