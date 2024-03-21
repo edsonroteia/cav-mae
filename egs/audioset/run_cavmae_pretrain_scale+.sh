@@ -48,7 +48,7 @@ tr_data=/data/sls/scratch/yuangong/cav-mae/pretrained_model/datafiles/audioset/a
 te_data=/data/sls/scratch/yuangong/cav-mae/pretrained_model/datafiles/audioset/audioset_eval_cleaned.json
 label_csv=/data/sls/scratch/yuangong/convast/egs/audioset/data/class_labels_indices.csv
 
-exp_dir=./exp/testmae01-${dataset}-${model}-bal${bal}-lr${lr}-epoch${epoch}-bs${batch_size}-norm${norm_pix_loss}-c${contrast_loss_weight}-p${mae_loss_weight}-tp${tr_pos}-mr-${mask_mode}-${masking_ratio}-a5
+exp_dir=/data1/edson/cavmae/exp/testmae01-${dataset}-${model}-bal${bal}-lr${lr}-epoch${epoch}-bs${batch_size}-norm${norm_pix_loss}-c${contrast_loss_weight}-p${mae_loss_weight}-tp${tr_pos}-mr-${mask_mode}-${masking_ratio}-a5
 mkdir -p $exp_dir
 
 CUDA_CACHE_DISABLE=1 python -W ignore ../../src/run_cavmae_pretrain.py --model ${model} --dataset ${dataset} \
