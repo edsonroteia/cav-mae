@@ -17,6 +17,7 @@ pretrained_model/*
 src/dataloader_old.py
 !src/preprocess/sample_datafiles/*
 !src/preprocess/sample_video/*
+!datafiles/*
 .idea
 .DS_Store
 egs/vggsound/run_cavmae_ft_internal.sh
