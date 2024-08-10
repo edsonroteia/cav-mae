@@ -124,10 +124,18 @@ class CAVMAE(nn.Module):
 
         self.norm_pix_loss = norm_pix_loss
 
+        self.intermediate_outputs = {}
+
         self.initialize_weights()
 
         print('Audio Positional Embedding Shape:', self.pos_embed_a.shape)
         print('Visual Positional Embedding Shape:', self.pos_embed_v.shape)
+
+    def register_hooks(self, blocks, block_type):
+        def hook_fn(m, i, o):
+            self.intermediate_outputs[block_type + str(m)] = o
+        for idx, block in enumerate(blocks):
+            block.register_forward_hook(hook_fn)
 
     def initialize_weights(self):
         # initialize (and freeze) pos_embed by sin-cos embedding, opt the cls token, add by myself
@@ -383,6 +391,7 @@ class CAVMAE(nn.Module):
 
         # patch-wise normalization might minorly improve the classification performance, but will make the model lose inpainting function
         if self.norm_pix_loss:
+
             mean = target.mean(dim=-1, keepdim=True)
             var = target.var(dim=-1, keepdim=True)
             target = (target - mean) / (var + 1.e-6) ** .5
@@ -415,7 +424,12 @@ class CAVMAE(nn.Module):
 
         loss = loss_mae + loss_c
 
-        return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc
+        recon_a = self.unpatchify(pred_a, 1, 8, 64, 16)
+        recon_a = torch.einsum('nchw->nhwc', recon_a)
+        recon_v = self.unpatchify(pred_v, 3, 14, 14, 16)
+        recon_v = torch.einsum('nchw->nhwc', recon_v)
+
+        return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc, recon_a, recon_v
 
     # used only for inpainting, ignore if inpainting is not of interest
     def forward_inpaint(self, audio, imgs, mask_ratio_a=0.75, mask_ratio_v=0.75, mask_mode='unstructured'):
@@ -426,7 +440,11 @@ class CAVMAE(nn.Module):
         return pred_a, pred_v, mask_a, mask_v, loss_pixel_a, loss_pixel_v
 
     # used for retrieval, ignore if retrieval is not of interest
-    def forward_feat(self, a, v):
+    def forward_feat(self, a, v, register_hook=False):
+        if register_hook:
+            self.register_hooks(self.blocks_a, "blocks_a_")
+            self.register_hooks(self.blocks_v, "blocks_v_")
+            self.register_hooks(self.blocks_u, "blocks_u_")
         # embed patches
         a = a.unsqueeze(1)
         a = a.transpose(2, 3)
@@ -647,7 +665,12 @@ class CAVMAEFT(nn.Module):
             return x
 
     # for retrieval
-    def forward_feat(self, a, v, mode='av'):
+    def forward_feat(self, a, v, mode='av', register_hook=False):
+        if register_hook:
+            self.register_hooks(self.blocks_a, "blocks_a_")
+            self.register_hooks(self.blocks_v, "blocks_v_")
+            self.register_hooks(self.blocks_u, "blocks_u_")
+
         # return both audio and visual
         if mode == 'av':
             a = a.unsqueeze(1)

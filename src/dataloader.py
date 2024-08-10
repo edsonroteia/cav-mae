@@ -69,7 +69,7 @@ class AudiosetDataset(Dataset):
         with open(dataset_json_file, 'r') as fp:
             data_json = json.load(fp)
 
-        self.data = data_json['data']
+        self.data = data_json['data']#[:200000]
         self.data = self.pro_data(self.data)
         print('Dataset has {:d} samples'.format(self.data.shape[0]))
         self.num_samples = self.data.shape[0]
@@ -87,6 +87,8 @@ class AudiosetDataset(Dataset):
         # dataset spectrogram mean and std, used to normalize the input
         self.norm_mean = self.audio_conf.get('mean')
         self.norm_std = self.audio_conf.get('std')
+        self.failed_audio_loadings = 0
+        self.failed_image_loadings = 0
         # skip_norm is a flag that if you want to skip normalization to compute the normalization stats using src/get_norm_stats.py, if Ture, input normalization will be skipped for correctly calculating the stats.
         # set it as True ONLY when you are getting the normalization stats.
         self.skip_norm = self.audio_conf.get('skip_norm') if self.audio_conf.get('skip_norm') else False
@@ -238,11 +240,13 @@ class AudiosetDataset(Dataset):
             except:
                 fbank = torch.zeros([self.target_length, 128]) + 0.01
                 print('there is an error in loading audio')
+                self.failed_audio_loadings += 1
             try:
                 image = self.get_image(self.randselect_img(datum['video_id'], datum['video_path']), self.randselect_img(mix_datum['video_id'], datum['video_path']), mix_lambda)
             except:
                 image = torch.zeros([3, self.im_res, self.im_res]) + 0.01
                 print('there is an error in loading image')
+                self.failed_image_loadings += 1
             label_indices = np.zeros(self.label_num) + (self.label_smooth / self.label_num)
             for label_str in datum['labels'].split(','):
                 label_indices[int(self.index_dict[label_str])] += mix_lambda * (1.0 - self.label_smooth)
@@ -260,11 +264,13 @@ class AudiosetDataset(Dataset):
             except:
                 fbank = torch.zeros([self.target_length, 128]) + 0.01
                 print('there is an error in loading audio')
+                self.failed_audio_loadings += 1
             try:
                 image = self.get_image(self.randselect_img(datum['video_id'], datum['video_path']), None, 0)
             except:
                 image = torch.zeros([3, self.im_res, self.im_res]) + 0.01
                 print('there is an error in loading image')
+                self.failed_image_loadings += 1
             for label_str in datum['labels'].split(','):
                 label_indices[int(self.index_dict[label_str])] = 1.0 - self.label_smooth
             label_indices = torch.FloatTensor(label_indices)
@@ -297,3 +303,9 @@ class AudiosetDataset(Dataset):
 
     def __len__(self):
         return self.num_samples
+    
+    def get_error_counts(self):
+        return self.failed_audio_loadings, self.failed_image_loadings
+
+    def reset_error_counts(self):
+        self.failed_audio_loadings, self.failed_image_loadings = 0, 0

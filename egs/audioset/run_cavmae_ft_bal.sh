@@ -9,19 +9,19 @@
 #SBATCH --job-name="as-bal-ft"
 #SBATCH --output=../log/%j_as_ft.txt
 
-set -x
+# set -x
 # comment this line if not running on sls cluster
-. /data/sls/scratch/share-201907/slstoolchainrc
-source /data/sls/scratch/yuangong/avbyol/venv-a5/bin/activate
-export TORCH_HOME=../../pretrained_models
+# . /data/sls/scratch/share-201907/slstoolchainrc
+# source /data/sls/scratch/yuangong/avbyol/venv-a5/bin/activate
+export TORCH_HOME=../../pretrained_model
 
 model=cav-mae-ft
 ftmode=multimodal
 
 # you can replace with any checkpoint you want, but by default, we use cav-mae-scale++
 cur_dir=$(pwd)
-wget -nc https://www.dropbox.com/s/l5t5geufdy3qvnv/audio_model.21.pth?dl=1 -O cav-mae-scale++.pth
-pretrain_path=${cur_dir}/cav-mae-scale++.pth
+# wget -nc https://www.dropbox.com/s/l5t5geufdy3qvnv/audio_model.21.pth?dl=1 -O cav-mae-scale++.pth
+pretrain_path=/data1/edson/cavmae/finetune_models/original_cavmae/best_audio_model.pth
 
 freeze_base=False
 head_lr=100 # newly initialized ft layers uses 100 times larger than the base lr
@@ -43,18 +43,18 @@ noise=True
 freqm=48
 timem=192
 mixup=0.5
-batch_size=36
+batch_size=72
 label_smooth=0.1
 
 dataset=audioset
-tr_data=/data/sls/scratch/yuangong/cav-mae/pretrained_model/datafiles/audioset/audioset_20k_cleaned.json
-te_data=/data/sls/scratch/yuangong/cav-mae/pretrained_model/datafiles/audioset/audioset_eval_cleaned.json
-label_csv=/data/sls/scratch/yuangong/convast/egs/audioset/data/class_labels_indices.csv
+tr_data=/home/edson/code/cav-mae/datafilles/audioset_20k_cleaned.json
+te_data=/home/edson/code/cav-mae/datafilles/audioset_20k_cleaned_auto_val.json
+label_csv=/home/edson/code/cav-mae/datafilles/class_labels_indices.csv
 
-exp_dir=./exp/testmae06-bal-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-a5
+exp_dir=/data1/edson/cavmae/exp/testmae06-bal-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-a5
 mkdir -p $exp_dir
 
-CUDA_CACHE_DISABLE=1 python -W ignore ../../src/run_cavmae_ft.py --model ${model} --dataset ${dataset} \
+CUDA_CACHE_DISABLE=1 python -W ignore ../../src/run_cavmae_ft_neptune.py --model ${model} --dataset ${dataset} \
 --data-train ${tr_data} --data-val ${te_data} --exp-dir $exp_dir \
 --label-csv ${label_csv} --n_class 527 \
 --lr $lr --n-epochs ${epoch} --batch-size $batch_size --save_model True \
@@ -66,4 +66,4 @@ CUDA_CACHE_DISABLE=1 python -W ignore ../../src/run_cavmae_ft.py --model ${model
 --wa ${wa} --wa_start ${wa_start} --wa_end ${wa_end} --lr_adapt ${lr_adapt} \
 --pretrain_path ${pretrain_path} --ftmode ${ftmode} \
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
---num-workers 32
+--num-workers 32 --wandb_name original_finetune_balanced

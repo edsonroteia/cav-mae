@@ -1,0 +1,352 @@
+File ‘IN-initial.pth’ already there; not retrieving.
+https://app.neptune.ai/junioroteia/CAV-MAE/e/CAVV1-752
+wandb: Currently logged in as: edsonroteia. Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.17.0 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.13.4
+wandb: Run data is saved locally in /home/edson/code/cav-mae/egs/audioset/wandb/run-20240530_102944-16pwzcj9
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run pretrain_cavmaev2_base
+wandb: ⭐️ View project at https://wandb.ai/edsonroteia/cavmaev2
+wandb: 🚀 View run at https://wandb.ai/edsonroteia/cavmaev2/runs/16pwzcj9
+I am process 1471957, running on cvai-gpu05: starting (Thu May 30 10:29:43 2024)
+current mae loss 1.000, and contrastive loss 0.010
+balanced sampler is not used
+Dataset has 1763891 samples
+Using Label Smoothing: 0
+now using following mask: 0 freq, 0 time
+now using mix-up with rate 0.000000
+now process audioset
+use dataset mean -5.081 and std 4.485 to normalize the input.
+now use noise augmentation
+number of classes is 527
+now in train mode.
+now use frame -1 from total 10 frames
+now using 224 * 224 image input
+Dataset has 1763891 samples
+Using Label Smoothing: 0.0
+now using following mask: 0 freq, 0 time
+now using mix-up with rate 0.000000
+now process audioset
+use dataset mean -5.081 and std 4.485 to normalize the input.
+not use noise augmentation
+number of classes is 527
+now in eval mode.
+now use frame -1 from total 10 frames
+now using 224 * 224 image input
+pretrain a cav-mae model with 11 modality-specific layers and 1 modality-sharing layers
+A CAV-MAE Model
+Use norm_pix_loss:  True
+Learnable Positional Embedding:  False
+(2, 16, 16)
+Number of Audio Patches: 512, Visual Patches: 784
+(2, 16, 16)
+(784, 768)
+NUM PATCHES:  784
+(784, 768)
+(784, 512)
+Audio Positional Embedding Shape: torch.Size([1, 512, 768])
+Visual Positional Embedding Shape: torch.Size([1, 784, 768])
+Shape mismatch for module.pos_embed_v: checkpoint torch.Size([1, 196, 768]), model torch.Size([1, 784, 768])
+Shape mismatch for module.decoder_pos_embed_v: checkpoint torch.Size([1, 196, 512]), model torch.Size([1, 784, 512])
+Shape mismatch for module.patch_embed_v.proj.weight: checkpoint torch.Size([768, 3, 16, 16]), model torch.Size([768, 3, 2, 16, 16])
+Skipping module.blocks_v.0.norm1.weight as it's not in the model.
+Skipping module.blocks_v.0.norm1.bias as it's not in the model.
+Skipping module.blocks_v.0.norm1_a.weight as it's not in the model.
+Skipping module.blocks_v.0.norm1_a.bias as it's not in the model.
+Skipping module.blocks_v.0.norm1_v.weight as it's not in the model.
+Skipping module.blocks_v.0.norm1_v.bias as it's not in the model.
+Skipping module.blocks_v.0.attn.qkv.weight as it's not in the model.
+Skipping module.blocks_v.0.attn.qkv.bias as it's not in the model.
+Skipping module.blocks_v.0.attn.proj.weight as it's not in the model.
+Skipping module.blocks_v.0.attn.proj.bias as it's not in the model.
+Skipping module.blocks_v.0.norm2.weight as it's not in the model.
+Skipping module.blocks_v.0.norm2.bias as it's not in the model.
+Skipping module.blocks_v.0.norm2_a.weight as it's not in the model.
+Skipping module.blocks_v.0.norm2_a.bias as it's not in the model.
+Skipping module.blocks_v.0.norm2_v.weight as it's not in the model.
+Skipping module.blocks_v.0.norm2_v.bias as it's not in the model.
+Skipping module.blocks_v.0.mlp.fc1.weight as it's not in the model.
+Skipping module.blocks_v.0.mlp.fc1.bias as it's not in the model.
+Skipping module.blocks_v.0.mlp.fc2.weight as it's not in the model.
+Skipping module.blocks_v.0.mlp.fc2.bias as it's not in the model.
+Skipping module.blocks_v.1.norm1.weight as it's not in the model.
+Skipping module.blocks_v.1.norm1.bias as it's not in the model.
+Skipping module.blocks_v.1.norm1_a.weight as it's not in the model.
+Skipping module.blocks_v.1.norm1_a.bias as it's not in the model.
+Skipping module.blocks_v.1.norm1_v.weight as it's not in the model.
+Skipping module.blocks_v.1.norm1_v.bias as it's not in the model.
+Skipping module.blocks_v.1.attn.qkv.weight as it's not in the model.
+Skipping module.blocks_v.1.attn.qkv.bias as it's not in the model.
+Skipping module.blocks_v.1.attn.proj.weight as it's not in the model.
+Skipping module.blocks_v.1.attn.proj.bias as it's not in the model.
+Skipping module.blocks_v.1.norm2.weight as it's not in the model.
+Skipping module.blocks_v.1.norm2.bias as it's not in the model.
+Skipping module.blocks_v.1.norm2_a.weight as it's not in the model.
+Skipping module.blocks_v.1.norm2_a.bias as it's not in the model.
+Skipping module.blocks_v.1.norm2_v.weight as it's not in the model.
+Skipping module.blocks_v.1.norm2_v.bias as it's not in the model.
+Skipping module.blocks_v.1.mlp.fc1.weight as it's not in the model.
+Skipping module.blocks_v.1.mlp.fc1.bias as it's not in the model.
+Skipping module.blocks_v.1.mlp.fc2.weight as it's not in the model.
+Skipping module.blocks_v.1.mlp.fc2.bias as it's not in the model.
+Skipping module.blocks_v.2.norm1.weight as it's not in the model.
+Skipping module.blocks_v.2.norm1.bias as it's not in the model.
+Skipping module.blocks_v.2.norm1_a.weight as it's not in the model.
+Skipping module.blocks_v.2.norm1_a.bias as it's not in the model.
+Skipping module.blocks_v.2.norm1_v.weight as it's not in the model.
+Skipping module.blocks_v.2.norm1_v.bias as it's not in the model.
+Skipping module.blocks_v.2.attn.qkv.weight as it's not in the model.
+Skipping module.blocks_v.2.attn.qkv.bias as it's not in the model.
+Skipping module.blocks_v.2.attn.proj.weight as it's not in the model.
+Skipping module.blocks_v.2.attn.proj.bias as it's not in the model.
+Skipping module.blocks_v.2.norm2.weight as it's not in the model.
+Skipping module.blocks_v.2.norm2.bias as it's not in the model.
+Skipping module.blocks_v.2.norm2_a.weight as it's not in the model.
+Skipping module.blocks_v.2.norm2_a.bias as it's not in the model.
+Skipping module.blocks_v.2.norm2_v.weight as it's not in the model.
+Skipping module.blocks_v.2.norm2_v.bias as it's not in the model.
+Skipping module.blocks_v.2.mlp.fc1.weight as it's not in the model.
+Skipping module.blocks_v.2.mlp.fc1.bias as it's not in the model.
+Skipping module.blocks_v.2.mlp.fc2.weight as it's not in the model.
+Skipping module.blocks_v.2.mlp.fc2.bias as it's not in the model.
+Skipping module.blocks_v.3.norm1.weight as it's not in the model.
+Skipping module.blocks_v.3.norm1.bias as it's not in the model.
+Skipping module.blocks_v.3.norm1_a.weight as it's not in the model.
+Skipping module.blocks_v.3.norm1_a.bias as it's not in the model.
+Skipping module.blocks_v.3.norm1_v.weight as it's not in the model.
+Skipping module.blocks_v.3.norm1_v.bias as it's not in the model.
+Skipping module.blocks_v.3.attn.qkv.weight as it's not in the model.
+Skipping module.blocks_v.3.attn.qkv.bias as it's not in the model.
+Skipping module.blocks_v.3.attn.proj.weight as it's not in the model.
+Skipping module.blocks_v.3.attn.proj.bias as it's not in the model.
+Skipping module.blocks_v.3.norm2.weight as it's not in the model.
+Skipping module.blocks_v.3.norm2.bias as it's not in the model.
+Skipping module.blocks_v.3.norm2_a.weight as it's not in the model.
+Skipping module.blocks_v.3.norm2_a.bias as it's not in the model.
+Skipping module.blocks_v.3.norm2_v.weight as it's not in the model.
+Skipping module.blocks_v.3.norm2_v.bias as it's not in the model.
+Skipping module.blocks_v.3.mlp.fc1.weight as it's not in the model.
+Skipping module.blocks_v.3.mlp.fc1.bias as it's not in the model.
+Skipping module.blocks_v.3.mlp.fc2.weight as it's not in the model.
+Skipping module.blocks_v.3.mlp.fc2.bias as it's not in the model.
+Skipping module.blocks_v.4.norm1.weight as it's not in the model.
+Skipping module.blocks_v.4.norm1.bias as it's not in the model.
+Skipping module.blocks_v.4.norm1_a.weight as it's not in the model.
+Skipping module.blocks_v.4.norm1_a.bias as it's not in the model.
+Skipping module.blocks_v.4.norm1_v.weight as it's not in the model.
+Skipping module.blocks_v.4.norm1_v.bias as it's not in the model.
+Skipping module.blocks_v.4.attn.qkv.weight as it's not in the model.
+Skipping module.blocks_v.4.attn.qkv.bias as it's not in the model.
+Skipping module.blocks_v.4.attn.proj.weight as it's not in the model.
+Skipping module.blocks_v.4.attn.proj.bias as it's not in the model.
+Skipping module.blocks_v.4.norm2.weight as it's not in the model.
+Skipping module.blocks_v.4.norm2.bias as it's not in the model.
+Skipping module.blocks_v.4.norm2_a.weight as it's not in the model.
+Skipping module.blocks_v.4.norm2_a.bias as it's not in the model.
+Skipping module.blocks_v.4.norm2_v.weight as it's not in the model.
+Skipping module.blocks_v.4.norm2_v.bias as it's not in the model.
+Skipping module.blocks_v.4.mlp.fc1.weight as it's not in the model.
+Skipping module.blocks_v.4.mlp.fc1.bias as it's not in the model.
+Skipping module.blocks_v.4.mlp.fc2.weight as it's not in the model.
+Skipping module.blocks_v.4.mlp.fc2.bias as it's not in the model.
+Skipping module.blocks_v.5.norm1.weight as it's not in the model.
+Skipping module.blocks_v.5.norm1.bias as it's not in the model.
+Skipping module.blocks_v.5.norm1_a.weight as it's not in the model.
+Skipping module.blocks_v.5.norm1_a.bias as it's not in the model.
+Skipping module.blocks_v.5.norm1_v.weight as it's not in the model.
+Skipping module.blocks_v.5.norm1_v.bias as it's not in the model.
+Skipping module.blocks_v.5.attn.qkv.weight as it's not in the model.
+Skipping module.blocks_v.5.attn.qkv.bias as it's not in the model.
+Skipping module.blocks_v.5.attn.proj.weight as it's not in the model.
+Skipping module.blocks_v.5.attn.proj.bias as it's not in the model.
+Skipping module.blocks_v.5.norm2.weight as it's not in the model.
+Skipping module.blocks_v.5.norm2.bias as it's not in the model.
+Skipping module.blocks_v.5.norm2_a.weight as it's not in the model.
+Skipping module.blocks_v.5.norm2_a.bias as it's not in the model.
+Skipping module.blocks_v.5.norm2_v.weight as it's not in the model.
+Skipping module.blocks_v.5.norm2_v.bias as it's not in the model.
+Skipping module.blocks_v.5.mlp.fc1.weight as it's not in the model.
+Skipping module.blocks_v.5.mlp.fc1.bias as it's not in the model.
+Skipping module.blocks_v.5.mlp.fc2.weight as it's not in the model.
+Skipping module.blocks_v.5.mlp.fc2.bias as it's not in the model.
+Skipping module.blocks_v.6.norm1.weight as it's not in the model.
+Skipping module.blocks_v.6.norm1.bias as it's not in the model.
+Skipping module.blocks_v.6.norm1_a.weight as it's not in the model.
+Skipping module.blocks_v.6.norm1_a.bias as it's not in the model.
+Skipping module.blocks_v.6.norm1_v.weight as it's not in the model.
+Skipping module.blocks_v.6.norm1_v.bias as it's not in the model.
+Skipping module.blocks_v.6.attn.qkv.weight as it's not in the model.
+Skipping module.blocks_v.6.attn.qkv.bias as it's not in the model.
+Skipping module.blocks_v.6.attn.proj.weight as it's not in the model.
+Skipping module.blocks_v.6.attn.proj.bias as it's not in the model.
+Skipping module.blocks_v.6.norm2.weight as it's not in the model.
+Skipping module.blocks_v.6.norm2.bias as it's not in the model.
+Skipping module.blocks_v.6.norm2_a.weight as it's not in the model.
+Skipping module.blocks_v.6.norm2_a.bias as it's not in the model.
+Skipping module.blocks_v.6.norm2_v.weight as it's not in the model.
+Skipping module.blocks_v.6.norm2_v.bias as it's not in the model.
+Skipping module.blocks_v.6.mlp.fc1.weight as it's not in the model.
+Skipping module.blocks_v.6.mlp.fc1.bias as it's not in the model.
+Skipping module.blocks_v.6.mlp.fc2.weight as it's not in the model.
+Skipping module.blocks_v.6.mlp.fc2.bias as it's not in the model.
+Skipping module.blocks_v.7.norm1.weight as it's not in the model.
+Skipping module.blocks_v.7.norm1.bias as it's not in the model.
+Skipping module.blocks_v.7.norm1_a.weight as it's not in the model.
+Skipping module.blocks_v.7.norm1_a.bias as it's not in the model.
+Skipping module.blocks_v.7.norm1_v.weight as it's not in the model.
+Skipping module.blocks_v.7.norm1_v.bias as it's not in the model.
+Skipping module.blocks_v.7.attn.qkv.weight as it's not in the model.
+Skipping module.blocks_v.7.attn.qkv.bias as it's not in the model.
+Skipping module.blocks_v.7.attn.proj.weight as it's not in the model.
+Skipping module.blocks_v.7.attn.proj.bias as it's not in the model.
+Skipping module.blocks_v.7.norm2.weight as it's not in the model.
+Skipping module.blocks_v.7.norm2.bias as it's not in the model.
+Skipping module.blocks_v.7.norm2_a.weight as it's not in the model.
+Skipping module.blocks_v.7.norm2_a.bias as it's not in the model.
+Skipping module.blocks_v.7.norm2_v.weight as it's not in the model.
+Skipping module.blocks_v.7.norm2_v.bias as it's not in the model.
+Skipping module.blocks_v.7.mlp.fc1.weight as it's not in the model.
+Skipping module.blocks_v.7.mlp.fc1.bias as it's not in the model.
+Skipping module.blocks_v.7.mlp.fc2.weight as it's not in the model.
+Skipping module.blocks_v.7.mlp.fc2.bias as it's not in the model.
+Skipping module.blocks_v.8.norm1.weight as it's not in the model.
+Skipping module.blocks_v.8.norm1.bias as it's not in the model.
+Skipping module.blocks_v.8.norm1_a.weight as it's not in the model.
+Skipping module.blocks_v.8.norm1_a.bias as it's not in the model.
+Skipping module.blocks_v.8.norm1_v.weight as it's not in the model.
+Skipping module.blocks_v.8.norm1_v.bias as it's not in the model.
+Skipping module.blocks_v.8.attn.qkv.weight as it's not in the model.
+Skipping module.blocks_v.8.attn.qkv.bias as it's not in the model.
+Skipping module.blocks_v.8.attn.proj.weight as it's not in the model.
+Skipping module.blocks_v.8.attn.proj.bias as it's not in the model.
+Skipping module.blocks_v.8.norm2.weight as it's not in the model.
+Skipping module.blocks_v.8.norm2.bias as it's not in the model.
+Skipping module.blocks_v.8.norm2_a.weight as it's not in the model.
+Skipping module.blocks_v.8.norm2_a.bias as it's not in the model.
+Skipping module.blocks_v.8.norm2_v.weight as it's not in the model.
+Skipping module.blocks_v.8.norm2_v.bias as it's not in the model.
+Skipping module.blocks_v.8.mlp.fc1.weight as it's not in the model.
+Skipping module.blocks_v.8.mlp.fc1.bias as it's not in the model.
+Skipping module.blocks_v.8.mlp.fc2.weight as it's not in the model.
+Skipping module.blocks_v.8.mlp.fc2.bias as it's not in the model.
+Skipping module.blocks_v.9.norm1.weight as it's not in the model.
+Skipping module.blocks_v.9.norm1.bias as it's not in the model.
+Skipping module.blocks_v.9.norm1_a.weight as it's not in the model.
+Skipping module.blocks_v.9.norm1_a.bias as it's not in the model.
+Skipping module.blocks_v.9.norm1_v.weight as it's not in the model.
+Skipping module.blocks_v.9.norm1_v.bias as it's not in the model.
+Skipping module.blocks_v.9.attn.qkv.weight as it's not in the model.
+Skipping module.blocks_v.9.attn.qkv.bias as it's not in the model.
+Skipping module.blocks_v.9.attn.proj.weight as it's not in the model.
+Skipping module.blocks_v.9.attn.proj.bias as it's not in the model.
+Skipping module.blocks_v.9.norm2.weight as it's not in the model.
+Skipping module.blocks_v.9.norm2.bias as it's not in the model.
+Skipping module.blocks_v.9.norm2_a.weight as it's not in the model.
+Skipping module.blocks_v.9.norm2_a.bias as it's not in the model.
+Skipping module.blocks_v.9.norm2_v.weight as it's not in the model.
+Skipping module.blocks_v.9.norm2_v.bias as it's not in the model.
+Skipping module.blocks_v.9.mlp.fc1.weight as it's not in the model.
+Skipping module.blocks_v.9.mlp.fc1.bias as it's not in the model.
+Skipping module.blocks_v.9.mlp.fc2.weight as it's not in the model.
+Skipping module.blocks_v.9.mlp.fc2.bias as it's not in the model.
+Skipping module.blocks_v.10.norm1.weight as it's not in the model.
+Skipping module.blocks_v.10.norm1.bias as it's not in the model.
+Skipping module.blocks_v.10.norm1_a.weight as it's not in the model.
+Skipping module.blocks_v.10.norm1_a.bias as it's not in the model.
+Skipping module.blocks_v.10.norm1_v.weight as it's not in the model.
+Skipping module.blocks_v.10.norm1_v.bias as it's not in the model.
+Skipping module.blocks_v.10.attn.qkv.weight as it's not in the model.
+Skipping module.blocks_v.10.attn.qkv.bias as it's not in the model.
+Skipping module.blocks_v.10.attn.proj.weight as it's not in the model.
+Skipping module.blocks_v.10.attn.proj.bias as it's not in the model.
+Skipping module.blocks_v.10.norm2.weight as it's not in the model.
+Skipping module.blocks_v.10.norm2.bias as it's not in the model.
+Skipping module.blocks_v.10.norm2_a.weight as it's not in the model.
+Skipping module.blocks_v.10.norm2_a.bias as it's not in the model.
+Skipping module.blocks_v.10.norm2_v.weight as it's not in the model.
+Skipping module.blocks_v.10.norm2_v.bias as it's not in the model.
+Skipping module.blocks_v.10.mlp.fc1.weight as it's not in the model.
+Skipping module.blocks_v.10.mlp.fc1.bias as it's not in the model.
+Skipping module.blocks_v.10.mlp.fc2.weight as it's not in the model.
+Skipping module.blocks_v.10.mlp.fc2.bias as it's not in the model.
+Shape mismatch for module.decoder_pred_v.weight: checkpoint torch.Size([768, 512]), model torch.Size([1536, 512])
+Shape mismatch for module.decoder_pred_v.bias: checkpoint torch.Size([768]), model torch.Size([1536])
+now load mae pretrained weights from  /home/edson/code/cav-mae/egs/audioset/IN-initial.pth
+['module.pos_embed_v', 'module.decoder_pos_embed_v', 'module.patch_embed_v.proj.weight', 'module.decoder_pred_v.weight', 'module.decoder_pred_v.bias'] ['module.blocks_v.0.norm1.weight', 'module.blocks_v.0.norm1.bias', 'module.blocks_v.0.norm1_a.weight', 'module.blocks_v.0.norm1_a.bias', 'module.blocks_v.0.norm1_v.weight', 'module.blocks_v.0.norm1_v.bias', 'module.blocks_v.0.attn.qkv.weight', 'module.blocks_v.0.attn.qkv.bias', 'module.blocks_v.0.attn.proj.weight', 'module.blocks_v.0.attn.proj.bias', 'module.blocks_v.0.norm2.weight', 'module.blocks_v.0.norm2.bias', 'module.blocks_v.0.norm2_a.weight', 'module.blocks_v.0.norm2_a.bias', 'module.blocks_v.0.norm2_v.weight', 'module.blocks_v.0.norm2_v.bias', 'module.blocks_v.0.mlp.fc1.weight', 'module.blocks_v.0.mlp.fc1.bias', 'module.blocks_v.0.mlp.fc2.weight', 'module.blocks_v.0.mlp.fc2.bias', 'module.blocks_v.1.norm1.weight', 'module.blocks_v.1.norm1.bias', 'module.blocks_v.1.norm1_a.weight', 'module.blocks_v.1.norm1_a.bias', 'module.blocks_v.1.norm1_v.weight', 'module.blocks_v.1.norm1_v.bias', 'module.blocks_v.1.attn.qkv.weight', 'module.blocks_v.1.attn.qkv.bias', 'module.blocks_v.1.attn.proj.weight', 'module.blocks_v.1.attn.proj.bias', 'module.blocks_v.1.norm2.weight', 'module.blocks_v.1.norm2.bias', 'module.blocks_v.1.norm2_a.weight', 'module.blocks_v.1.norm2_a.bias', 'module.blocks_v.1.norm2_v.weight', 'module.blocks_v.1.norm2_v.bias', 'module.blocks_v.1.mlp.fc1.weight', 'module.blocks_v.1.mlp.fc1.bias', 'module.blocks_v.1.mlp.fc2.weight', 'module.blocks_v.1.mlp.fc2.bias', 'module.blocks_v.2.norm1.weight', 'module.blocks_v.2.norm1.bias', 'module.blocks_v.2.norm1_a.weight', 'module.blocks_v.2.norm1_a.bias', 'module.blocks_v.2.norm1_v.weight', 'module.blocks_v.2.norm1_v.bias', 'module.blocks_v.2.attn.qkv.weight', 'module.blocks_v.2.attn.qkv.bias', 'module.blocks_v.2.attn.proj.weight', 'module.blocks_v.2.attn.proj.bias', 'module.blocks_v.2.norm2.weight', 'module.blocks_v.2.norm2.bias', 'module.blocks_v.2.norm2_a.weight', 'module.blocks_v.2.norm2_a.bias', 'module.blocks_v.2.norm2_v.weight', 'module.blocks_v.2.norm2_v.bias', 'module.blocks_v.2.mlp.fc1.weight', 'module.blocks_v.2.mlp.fc1.bias', 'module.blocks_v.2.mlp.fc2.weight', 'module.blocks_v.2.mlp.fc2.bias', 'module.blocks_v.3.norm1.weight', 'module.blocks_v.3.norm1.bias', 'module.blocks_v.3.norm1_a.weight', 'module.blocks_v.3.norm1_a.bias', 'module.blocks_v.3.norm1_v.weight', 'module.blocks_v.3.norm1_v.bias', 'module.blocks_v.3.attn.qkv.weight', 'module.blocks_v.3.attn.qkv.bias', 'module.blocks_v.3.attn.proj.weight', 'module.blocks_v.3.attn.proj.bias', 'module.blocks_v.3.norm2.weight', 'module.blocks_v.3.norm2.bias', 'module.blocks_v.3.norm2_a.weight', 'module.blocks_v.3.norm2_a.bias', 'module.blocks_v.3.norm2_v.weight', 'module.blocks_v.3.norm2_v.bias', 'module.blocks_v.3.mlp.fc1.weight', 'module.blocks_v.3.mlp.fc1.bias', 'module.blocks_v.3.mlp.fc2.weight', 'module.blocks_v.3.mlp.fc2.bias', 'module.blocks_v.4.norm1.weight', 'module.blocks_v.4.norm1.bias', 'module.blocks_v.4.norm1_a.weight', 'module.blocks_v.4.norm1_a.bias', 'module.blocks_v.4.norm1_v.weight', 'module.blocks_v.4.norm1_v.bias', 'module.blocks_v.4.attn.qkv.weight', 'module.blocks_v.4.attn.qkv.bias', 'module.blocks_v.4.attn.proj.weight', 'module.blocks_v.4.attn.proj.bias', 'module.blocks_v.4.norm2.weight', 'module.blocks_v.4.norm2.bias', 'module.blocks_v.4.norm2_a.weight', 'module.blocks_v.4.norm2_a.bias', 'module.blocks_v.4.norm2_v.weight', 'module.blocks_v.4.norm2_v.bias', 'module.blocks_v.4.mlp.fc1.weight', 'module.blocks_v.4.mlp.fc1.bias', 'module.blocks_v.4.mlp.fc2.weight', 'module.blocks_v.4.mlp.fc2.bias', 'module.blocks_v.5.norm1.weight', 'module.blocks_v.5.norm1.bias', 'module.blocks_v.5.norm1_a.weight', 'module.blocks_v.5.norm1_a.bias', 'module.blocks_v.5.norm1_v.weight', 'module.blocks_v.5.norm1_v.bias', 'module.blocks_v.5.attn.qkv.weight', 'module.blocks_v.5.attn.qkv.bias', 'module.blocks_v.5.attn.proj.weight', 'module.blocks_v.5.attn.proj.bias', 'module.blocks_v.5.norm2.weight', 'module.blocks_v.5.norm2.bias', 'module.blocks_v.5.norm2_a.weight', 'module.blocks_v.5.norm2_a.bias', 'module.blocks_v.5.norm2_v.weight', 'module.blocks_v.5.norm2_v.bias', 'module.blocks_v.5.mlp.fc1.weight', 'module.blocks_v.5.mlp.fc1.bias', 'module.blocks_v.5.mlp.fc2.weight', 'module.blocks_v.5.mlp.fc2.bias', 'module.blocks_v.6.norm1.weight', 'module.blocks_v.6.norm1.bias', 'module.blocks_v.6.norm1_a.weight', 'module.blocks_v.6.norm1_a.bias', 'module.blocks_v.6.norm1_v.weight', 'module.blocks_v.6.norm1_v.bias', 'module.blocks_v.6.attn.qkv.weight', 'module.blocks_v.6.attn.qkv.bias', 'module.blocks_v.6.attn.proj.weight', 'module.blocks_v.6.attn.proj.bias', 'module.blocks_v.6.norm2.weight', 'module.blocks_v.6.norm2.bias', 'module.blocks_v.6.norm2_a.weight', 'module.blocks_v.6.norm2_a.bias', 'module.blocks_v.6.norm2_v.weight', 'module.blocks_v.6.norm2_v.bias', 'module.blocks_v.6.mlp.fc1.weight', 'module.blocks_v.6.mlp.fc1.bias', 'module.blocks_v.6.mlp.fc2.weight', 'module.blocks_v.6.mlp.fc2.bias', 'module.blocks_v.7.norm1.weight', 'module.blocks_v.7.norm1.bias', 'module.blocks_v.7.norm1_a.weight', 'module.blocks_v.7.norm1_a.bias', 'module.blocks_v.7.norm1_v.weight', 'module.blocks_v.7.norm1_v.bias', 'module.blocks_v.7.attn.qkv.weight', 'module.blocks_v.7.attn.qkv.bias', 'module.blocks_v.7.attn.proj.weight', 'module.blocks_v.7.attn.proj.bias', 'module.blocks_v.7.norm2.weight', 'module.blocks_v.7.norm2.bias', 'module.blocks_v.7.norm2_a.weight', 'module.blocks_v.7.norm2_a.bias', 'module.blocks_v.7.norm2_v.weight', 'module.blocks_v.7.norm2_v.bias', 'module.blocks_v.7.mlp.fc1.weight', 'module.blocks_v.7.mlp.fc1.bias', 'module.blocks_v.7.mlp.fc2.weight', 'module.blocks_v.7.mlp.fc2.bias', 'module.blocks_v.8.norm1.weight', 'module.blocks_v.8.norm1.bias', 'module.blocks_v.8.norm1_a.weight', 'module.blocks_v.8.norm1_a.bias', 'module.blocks_v.8.norm1_v.weight', 'module.blocks_v.8.norm1_v.bias', 'module.blocks_v.8.attn.qkv.weight', 'module.blocks_v.8.attn.qkv.bias', 'module.blocks_v.8.attn.proj.weight', 'module.blocks_v.8.attn.proj.bias', 'module.blocks_v.8.norm2.weight', 'module.blocks_v.8.norm2.bias', 'module.blocks_v.8.norm2_a.weight', 'module.blocks_v.8.norm2_a.bias', 'module.blocks_v.8.norm2_v.weight', 'module.blocks_v.8.norm2_v.bias', 'module.blocks_v.8.mlp.fc1.weight', 'module.blocks_v.8.mlp.fc1.bias', 'module.blocks_v.8.mlp.fc2.weight', 'module.blocks_v.8.mlp.fc2.bias', 'module.blocks_v.9.norm1.weight', 'module.blocks_v.9.norm1.bias', 'module.blocks_v.9.norm1_a.weight', 'module.blocks_v.9.norm1_a.bias', 'module.blocks_v.9.norm1_v.weight', 'module.blocks_v.9.norm1_v.bias', 'module.blocks_v.9.attn.qkv.weight', 'module.blocks_v.9.attn.qkv.bias', 'module.blocks_v.9.attn.proj.weight', 'module.blocks_v.9.attn.proj.bias', 'module.blocks_v.9.norm2.weight', 'module.blocks_v.9.norm2.bias', 'module.blocks_v.9.norm2_a.weight', 'module.blocks_v.9.norm2_a.bias', 'module.blocks_v.9.norm2_v.weight', 'module.blocks_v.9.norm2_v.bias', 'module.blocks_v.9.mlp.fc1.weight', 'module.blocks_v.9.mlp.fc1.bias', 'module.blocks_v.9.mlp.fc2.weight', 'module.blocks_v.9.mlp.fc2.bias', 'module.blocks_v.10.norm1.weight', 'module.blocks_v.10.norm1.bias', 'module.blocks_v.10.norm1_a.weight', 'module.blocks_v.10.norm1_a.bias', 'module.blocks_v.10.norm1_v.weight', 'module.blocks_v.10.norm1_v.bias', 'module.blocks_v.10.attn.qkv.weight', 'module.blocks_v.10.attn.qkv.bias', 'module.blocks_v.10.attn.proj.weight', 'module.blocks_v.10.attn.proj.bias', 'module.blocks_v.10.norm2.weight', 'module.blocks_v.10.norm2.bias', 'module.blocks_v.10.norm2_a.weight', 'module.blocks_v.10.norm2_a.bias', 'module.blocks_v.10.norm2_v.weight', 'module.blocks_v.10.norm2_v.bias', 'module.blocks_v.10.mlp.fc1.weight', 'module.blocks_v.10.mlp.fc1.bias', 'module.blocks_v.10.mlp.fc2.weight', 'module.blocks_v.10.mlp.fc2.bias']
+
+Creating experiment directory: /data1/edson/cavmae/exp/testmae02-audioset-cav-mae-balNone-lr5e-5-epoch25-bs36-normTrue-c0.01-p1.0-tpFalse-mr-unstructured-0.75
+Now starting training for 25 epochs.
+Namespace(audio_conf_dataset='audioset', audio_conf_freqm=None, audio_conf_im_res=224, audio_conf_label_smooth=None, audio_conf_mean=None, audio_conf_mixup=0.0, audio_conf_mode=None, audio_conf_noise=True, audio_conf_num_mel_bins=None, audio_conf_std=None, audio_conf_target_length=1024, audio_conf_timem=None, bal='None', batch_size=36, cont_model=None, contrast_loss_weight=0.01, data_eval=None, data_train='/home/edson/code/cav-mae/datafilles/as2m_web_nolabels_mp4.json', data_val='/home/edson/code/cav-mae/datafilles/as2m_web_nolabels_mp4.json', dataset='audioset', dataset_mean=-5.081, dataset_std=4.4849, exp_dir='/data1/edson/cavmae/exp/testmae02-audioset-cav-mae-balNone-lr5e-5-epoch25-bs36-normTrue-c0.01-p1.0-tpFalse-mr-unstructured-0.75', label_csv='/home/edson/code/cav-mae/datafilles/class_labels_indices.csv', lr=5e-05, lr_adapt=False, lr_patience=2, lrscheduler_decay=0.5, lrscheduler_start=10, lrscheduler_step=5, mae_loss_weight=1.0, mask_mode='unstructured', masking_ratio=0.75, metrics='mAP', mixup=0.0, model='cav-mae', n_class=527, n_epochs=25, n_print_steps=100, noise=True, norm_pix_loss=True, num_workers=32, optim='adam', pretrain_path='/home/edson/code/cav-mae/egs/audioset/IN-initial.pth', save_model=True, target_length=1024, tr_pos=False, val_audio_conf_dataset='audioset', val_audio_conf_freqm=None, val_audio_conf_im_res=224, val_audio_conf_label_smooth=None, val_audio_conf_mean=None, val_audio_conf_mixup=0.0, val_audio_conf_mode=None, val_audio_conf_noise=True, val_audio_conf_num_mel_bins=None, val_audio_conf_std=None, val_audio_conf_target_length=1024, val_audio_conf_timem=None, wandb_name='pretrain_cavmaev2_base', warmup=True, weight_file=None)
+running on cuda
+Warning: string series 'monitoring/5653d0c7/stdout' value was longer than 1000 characters and was truncated. This warning is printed only once per series.
+Total parameter number is : 194.648 million
+Total trainable parameter number is : 192.989 million
+The learning rate scheduler starts at 10 epoch with decay rate of 0.500 every 5 epoches
+now training with audioset, learning rate scheduler: <torch.optim.lr_scheduler.MultiStepLR object at 0x7fd18225c3d0>
+current #steps=0, #epochs=1
+start training...
+---------------
+2024-05-30 10:30:01.209876
+current #epochs=1, #steps=0
+current masking ratio is 0.750 for both modalities; audio mask mode unstructured
+wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
+wandb: - 0.002 MB of 0.002 MB uploaded (0.000 MB deduped)wandb: \ 0.002 MB of 0.043 MB uploaded (0.000 MB deduped)wandb: | 0.043 MB of 0.043 MB uploaded (0.000 MB deduped)wandb: Synced pretrain_cavmaev2_base: https://wandb.ai/edsonroteia/cavmaev2/runs/16pwzcj9
+wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20240530_102944-16pwzcj9/logs
+Shutting down background jobs, please wait a moment...
+Done!
+Waiting for the remaining 1 operations to synchronize with Neptune. Do not kill this process.
+All 1 operations synced, thanks for waiting!
+Explore the metadata in the Neptune app:
+https://app.neptune.ai/junioroteia/CAV-MAE/e/CAVV1-752/metadata
+Traceback (most recent call last):
+  File "../../src/run_cavmaev2_pretrain_mp4.py", line 192, in <module>
+    train(audio_model, train_loader, val_loader, args)
+  File "/home/edson/code/cav-mae/src/traintest_cavmaev2.py", line 83, in train
+    for i, (a_input, v_input, _) in enumerate(train_loader):
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/utils/data/dataloader.py", line 681, in __next__
+    data = self._next_data()
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/utils/data/dataloader.py", line 1376, in _next_data
+    return self._process_data(data)
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/utils/data/dataloader.py", line 1402, in _process_data
+    data.reraise()
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/_utils.py", line 461, in reraise
+    raise exception
+KeyError: Caught KeyError in DataLoader worker process 0.
+Original Traceback (most recent call last):
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/utils/data/_utils/worker.py", line 302, in _worker_loop
+    data = fetcher.fetch(index)
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/utils/data/_utils/fetch.py", line 49, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/utils/data/_utils/fetch.py", line 49, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/edson/code/cav-mae/src/dataloaderv2_mp4.py", line 233, in __getitem__
+    label_indices[int(self.index_dict[label_str])] = 1.0 - self.label_smooth
+KeyError: 'None'
+
+Traceback (most recent call last):
+  File "../../src/run_cavmaev2_pretrain_mp4.py", line 192, in <module>
+    train(audio_model, train_loader, val_loader, args)
+  File "/home/edson/code/cav-mae/src/traintest_cavmaev2.py", line 83, in train
+    for i, (a_input, v_input, _) in enumerate(train_loader):
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/utils/data/dataloader.py", line 681, in __next__
+    data = self._next_data()
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/utils/data/dataloader.py", line 1376, in _next_data
+    return self._process_data(data)
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/utils/data/dataloader.py", line 1402, in _process_data
+    data.reraise()
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/_utils.py", line 461, in reraise
+    raise exception
+KeyError: Caught KeyError in DataLoader worker process 0.
+Original Traceback (most recent call last):
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/utils/data/_utils/worker.py", line 302, in _worker_loop
+    data = fetcher.fetch(index)
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/utils/data/_utils/fetch.py", line 49, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/edson/miniconda3/envs/cavmae/lib/python3.7/site-packages/torch/utils/data/_utils/fetch.py", line 49, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/edson/code/cav-mae/src/dataloaderv2_mp4.py", line 233, in __getitem__
+    label_indices[int(self.index_dict[label_str])] = 1.0 - self.label_smooth
+KeyError: 'None'
+

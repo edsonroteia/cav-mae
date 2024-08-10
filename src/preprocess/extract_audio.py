@@ -17,6 +17,8 @@ for i in range(input_filelist.shape[0]):
     ext_len = len(input_f.split('/')[-1].split('.')[-1])
     video_id = input_f.split('/')[-1][:-ext_len-1]
     output_f_1 = args.target_fold + '/' + video_id + '_intermediate.wav'
+    if os.path.exists(output_f_1):
+        continue
     os.system('ffmpeg -i {:s} -vn -ar 16000 {:s}'.format(input_f, output_f_1)) # save an intermediate file
 
 # then extract the first channel

@@ -94,7 +94,7 @@ mask_ratio_a, mask_ratio_v = 0.75, 0.75
 # or 'time' or 'freq' or 'tf'
 mask_mode = 'unstructured'
 # the model has to be trained without pixel normalization for inpaint purpose
-model_path = '/data/sls/scratch/yuangong/cav-mae/pretrained_model/cav_mae_models/audioset/main/cav-mae-base-nonorm.pth'
+model_path = '/home/edson/code/cav-mae/egs/audioset/cav-mae-base-nonorm.pth'
 
 A_loss_a, A_loss_v = [], []
 if os.path.exists('./sample_reconstruct') == False:
@@ -112,9 +112,11 @@ mae_mdl.eval()
 val_audio_conf = {'num_mel_bins': 128, 'target_length': 1024, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': 'vggsound',
                   'mode':'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5}
 
+
+
 # on vggsound, while the model is pretrained on AS-2M, so it is zero-shot.
 val_loader = torch.utils.data.DataLoader(
-    dataloader.AudiosetDataset('/data/sls/scratch/yuangong/cav-mae/pretrained_model/datafiles/vggsound/vgg_test_cleaned.json', label_csv='/data/sls/scratch/yuangong/cav-mae/pretrained_model/datafiles/vggsound/class_labels_indices_vgg.csv', audio_conf=val_audio_conf),
+    dataloader.AudiosetDataset('/home/edson/code/cav-mae/datafilles/audioset_20k_cleaned_auto_train.json', label_csv='/home/edson/code/cav-mae/datafilles/class_labels_indices.csv', audio_conf=val_audio_conf),
     batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
 
 for i, (a_input, v_input, _) in enumerate(val_loader):

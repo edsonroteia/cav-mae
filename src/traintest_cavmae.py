@@ -18,9 +18,60 @@ from torch import nn
 import numpy as np
 import pickle
 from torch.cuda.amp import autocast,GradScaler
+import neptune
+import wandb
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
+def visualize_and_log(a_input, v_input, audio_model, step):
+    print("Logging examples to wandb...")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    a_input, v_input = a_input.to(device), v_input.to(device)
+        
+    # Get reconstructions
+    with torch.no_grad():
+        _, _, _, _, _, mask_a, mask_v, _, recon_a, recon_v = audio_model(a_input, v_input)
+    # Select first sample and first frame of the batch for visualization
+    a_input_np = a_input[0].cpu().numpy()
+    v_input_np = v_input[0, :].cpu().numpy() 
+    recon_a_np = recon_a[0].squeeze().cpu().numpy()
+    recon_v_np = recon_v[0, :].cpu().numpy()
 
-def train(audio_model, train_loader, test_loader, args):
+    # print("Audio Shape:", a_input.shape) #torch.Size([200, 1024, 128])
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+
+    if v_input_np.max() > 1 or v_input_np.min() < 0:
+      v_input_np = (v_input_np - v_input_np.min()) / (v_input_np.max() - v_input_np.min())
+      recon_v_np = (recon_v_np - recon_v_np.min()) / (recon_v_np.max() - recon_v_np.min())
+
+    # Plot original and reconstructed images
+    axes[0, 0].imshow(v_input_np.transpose(1, 2, 0))
+    axes[0, 0].set_title("Original Image Frame")
+    axes[0, 0].axis('off')
+
+    axes[0, 1].imshow(recon_v_np)
+    axes[0, 1].set_title("Reconstructed Image Frame")
+    axes[0, 1].axis('off')
+
+    # Plot original and reconstructed audio
+    axes[1, 0].imshow(a_input_np.transpose(1,0), aspect='equal', origin='lower')
+    axes[1, 0].set_title("Original Audio")
+    axes[1, 0].axis('off')
+
+    axes[1, 1].imshow(recon_a_np, aspect='equal', origin='lower')
+    axes[1, 1].set_title("Reconstructed Audio")
+    axes[1, 1].axis('off')
+
+    # Save the figure and log it to W&B
+    fig_path = os.path.join("visualizations", f"step_{step}.png")
+    os.makedirs(os.path.dirname(fig_path), exist_ok=True)
+    plt.savefig(fig_path)
+    plt.close(fig)
+
+    wandb.log({"Visualizations": wandb.Image(fig_path)}, step=step)
+
+def train(audio_model, train_loader, train_dataset, test_loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print('running on ' + str(device))
     torch.set_grad_enabled(True)
@@ -78,18 +129,16 @@ def train(audio_model, train_loader, test_loader, args):
         print("current #epochs=%s, #steps=%s" % (epoch, global_step))
         print('current masking ratio is {:.3f} for both modalities; audio mask mode {:s}'.format(args.masking_ratio, args.mask_mode))
 
-        for i, (a_input, v_input, _) in enumerate(train_loader):
-
+        for i, (a_input, v_input, _) in tqdm(enumerate(train_loader)):
             B = a_input.size(0)
             a_input = a_input.to(device, non_blocking=True)
             v_input = v_input.to(device, non_blocking=True)
-
             data_time.update(time.time() - end_time)
             per_sample_data_time.update((time.time() - end_time) / a_input.shape[0])
             dnn_start_time = time.time()
 
             with autocast():
-                loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
+                loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc, _, _ = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
                 # this is due to for torch.nn.DataParallel, the output loss of 4 gpus won't be automatically averaged, need to be done manually
                 loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, c_acc = loss.sum(), loss_mae.sum(), loss_mae_a.sum(), loss_mae_v.sum(), loss_c.sum(), c_acc.mean()
 
@@ -97,7 +146,7 @@ def train(audio_model, train_loader, test_loader, args):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-
+            
             # loss_av is the main loss
             loss_av_meter.update(loss.item(), B)
             loss_a_meter.update(loss_mae_a.item(), B)
@@ -106,6 +155,8 @@ def train(audio_model, train_loader, test_loader, args):
             batch_time.update(time.time() - end_time)
             per_sample_time.update((time.time() - end_time)/a_input.shape[0])
             per_sample_dnn_time.update((time.time() - dnn_start_time)/a_input.shape[0])
+
+            wandb.log({"Train Total Loss": loss_av_meter.val, "Train MAE Loss Audio": loss_a_meter.val, "Train MAE Loss Visual": loss_v_meter.val, "Train Contrastive Loss": loss_c_meter.val, "Train Contrastive Acc": c_acc}, step=global_step)
 
             print_step = global_step % args.n_print_steps == 0
             early_print_step = epoch == 0 and global_step % (args.n_print_steps/10) == 0
@@ -130,6 +181,15 @@ def train(audio_model, train_loader, test_loader, args):
             end_time = time.time()
             global_step += 1
 
+            if global_step % 2900 == 0 and args.mae_loss_weight != 0:
+                visualize_and_log(a_input, v_input, audio_model, global_step)
+
+        # Retrieve error counts at the end of the epoch
+        audio_errors, image_errors = train_dataset.get_error_counts()
+        print(f'Epoch {epoch}: Audio Loading Errors = {audio_errors}, Image Loading Errors = {image_errors}')
+        # Reset counters after logging
+        train_dataset.reset_error_counts()
+
         print('start validation')
         eval_loss_av, eval_loss_mae, eval_loss_mae_a, eval_loss_mae_v, eval_loss_c, eval_c_acc = validate(audio_model, test_loader, args)
 
@@ -144,6 +204,8 @@ def train(audio_model, train_loader, test_loader, args):
         print("Train Visual MAE Loss: {:.6f}".format(loss_v_meter.avg))
         print("Train Contrastive Loss: {:.6f}".format(loss_c_meter.avg))
         print("Train Total Loss: {:.6f}".format(loss_av_meter.avg))
+
+        wandb.log({"Eval Total Loss": eval_loss_av, "Eval MAE Loss Audio": eval_loss_mae_a, "Eval MAE Loss Visual": eval_loss_mae_v, "Eval Contrastive Loss": eval_loss_c, "Eval Contrastive Acc": eval_c_acc}, step=global_step)
 
         # train audio mae loss, train visual mae loss, train contrastive loss, train total loss
         # eval audio mae loss, eval visual mae loss, eval contrastive loss, eval total loss, eval contrastive accuracy, lr
@@ -201,7 +263,7 @@ def validate(audio_model, val_loader, args):
             a_input = a_input.to(device)
             v_input = v_input.to(device)
             with autocast():
-                loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
+                loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc, _, _ = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
                 loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, c_acc = loss.sum(), loss_mae.sum(), loss_mae_a.sum(), loss_mae_v.sum(), loss_c.sum(), c_acc.mean()
             A_loss.append(loss.to('cpu').detach())
             A_loss_mae.append(loss_mae.to('cpu').detach())

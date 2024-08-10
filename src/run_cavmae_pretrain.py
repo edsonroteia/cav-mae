@@ -20,8 +20,15 @@ import dataloader as dataloader
 import models
 import numpy as np
 from traintest_cavmae import train
+import neptune
+import wandb
 
 # pretrain cav-mae model
+
+run = neptune.init_run(
+    project="junioroteia/CAV-MAE",
+    api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJmNGE4NDA2NS1hYmE2LTQ3YWYtODllMC02ODk4NGNlODY0MDUifQ==",
+)  # your credentials
 
 print("I am process %s, running on %s: starting (%s)" % (os.getpid(), os.uname()[1], time.asctime()))
 
@@ -68,6 +75,9 @@ parser.add_argument('--tr_pos', help='if use trainable positional embedding', ty
 parser.add_argument("--masking_ratio", type=float, default=0.75, help="masking ratio")
 parser.add_argument("--mask_mode", type=str, default='unstructured', help="masking ratio", choices=['unstructured', 'time', 'freq', 'tf'])
 
+parser.add_argument('--wandb_name', type=str, default=None, help="wandb name")
+
+
 args = parser.parse_args()
 
 im_res = 224
@@ -75,6 +85,25 @@ audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm':
               'noise':args.noise, 'label_smooth': 0, 'im_res': im_res}
 val_audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': args.dataset,
                   'mode':'eval', 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': im_res}
+
+
+# Extract command-line arguments into a dictionary
+cmd_args = vars(args)
+
+# Flatten the audio_conf and val_audio_conf into the main dictionary
+# Prefixing each key with 'audio_conf_' or 'val_audio_conf_' to avoid key conflicts
+for key in ['num_mel_bins', 'target_length', 'freqm', 'timem', 'mixup', 'dataset', 'mode', 'mean', 'std', 'noise', 'label_smooth', 'im_res']:
+    cmd_args[f'audio_conf_{key}'] = cmd_args[key] if key in cmd_args else None
+    cmd_args[f'val_audio_conf_{key}'] = cmd_args[key] if key in cmd_args else None
+
+# The 'im_res' value should be set separately if it's not a command-line argument
+if 'im_res' not in cmd_args:
+    cmd_args['audio_conf_im_res'] = 224
+    cmd_args['val_audio_conf_im_res'] = 224
+
+params = cmd_args
+
+wandb.init(project="cavmaev2", entity="edsonroteia", name=args.wandb_name, config=params) 
 
 print('current mae loss {:.3f}, and contrastive loss {:.3f}'.format(args.mae_loss_weight, args.contrast_loss_weight))
 
@@ -85,14 +114,15 @@ if args.bal == 'bal':
     else:
         samples_weight = np.loadtxt(args.data_train[:-5] + '_' + args.weight_file + '.csv', delimiter=',')
     sampler = WeightedRandomSampler(samples_weight, len(samples_weight), replacement=True)
-
+    train_dataset = dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf)
     train_loader = torch.utils.data.DataLoader(
-        dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
+        train_dataset,
         batch_size=args.batch_size, sampler=sampler, num_workers=args.num_workers, pin_memory=True, drop_last=True)
 else:
     print('balanced sampler is not used')
+    train_dataset = dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf)
     train_loader = torch.utils.data.DataLoader(
-        dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
+        train_dataset,
         batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True, drop_last=True)
 
 val_loader = torch.utils.data.DataLoader(
@@ -106,7 +136,8 @@ if args.data_eval != None:
 
 if args.model == 'cav-mae':
     print('pretrain a cav-mae model with 11 modality-specific layers and 1 modality-sharing layers')
-    audio_model = models.CAVMAE(audio_length=args.target_length, norm_pix_loss=args.norm_pix_loss, modality_specific_depth=11, tr_pos=args.tr_pos)
+    # audio_model = models.CAVMAE(audio_length=args.target_length, norm_pix_loss=args.norm_pix_loss, modality_specific_depth=11, tr_pos=args.tr_pos)
+    audio_model = models.CAVMAEDecomp(audio_length=args.target_length, norm_pix_loss=args.norm_pix_loss, modality_specific_depth=11, tr_pos=args.tr_pos)
 else:
     raise ValueError('model not supported')
 
@@ -138,4 +169,6 @@ with open(args.exp_dir + '/args.json', 'w') as f:
     json.dump(args.__dict__, f, indent=2)
 
 print('Now starting training for {:d} epochs.'.format(args.n_epochs))
-train(audio_model, train_loader, val_loader, args)
+print(args)
+train(audio_model, train_loader, train_dataset, val_loader, args)
+run.stop()
