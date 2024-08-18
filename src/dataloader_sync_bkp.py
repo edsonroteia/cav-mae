@@ -69,10 +69,7 @@ class AudiosetDataset(Dataset):
         with open(dataset_json_file, 'r') as fp:
             data_json = json.load(fp)
 
-        num_samples = audio_conf.get('num_samples')
-        self.data = data_json['data']
-        if num_samples is not None:
-            self.data = self.data[:num_samples]
+        self.data = data_json['data'][:200000]
         self.data = self.pro_data(self.data)
         print('Dataset has {:d} samples'.format(self.data.shape[0]))
         self.num_samples = self.data.shape[0]
@@ -92,7 +89,6 @@ class AudiosetDataset(Dataset):
         self.norm_std = self.audio_conf.get('std')
         self.failed_audio_loadings = 0
         self.failed_image_loadings = 0
-        self.debug_counter = 0  # Add a counter for debugging
         # skip_norm is a flag that if you want to skip normalization to compute the normalization stats using src/get_norm_stats.py, if Ture, input normalization will be skipped for correctly calculating the stats.
         # set it as True ONLY when you are getting the normalization stats.
         self.skip_norm = self.audio_conf.get('skip_norm') if self.audio_conf.get('skip_norm') else False
@@ -260,59 +256,67 @@ class AudiosetDataset(Dataset):
                     fbanks.append(fbank)
                     images.append(image)
                     frame_indices.append(frame_idx)
-                except Exception as e:
-                    pass
-                    # print(f'Error loading frame {frame_idx} for video {datum["video_id"]}: {str(e)}')
+                except:
+                    print(f'Error loading frame {frame_idx} for video {datum["video_id"]}')
             
             label_indices = np.zeros(self.label_num) + (self.label_smooth / self.label_num)
             for label_str in datum['labels'].split(','):
                 label_indices[int(self.index_dict[label_str])] = 1.0 - self.label_smooth
             label_indices = torch.FloatTensor(label_indices)
             
-            # # Debug print
-            # if self.debug_counter % 100 == 0:
-            #     print(f"Debug - Eval mode: Video ID: {datum['video_id']}, "
-            #           f"Num frames: {len(fbanks)}, "
-            #           f"Fbank shape: {fbanks[0].shape if fbanks else 'N/A'}, "
-            #           f"Image shape: {images[0].shape if images else 'N/A'}")
-            self.debug_counter += 1
-
             return torch.stack(fbanks), torch.stack(images), label_indices, datum['video_id'], torch.tensor(frame_indices)
         
-        else:  # Training mode
-            # Select a random frame
-            frame_idx = random.randint(0, self.total_frame - 1)
-            frame_path = f"{datum['video_path']}/frame_{frame_idx}/{datum['video_id']}.jpg"
-            
+        
+        
+        else:
+            # label smooth for negative samples, epsilon/label_num
+            label_indices = np.zeros(self.label_num) + (self.label_smooth / self.label_num)
             try:
-                fbank = self._wav2fbank(datum['wav'])
-                fbank = fbank[frame_idx*96:(frame_idx+1)*96, :]
-                image = self.get_image(frame_path)
-                
-                if not self.skip_norm:
-                    fbank = (fbank - self.norm_mean) / (self.norm_std)
-                
-                label_indices = np.zeros(self.label_num) + (self.label_smooth / self.label_num)
-                for label_str in datum['labels'].split(','):
-                    label_indices[int(self.index_dict[label_str])] = 1.0 - self.label_smooth
-                label_indices = torch.FloatTensor(label_indices)
-                
-                # # Debug print
-                # if self.debug_counter % 100 == 0:
-                #     print(f"Debug - Train mode: Video ID: {datum['video_id']}, "
-                #           f"Fbank shape: {fbank.shape}, "
-                #           f"Image shape: {image.shape}, "
-                #           f"Frame index: {frame_idx}")
-                self.debug_counter += 1
-
-                return fbank, image, label_indices, datum['video_id'], frame_idx
+                fbank = self._wav2fbank(datum['wav'], None, 0)
+            except:
+                fbank = torch.zeros([self.target_length, 128]) + 0.01
+                print('there is an error in loading audio')
+                self.failed_audio_loadings += 1
+            try:
+                img_path, frame_idx = self.randselect_img(datum['video_id'], datum['video_path'])
+                image = self.get_image(img_path, None, 0)
+            except:
+                image = torch.zeros([3, self.im_res, self.im_res]) + 0.01
+                print('there is an error in loading image')
+                self.failed_image_loadings += 1
+            for label_str in datum['labels'].split(','):
+                label_indices[int(self.index_dict[label_str])] = 1.0 - self.label_smooth
             
-            except Exception as e:
-                # print(f'Error loading frame {frame_idx} for video {datum["video_id"]}: {str(e)}')
-                # Return dummy data in case of error
-                return torch.zeros((96, 128)), torch.zeros((3, 224, 224)), torch.zeros(self.label_num), datum['video_id'], frame_idx
+            # get segment of the spectrogram corresponding to frame position
+            # each block is 1024 / 10 frames from the spectrogram but it should be divisible by 16
+            fbank = fbank[frame_idx*96:(frame_idx+1)*96, :]
+            label_indices = torch.FloatTensor(label_indices)
 
+            # SpecAug, not do for eval set
+            freqm = torchaudio.transforms.FrequencyMasking(self.freqm)
+            timem = torchaudio.transforms.TimeMasking(self.timem)
+            fbank = torch.transpose(fbank, 0, 1)
+            fbank = fbank.unsqueeze(0)
+            if self.freqm != 0:
+                fbank = freqm(fbank)
+            if self.timem != 0:
+                fbank = timem(fbank)
+            fbank = fbank.squeeze(0)
+            fbank = torch.transpose(fbank, 0, 1)
 
+            # normalize the input for both training and test
+            if self.skip_norm == False:
+                fbank = (fbank - self.norm_mean) / (self.norm_std)
+            # skip normalization the input ONLY when you are trying to get the normalization stats.
+            else:
+                pass
+
+            if self.noise == True:
+                fbank = fbank + torch.rand(fbank.shape[0], fbank.shape[1]) * np.random.rand() / 10
+                fbank = torch.roll(fbank, np.random.randint(-self.target_length, self.target_length), 0)
+
+            # fbank shape is [time_frame_num, frequency_bins], e.g., [1024, 128]
+            return fbank, image, label_indices
 
 
 
@@ -333,29 +337,5 @@ def eval_collate_fn(batch):
     labels = torch.stack(labels).repeat_interleave(fbanks.size(0) // len(labels), dim=0)
     video_ids = [vid for vid in video_ids for _ in range(len(frame_indices[0]))]
     frame_indices = torch.cat(frame_indices)
-    
-    # print(f"Collate fn - Batch size: {len(batch)}, "
-    #       f"Fbanks shape: {fbanks.shape}, "
-    #       f"Images shape: {images.shape}, "
-    #       f"Labels shape: {labels.shape}, "
-    #       f"Num video IDs: {len(video_ids)}, "
-    #       f"Frame indices shape: {frame_indices.shape}")
-    
-    return fbanks, images, labels, video_ids, frame_indices
-
-# New function for training collate
-def train_collate_fn(batch):
-    fbanks, images, labels, video_ids, frame_indices = zip(*batch)
-    
-    fbanks = torch.stack(fbanks)
-    images = torch.stack(images)
-    labels = torch.stack(labels)
-    
-    # print(f"Train Collate fn - Batch size: {len(batch)}, "
-    #       f"Fbanks shape: {fbanks.shape}, "
-    #       f"Images shape: {images.shape}, "
-    #       f"Labels shape: {labels.shape}, "
-    #       f"Num video IDs: {len(video_ids)}, "
-    #       f"Frame indices: {frame_indices}")
     
     return fbanks, images, labels, video_ids, frame_indices

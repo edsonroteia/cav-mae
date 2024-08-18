@@ -31,3 +31,4 @@ egs/audioset/visualizations
 *.pyc
 visualizations
 wandb
+reconstruction*

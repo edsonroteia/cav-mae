@@ -358,27 +358,62 @@ class CAVMAE(nn.Module):
         # return audio and video tokens
         return x_a, x_v
 
-    def forward_contrastive(self, audio_rep, video_rep, bidirect_contrast=False):
-        # calculate nce loss for mean-visual representation and mean-audio representation
+    # def forward_contrastive(self, audio_rep, video_rep, bidirect_contrast=False):
+    #     # calculate nce loss for mean-visual representation and mean-audio representation
 
+    #     audio_rep = torch.nn.functional.normalize(audio_rep, dim=-1)
+    #     video_rep = torch.nn.functional.normalize(video_rep, dim=-1)
+
+    #     total = torch.mm(audio_rep, torch.transpose(video_rep, 0, 1)) / 0.05
+
+    #     # by default we use single directional
+    #     if bidirect_contrast == False:
+    #         nce = -torch.mean(torch.diag(torch.nn.functional.log_softmax(total, dim=0)))
+    #         c_acc = torch.sum(torch.eq(torch.argmax(torch.nn.functional.softmax(total, dim=0), dim=0), torch.arange(0, total.shape[0], device=audio_rep.device))) / total.shape[0]
+    #         return nce, c_acc
+    #     else:
+    #         nce_1 = -torch.mean(torch.diag(torch.nn.functional.log_softmax(total, dim=0)))
+    #         nce_2 = -torch.mean(torch.diag(torch.nn.functional.log_softmax(total.t(), dim=0)))
+    #         c_acc_1 = torch.sum(torch.eq(torch.argmax(torch.nn.functional.softmax(total, dim=0), dim=0), torch.arange(0, total.shape[0], device=audio_rep.device))) / total.shape[0]
+    #         c_acc_2 = torch.sum(torch.eq(torch.argmax(torch.nn.functional.softmax(total.t(), dim=0), dim=0), torch.arange(0, total.shape[0], device=audio_rep.device))) / total.shape[0]
+    #         nce = (nce_1 + nce_2) / 2
+    #         c_acc = (c_acc_1 + c_acc_2) / 2
+    #         return nce, c_acc
+        
+    # Make sure to update the forward_contrastive method in your CAVMAE class
+    def forward_contrastive(self, audio_rep, video_rep, bidirect_contrast=False, mode='train'):
         audio_rep = torch.nn.functional.normalize(audio_rep, dim=-1)
         video_rep = torch.nn.functional.normalize(video_rep, dim=-1)
 
         total = torch.mm(audio_rep, torch.transpose(video_rep, 0, 1)) / 0.05
 
-        # by default we use single directional
-        if bidirect_contrast == False:
-            nce = -torch.mean(torch.diag(torch.nn.functional.log_softmax(total, dim=0)))
-            c_acc = torch.sum(torch.eq(torch.argmax(torch.nn.functional.softmax(total, dim=0), dim=0), torch.arange(0, total.shape[0], device=audio_rep.device))) / total.shape[0]
-            return nce, c_acc
-        else:
-            nce_1 = -torch.mean(torch.diag(torch.nn.functional.log_softmax(total, dim=0)))
-            nce_2 = -torch.mean(torch.diag(torch.nn.functional.log_softmax(total.t(), dim=0)))
-            c_acc_1 = torch.sum(torch.eq(torch.argmax(torch.nn.functional.softmax(total, dim=0), dim=0), torch.arange(0, total.shape[0], device=audio_rep.device))) / total.shape[0]
-            c_acc_2 = torch.sum(torch.eq(torch.argmax(torch.nn.functional.softmax(total.t(), dim=0), dim=0), torch.arange(0, total.shape[0], device=audio_rep.device))) / total.shape[0]
-            nce = (nce_1 + nce_2) / 2
-            c_acc = (c_acc_1 + c_acc_2) / 2
-            return nce, c_acc
+        if mode == 'train':
+            if bidirect_contrast:
+                nce_1 = -torch.mean(torch.diag(torch.nn.functional.log_softmax(total, dim=0)))
+                nce_2 = -torch.mean(torch.diag(torch.nn.functional.log_softmax(total.t(), dim=0)))
+                c_acc_1 = torch.sum(torch.eq(torch.argmax(torch.nn.functional.softmax(total, dim=0), dim=0), torch.arange(0, total.shape[0], device=audio_rep.device))) / total.shape[0]
+                c_acc_2 = torch.sum(torch.eq(torch.argmax(torch.nn.functional.softmax(total.t(), dim=0), dim=0), torch.arange(0, total.shape[0], device=audio_rep.device))) / total.shape[0]
+                nce = (nce_1 + nce_2) / 2
+                c_acc = (c_acc_1 + c_acc_2) / 2
+            else:
+                nce = -torch.mean(torch.diag(torch.nn.functional.log_softmax(total, dim=0)))
+                c_acc = torch.sum(torch.eq(torch.argmax(torch.nn.functional.softmax(total, dim=0), dim=0), torch.arange(0, total.shape[0], device=audio_rep.device))) / total.shape[0]
+        else:  # eval mode
+            # For eval, we consider any match within the same video as correct
+            # This assumes that samples from the same video are grouped together
+            num_frames = total.shape[0] // (total.shape[1] // 10)  # Assuming 10 frames per video
+            video_indices = torch.arange(total.shape[1] // 10, device=total.device).repeat_interleave(10)
+            
+            max_similarities, max_indices = torch.max(total, dim=1)
+            correct_matches = (video_indices[max_indices] == torch.arange(total.shape[0] // 10, device=total.device).repeat_interleave(num_frames))
+            
+            c_acc = correct_matches.float().mean()
+            
+            # For NCE loss in eval mode, we can use the same formula but considering all frames from the same video as positive
+            positive_mask = (video_indices.unsqueeze(0) == video_indices.unsqueeze(1))
+            nce = -torch.mean(torch.logsumexp(total * positive_mask, dim=1) - torch.logsumexp(total, dim=1))
+
+        return nce, c_acc
 
     def forward_mae_loss(self, input, pred, mask, modality):
         if modality == 'a':
@@ -402,10 +437,10 @@ class CAVMAE(nn.Module):
         loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
         return loss
 
-    def forward(self, audio, imgs, mask_ratio_a=0.75, mask_ratio_v=0.75, mae_loss_weight=1., contrast_loss_weight=0.01, mask_mode='unstructured'):
-        # latent is used for reconstruction (mae), latent_c_{a,v} are used for contrastive learning
+    def forward(self, audio, imgs, mask_ratio_a=0.75, mask_ratio_v=0.75, mae_loss_weight=1., contrast_loss_weight=0.01, mask_mode='unstructured', mode='train'):
         latent, mask_a, ids_restore_a, mask_v, ids_restore_v, latent_c_a, latent_c_v = self.forward_encoder(audio, imgs, mask_ratio_a, mask_ratio_v, mask_mode=mask_mode)
-        # if mae loss is used
+        
+        # MAE loss calculation (remains the same for both train and eval)
         if mae_loss_weight != 0:
             pred_a, pred_v = self.forward_decoder(latent, mask_a, ids_restore_a, mask_v, ids_restore_v)
             loss_mae_a = self.forward_mae_loss(audio, pred_a, mask_a, 'a')
@@ -414,10 +449,9 @@ class CAVMAE(nn.Module):
         else:
             loss_mae_a, loss_mae_v, loss_mae = torch.tensor(0.0, device=audio.device), torch.tensor(0.0, device=audio.device), torch.tensor(0.0, device=audio.device)
 
-        # if contrastive loss is used
+        # Contrastive loss calculation
         if contrast_loss_weight != 0:
-            # note this is single directional
-            loss_c, c_acc = self.forward_contrastive(latent_c_a.mean(dim=1), latent_c_v.mean(dim=1))
+            loss_c, c_acc = self.forward_contrastive(latent_c_a.mean(dim=1), latent_c_v.mean(dim=1), mode=mode)
             loss_c = contrast_loss_weight * loss_c
         else:
             loss_c, c_acc = torch.tensor(0.0, device=audio.device), torch.tensor(0.0, device=audio.device)

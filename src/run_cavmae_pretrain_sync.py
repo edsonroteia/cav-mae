@@ -22,7 +22,7 @@ import numpy as np
 from traintest_cavmae_sync import train
 import neptune
 import wandb
-from dataloader_sync import eval_collate_fn
+from dataloader_sync import eval_collate_fn, train_collate_fn
 
 
 # pretrain cav-mae model
@@ -78,13 +78,14 @@ parser.add_argument("--masking_ratio", type=float, default=0.75, help="masking r
 parser.add_argument("--mask_mode", type=str, default='unstructured', help="masking ratio", choices=['unstructured', 'time', 'freq', 'tf'])
 
 parser.add_argument('--wandb_name', type=str, default=None, help="wandb name")
+parser.add_argument("--num_samples", type=int, default=None, help="Number of samples to use (default: use all samples)")
 
 
 args = parser.parse_args()
 
 im_res = 224
 audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': 0, 'timem': 0, 'mixup': args.mixup, 'dataset': args.dataset, 'mode':'train', 'mean':args.dataset_mean, 'std':args.dataset_std,
-              'noise':args.noise, 'label_smooth': 0, 'im_res': im_res}
+              'noise':args.noise, 'label_smooth': 0, 'im_res': im_res, 'num_samples': args.num_samples}
 val_audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': args.dataset,
                   'mode':'eval', 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': im_res}
 
@@ -119,24 +120,26 @@ if args.bal == 'bal':
     train_dataset = dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=args.batch_size, sampler=sampler, num_workers=args.num_workers, pin_memory=True, drop_last=True)
+        batch_size=args.batch_size, sampler=sampler, num_workers=args.num_workers, pin_memory=True, 
+        drop_last=True, collate_fn=train_collate_fn)
 else:
     print('balanced sampler is not used')
     train_dataset = dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True, drop_last=True)
+        batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True, 
+        drop_last=True, collate_fn=train_collate_fn)
 
 val_loader = torch.utils.data.DataLoader(
     dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
     batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True,
-    collate_fn=eval_collate_fn if val_audio_conf['mode'] == 'eval' else None)
+    collate_fn=eval_collate_fn)
 
 if args.data_eval != None:
     eval_loader = torch.utils.data.DataLoader(
         dataloader.AudiosetDataset(args.data_eval, label_csv=args.label_csv, audio_conf=val_audio_conf),
         batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True,
-        collate_fn=eval_collate_fn if val_audio_conf['mode'] == 'eval' else None)
+        collate_fn=eval_collate_fn)
 
 
 if args.model == 'cav-mae':
@@ -186,5 +189,5 @@ with open(args.exp_dir + '/args.json', 'w') as f:
 
 print('Now starting training for {:d} epochs.'.format(args.n_epochs))
 print(args)
-train(audio_model, train_loader, train_dataset, val_loader, args)
+train(audio_model, train_loader, train_dataset, val_loader, args, run)
 run.stop()

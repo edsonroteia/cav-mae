@@ -4,7 +4,7 @@ import csv
 import sys
 
 # Load JSON data from file
-with open('/home/edson/code/cav-mae/datafilles/audioset_2m_cleaned.json', 'r') as file:
+with open('/home/edson/code/cav-mae/datafilles/audioset_eval_cleaned_original.json', 'r') as file:
     data = json.load(file)['data']
 
 # Sample n random videos
