@@ -239,6 +239,35 @@ class AudiosetDataset(Dataset):
         return all_frames
 
     def __getitem__(self, index):
+        """
+        Retrieve an item from the dataset.
+
+        This method handles both evaluation and training modes, processing audio and image data
+        for the given index.
+
+        Args:
+            index (int): The index of the item to retrieve.
+
+        Returns:
+            In evaluation mode:
+                tuple: (fbanks, images, label_indices, video_id, frame_indices)
+                    - fbanks (torch.Tensor): Stack of processed audio spectrograms.
+                    - images (torch.Tensor): Stack of processed images.
+                    - label_indices (torch.FloatTensor): One-hot encoded labels with smoothing.
+                    - video_id (str): Identifier for the video.
+                    - frame_indices (torch.Tensor): Indices of the processed frames.
+
+            In training mode:
+                tuple: (fbank, image, label_indices, video_id, frame_idx)
+                    - fbank (torch.Tensor): Processed audio spectrogram.
+                    - image (torch.Tensor): Processed image.
+                    - label_indices (torch.FloatTensor): One-hot encoded labels with smoothing.
+                    - video_id (str): Identifier for the video.
+                    - frame_idx (int): Index of the processed frame.
+
+        Note:
+            In case of errors during processing, dummy data may be returned in training mode.
+        """
         datum = self.decode_data(self.data[index])
         
         if self.mode == 'eval':
@@ -262,19 +291,12 @@ class AudiosetDataset(Dataset):
                     frame_indices.append(frame_idx)
                 except Exception as e:
                     pass
-                    # print(f'Error loading frame {frame_idx} for video {datum["video_id"]}: {str(e)}')
             
             label_indices = np.zeros(self.label_num) + (self.label_smooth / self.label_num)
             for label_str in datum['labels'].split(','):
                 label_indices[int(self.index_dict[label_str])] = 1.0 - self.label_smooth
             label_indices = torch.FloatTensor(label_indices)
             
-            # # Debug print
-            # if self.debug_counter % 100 == 0:
-            #     print(f"Debug - Eval mode: Video ID: {datum['video_id']}, "
-            #           f"Num frames: {len(fbanks)}, "
-            #           f"Fbank shape: {fbanks[0].shape if fbanks else 'N/A'}, "
-            #           f"Image shape: {images[0].shape if images else 'N/A'}")
             self.debug_counter += 1
 
             return torch.stack(fbanks), torch.stack(images), label_indices, datum['video_id'], torch.tensor(frame_indices)
@@ -297,18 +319,11 @@ class AudiosetDataset(Dataset):
                     label_indices[int(self.index_dict[label_str])] = 1.0 - self.label_smooth
                 label_indices = torch.FloatTensor(label_indices)
                 
-                # # Debug print
-                # if self.debug_counter % 100 == 0:
-                #     print(f"Debug - Train mode: Video ID: {datum['video_id']}, "
-                #           f"Fbank shape: {fbank.shape}, "
-                #           f"Image shape: {image.shape}, "
-                #           f"Frame index: {frame_idx}")
                 self.debug_counter += 1
 
                 return fbank, image, label_indices, datum['video_id'], frame_idx
             
             except Exception as e:
-                # print(f'Error loading frame {frame_idx} for video {datum["video_id"]}: {str(e)}')
                 # Return dummy data in case of error
                 return torch.zeros((96, 128)), torch.zeros((3, 224, 224)), torch.zeros(self.label_num), datum['video_id'], frame_idx
 
@@ -334,13 +349,6 @@ def eval_collate_fn(batch):
     video_ids = [vid for vid in video_ids for _ in range(len(frame_indices[0]))]
     frame_indices = torch.cat(frame_indices)
     
-    # print(f"Collate fn - Batch size: {len(batch)}, "
-    #       f"Fbanks shape: {fbanks.shape}, "
-    #       f"Images shape: {images.shape}, "
-    #       f"Labels shape: {labels.shape}, "
-    #       f"Num video IDs: {len(video_ids)}, "
-    #       f"Frame indices shape: {frame_indices.shape}")
-    
     return fbanks, images, labels, video_ids, frame_indices
 
 # New function for training collate
@@ -350,12 +358,5 @@ def train_collate_fn(batch):
     fbanks = torch.stack(fbanks)
     images = torch.stack(images)
     labels = torch.stack(labels)
-    
-    # print(f"Train Collate fn - Batch size: {len(batch)}, "
-    #       f"Fbanks shape: {fbanks.shape}, "
-    #       f"Images shape: {images.shape}, "
-    #       f"Labels shape: {labels.shape}, "
-    #       f"Num video IDs: {len(video_ids)}, "
-    #       f"Frame indices: {frame_indices}")
     
     return fbanks, images, labels, video_ids, frame_indices
