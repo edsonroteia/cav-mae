@@ -24,8 +24,15 @@ def extract_frame(input_video_path, target_fold, extract_frame_num=16, memory_fs
     if memory_fs and input_video_path in memory_fs:
         logging.info(f"Using memory file system for {input_video_path}")
         video_bytes = memory_fs[input_video_path].getvalue()
+        
+        # Convert video bytes to numpy array
+        nparr = np.frombuffer(video_bytes, np.uint8)
+        
+        # Decode the numpy array as a video file
         vidcap = cv2.VideoCapture()
-        vidcap.open(video_bytes)
+        if not vidcap.open(cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)):
+            logging.error(f"Failed to open video from memory: {input_video_path}")
+            return
     else:
         logging.info(f"Opening video file directly: {input_video_path}")
         vidcap = cv2.VideoCapture(input_video_path)
@@ -37,6 +44,10 @@ def extract_frame(input_video_path, target_fold, extract_frame_num=16, memory_fs
     fps = vidcap.get(cv2.CAP_PROP_FPS)
     total_frame_num = min(int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT)), int(fps * 10))
     logging.info(f"Video FPS: {fps}, Total frames: {total_frame_num}")
+
+    if total_frame_num == 0:
+        logging.error(f"No frames detected in video: {input_video_path}")
+        return
 
     frames = []
     for i in range(extract_frame_num):
