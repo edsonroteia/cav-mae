@@ -10,6 +10,10 @@ import io
 import multiprocessing
 import logging
 import torch
+import uuid
+
+# Ensure this path matches where you mounted the RAM disk
+RAM_DISK_PATH = '/mnt/ramdisk'
 
 # Move this outside the function to avoid recreating it for each video
 preprocess = T.Compose([
@@ -22,14 +26,15 @@ def extract_frame(input_video_path, target_fold, extract_frame_num=16, memory_fs
     video_id = os.path.splitext(os.path.basename(input_video_path))[0]
     logging.info(f"Video ID: {video_id}")
     
+    temp_file_path = None
     try:
         if memory_fs and input_video_path in memory_fs:
             video_bytes = memory_fs[input_video_path].getvalue()
-            # Convert bytes to numpy array
-            nparr = np.frombuffer(video_bytes, np.uint8)
-            # Decode the numpy array as a video file
-            vidcap = cv2.VideoCapture()
-            vidcap.open(cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED))
+            # Create a temporary file in the RAM disk
+            temp_file_path = os.path.join(RAM_DISK_PATH, f"{uuid.uuid4()}.mkv")
+            with open(temp_file_path, 'wb') as temp_file:
+                temp_file.write(video_bytes)
+            vidcap = cv2.VideoCapture(temp_file_path)
         else:
             vidcap = cv2.VideoCapture(input_video_path)
         
@@ -71,6 +76,11 @@ def extract_frame(input_video_path, target_fold, extract_frame_num=16, memory_fs
     
     except Exception as e:
         logging.error(f"Error processing video {input_video_path}: {str(e)}")
+    
+    finally:
+        # Clean up the temporary file if it was created
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
 def process_videos(input_file_list, target_fold, memory_fs=None):
     logging.info(f"Processing {len(input_file_list)} videos")
