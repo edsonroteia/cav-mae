@@ -6,10 +6,13 @@ from concurrent.futures import ProcessPoolExecutor
 from extract_video_frame_parallel import process_videos
 from tqdm import tqdm
 import multiprocessing
+import logging
 
 def process_tar_chunk(tar_files_chunk, output_base_dir):
     results = []
     for tar_path in tar_files_chunk:
+        logging.info(f"Processing tar file: {tar_path}")
+        
         # Extract tar file name without extension
         tar_name = os.path.splitext(os.path.basename(tar_path))[0]
         
@@ -32,7 +35,10 @@ def process_tar_chunk(tar_files_chunk, output_base_dir):
         os.makedirs(tar_output_dir, exist_ok=True)
         
         # Process videos using the existing script
+        logging.info(f"Processing {len(mkv_files)} MKV files from {tar_path}")
         process_videos(mkv_files, tar_output_dir, memory_fs)
+        
+        logging.info(f"Finished processing {tar_path}")
         
         # Clear memory
         del memory_fs
@@ -42,6 +48,8 @@ def process_tar_chunk(tar_files_chunk, output_base_dir):
     return results
 
 def main(tar_list_file, num_workers, output_base_dir):
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    
     # Read tar files from the input file
     with open(tar_list_file, 'r') as f:
         tar_files = [line.strip() for line in f.readlines()]
@@ -53,18 +61,24 @@ def main(tar_list_file, num_workers, output_base_dir):
     # Split tar files into chunks
     tar_chunks = [tar_files[i:i + chunk_size] for i in range(0, total_tars, chunk_size)]
     
-    # Process tar chunks in parallel with a progress bar
-    with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        results = list(tqdm(
-            executor.map(process_tar_chunk, tar_chunks, [output_base_dir] * len(tar_chunks)),
-            total=len(tar_chunks),
-            desc="Processing tar chunks",
-            unit="chunk"
-        ))
+    # If there's only one tar file, process it directly without multiprocessing
+    if total_tars == 1:
+        logging.info("Processing single tar file without multiprocessing")
+        process_tar_chunk(tar_files, output_base_dir)
+    else:
+        # Process tar chunks in parallel with a progress bar
+        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+            results = list(tqdm(
+                executor.map(process_tar_chunk, tar_chunks, [output_base_dir] * len(tar_chunks)),
+                total=len(tar_chunks),
+                desc="Processing tar chunks",
+                unit="chunk"
+            ))
+        
+        # Flatten results
+        processed_tars = [item for sublist in results for item in sublist]
     
-    # Flatten results
-    processed_tars = [item for sublist in results for item in sublist]
-    print(f"Processed {len(processed_tars)} tar files out of {total_tars}")
+    logging.info(f"Processed {len(processed_tars)} tar files out of {total_tars}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process tar files and extract video frames.")

@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from argparse import ArgumentParser
 import io
 import multiprocessing
+import logging
 
 preprocess = T.Compose([
     T.Resize(224),
@@ -15,6 +16,7 @@ preprocess = T.Compose([
     T.ToTensor()])
 
 def extract_frame(input_video_path, target_fold, extract_frame_num=16, memory_fs=None):
+    logging.info(f"Extracting frames from: {input_video_path}")
     ext_len = len(input_video_path.split('/')[-1].split('.')[-1])
     video_id = input_video_path.split('/')[-1][:-ext_len-1]
     
@@ -51,13 +53,17 @@ def extract_frame(input_video_path, target_fold, extract_frame_num=16, memory_fs
     for i, image_tensor in frames:
         frame_dir = os.path.join(target_fold, f'frame_{i}')
         os.makedirs(frame_dir, exist_ok=True)
-        save_image(image_tensor, os.path.join(frame_dir, f'{video_id}.jpg'))
+        output_path = os.path.join(frame_dir, f'{video_id}.jpg')
+        save_image(image_tensor, output_path)
+        logging.info(f"Saved frame to: {output_path}")
 
 def process_videos(input_file_list, target_fold, memory_fs=None):
+    logging.info(f"Processing {len(input_file_list)} videos")
     with ThreadPoolExecutor(max_workers=multiprocessing.cpu_count() * 2) as executor:
         executor.map(extract_frame, input_file_list, [target_fold]*len(input_file_list), [16]*len(input_file_list), [memory_fs]*len(input_file_list))
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     parser = ArgumentParser(description="Python script to extract frames from a video, save as jpgs.")
     parser.add_argument("-input_file_list", type=str, default='sample_video_extract_list.csv', help="CSV file of video paths.")
     parser.add_argument("-target_fold", type=str, default='./sample_frames/', help="Directory for extracted frames.")
