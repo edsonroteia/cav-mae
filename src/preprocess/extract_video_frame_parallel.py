@@ -16,46 +16,58 @@ preprocess = T.Compose([
     T.ToTensor()])
 
 def extract_frame(input_video_path, target_fold, extract_frame_num=16, memory_fs=None):
-    logging.info(f"Extracting frames from: {input_video_path}")
+    logging.info(f"Starting frame extraction for: {input_video_path}")
     ext_len = len(input_video_path.split('/')[-1].split('.')[-1])
     video_id = input_video_path.split('/')[-1][:-ext_len-1]
+    logging.info(f"Video ID: {video_id}")
     
     if memory_fs and input_video_path in memory_fs:
+        logging.info(f"Using memory file system for {input_video_path}")
         video_bytes = memory_fs[input_video_path].getvalue()
         vidcap = cv2.VideoCapture()
         vidcap.open(video_bytes)
     else:
+        logging.info(f"Opening video file directly: {input_video_path}")
         vidcap = cv2.VideoCapture(input_video_path)
     
     if not vidcap.isOpened():
-        print(f"Failed to open video: {input_video_path}")
+        logging.error(f"Failed to open video: {input_video_path}")
         return
     
     fps = vidcap.get(cv2.CAP_PROP_FPS)
     total_frame_num = min(int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT)), int(fps * 10))
+    logging.info(f"Video FPS: {fps}, Total frames: {total_frame_num}")
 
     frames = []
     for i in range(extract_frame_num):
         frame_idx = int(i * (total_frame_num / extract_frame_num))
+        logging.info(f"Attempting to read frame at index {frame_idx}")
         vidcap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx - 1)
         success, frame = vidcap.read()
         if not success:
-            print(f"Failed to read frame at index {frame_idx} from {input_video_path}")
+            logging.warning(f"Failed to read frame at index {frame_idx} from {input_video_path}")
             continue
         
+        logging.info(f"Successfully read frame at index {frame_idx}")
         cv2_im = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_im = Image.fromarray(cv2_im)
         image_tensor = preprocess(pil_im)
         frames.append((i, image_tensor))
     
     vidcap.release()
+    logging.info(f"Extracted {len(frames)} frames from {input_video_path}")
     
     for i, image_tensor in frames:
         frame_dir = os.path.join(target_fold, f'frame_{i}')
         os.makedirs(frame_dir, exist_ok=True)
         output_path = os.path.join(frame_dir, f'{video_id}.jpg')
-        save_image(image_tensor, output_path)
-        logging.info(f"Saved frame to: {output_path}")
+        try:
+            save_image(image_tensor, output_path)
+            logging.info(f"Saved frame to: {output_path}")
+        except Exception as e:
+            logging.error(f"Failed to save frame to {output_path}. Error: {str(e)}")
+
+    logging.info(f"Completed frame extraction for: {input_video_path}")
 
 def process_videos(input_file_list, target_fold, memory_fs=None):
     logging.info(f"Processing {len(input_file_list)} videos")
