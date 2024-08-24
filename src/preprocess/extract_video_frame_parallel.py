@@ -58,7 +58,7 @@ def extract_frame(input_video_path, target_fold, extract_frame_num=16, memory_fs
         
         if not frames:
             logging.error(f"No frames extracted from {input_video_path}")
-            return
+            # return
         
         # Process all frames at once
         frames = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames]
@@ -88,7 +88,7 @@ def process_videos(input_file_list, target_fold, memory_fs=None):
         executor.map(extract_frame, input_file_list, [target_fold]*len(input_file_list), [16]*len(input_file_list), [memory_fs]*len(input_file_list))
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
     parser = ArgumentParser(description="Python script to extract frames from a video, save as jpgs.")
     parser.add_argument("-input_file_list", type=str, default='sample_video_extract_list.csv', help="CSV file of video paths.")
     parser.add_argument("-target_fold", type=str, default='./sample_frames/', help="Directory for extracted frames.")
