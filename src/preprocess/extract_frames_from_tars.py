@@ -1,44 +1,70 @@
 import os
 import tarfile
-import tempfile
+import io
 import argparse
 from concurrent.futures import ProcessPoolExecutor
 from extract_video_frame_parallel import process_videos
 from tqdm import tqdm
+import multiprocessing
 
-def process_tar_file(tar_path, output_base_dir):
-    # Extract tar file name without extension
-    tar_name = os.path.splitext(os.path.basename(tar_path))[0]
-    
-    # Create a temporary directory for extraction
-    with tempfile.TemporaryDirectory() as temp_dir:
-        # Extract tar file
-        with tarfile.open(tar_path, 'r') as tar:
-            tar.extractall(path=temp_dir)
+def process_tar_chunk(tar_files_chunk, output_base_dir):
+    results = []
+    for tar_path in tar_files_chunk:
+        # Extract tar file name without extension
+        tar_name = os.path.splitext(os.path.basename(tar_path))[0]
         
-        # Get list of all MKV files in the extracted directory
-        mkv_files = [os.path.join(root, file)
-                     for root, _, files in os.walk(temp_dir)
-                     for file in files if file.endswith('.mkv')]
+        # Create a dictionary to store extracted files in memory
+        memory_fs = {}
+        
+        # Extract tar file to memory
+        with tarfile.open(tar_path, 'r') as tar:
+            for member in tar.getmembers():
+                if member.name.endswith('.mkv'):
+                    f = tar.extractfile(member)
+                    if f is not None:
+                        memory_fs[member.name] = io.BytesIO(f.read())
+        
+        # Get list of all MKV files in the extracted memory filesystem
+        mkv_files = list(memory_fs.keys())
         
         # Create output directory for this tar file
         tar_output_dir = os.path.join(output_base_dir, tar_name)
         os.makedirs(tar_output_dir, exist_ok=True)
         
         # Process videos using the existing script
-        process_videos(mkv_files, tar_output_dir)
+        process_videos(mkv_files, tar_output_dir, memory_fs)
+        
+        # Clear memory
+        del memory_fs
+        
+        results.append(tar_path)
     
-    return tar_path  # Return the processed tar_path
+    return results
 
 def main(tar_list_file, num_workers, output_base_dir):
     # Read tar files from the input file
     with open(tar_list_file, 'r') as f:
         tar_files = [line.strip() for line in f.readlines()]
     
-    # Process tar files in parallel with a progress bar
+    # Calculate chunk size based on available memory and number of workers
+    total_tars = len(tar_files)
+    chunk_size = max(1, min(50, total_tars // num_workers))
+    
+    # Split tar files into chunks
+    tar_chunks = [tar_files[i:i + chunk_size] for i in range(0, total_tars, chunk_size)]
+    
+    # Process tar chunks in parallel with a progress bar
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        list(tqdm(executor.map(process_tar_file, tar_files, [output_base_dir] * len(tar_files)),
-                  total=len(tar_files), desc="Processing tar files", unit="file"))
+        results = list(tqdm(
+            executor.map(process_tar_chunk, tar_chunks, [output_base_dir] * len(tar_chunks)),
+            total=len(tar_chunks),
+            desc="Processing tar chunks",
+            unit="chunk"
+        ))
+    
+    # Flatten results
+    processed_tars = [item for sublist in results for item in sublist]
+    print(f"Processed {len(processed_tars)} tar files out of {total_tars}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process tar files and extract video frames.")

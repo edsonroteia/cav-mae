@@ -4,18 +4,26 @@ import numpy as np
 from PIL import Image
 import torchvision.transforms as T
 from torchvision.utils import save_image
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from argparse import ArgumentParser
+import io
+import multiprocessing
 
 preprocess = T.Compose([
     T.Resize(224),
     T.CenterCrop(224),
     T.ToTensor()])
 
-def extract_frame(input_video_path, target_fold, extract_frame_num=16):
+def extract_frame(input_video_path, target_fold, extract_frame_num=16, memory_fs=None):
     ext_len = len(input_video_path.split('/')[-1].split('.')[-1])
     video_id = input_video_path.split('/')[-1][:-ext_len-1]
-    vidcap = cv2.VideoCapture(input_video_path)
+    
+    if memory_fs and input_video_path in memory_fs:
+        video_bytes = memory_fs[input_video_path].getvalue()
+        vidcap = cv2.VideoCapture()
+        vidcap.open(video_bytes)
+    else:
+        vidcap = cv2.VideoCapture(input_video_path)
     
     if not vidcap.isOpened():
         print(f"Failed to open video: {input_video_path}")
@@ -24,6 +32,7 @@ def extract_frame(input_video_path, target_fold, extract_frame_num=16):
     fps = vidcap.get(cv2.CAP_PROP_FPS)
     total_frame_num = min(int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT)), int(fps * 10))
 
+    frames = []
     for i in range(extract_frame_num):
         frame_idx = int(i * (total_frame_num / extract_frame_num))
         vidcap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx - 1)
@@ -35,14 +44,18 @@ def extract_frame(input_video_path, target_fold, extract_frame_num=16):
         cv2_im = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_im = Image.fromarray(cv2_im)
         image_tensor = preprocess(pil_im)
-        
+        frames.append((i, image_tensor))
+    
+    vidcap.release()
+    
+    for i, image_tensor in frames:
         frame_dir = os.path.join(target_fold, f'frame_{i}')
         os.makedirs(frame_dir, exist_ok=True)
         save_image(image_tensor, os.path.join(frame_dir, f'{video_id}.jpg'))
 
-def process_videos(input_file_list, target_fold):
-    with ProcessPoolExecutor(max_workers=48) as executor:
-        executor.map(extract_frame, input_file_list, [target_fold]*len(input_file_list))
+def process_videos(input_file_list, target_fold, memory_fs=None):
+    with ThreadPoolExecutor(max_workers=multiprocessing.cpu_count() * 2) as executor:
+        executor.map(extract_frame, input_file_list, [target_fold]*len(input_file_list), [16]*len(input_file_list), [memory_fs]*len(input_file_list))
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Python script to extract frames from a video, save as jpgs.")
