@@ -25,7 +25,7 @@ pretrain_path=${cur_dir}/cav-mae-scale++.pth
 
 freeze_base=False
 head_lr=100 # newly initialized ft layers uses 100 times larger than the base lr
-
+ 
 bal=None
 lr=5e-5
 epoch=15

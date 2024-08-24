@@ -14,3 +14,4 @@ from .cav_maev2_m3 import CAVMAEv2 as CAVMAEv2M3, CAVMAEv2FT as CAVMAEv2M3FT
 from .cav_maev2_m3_decomp import CAVMAEv2 as CAVMAEv2M3Decomp
 from .cav_mae_decomp import CAVMAE as CAVMAEDecomp
 from .cav_mae_sync import CAVMAE as CAVMAESync
+from .cav_mae_sync import CAVMAEFT as CAVMAEFTSync

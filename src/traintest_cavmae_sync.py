@@ -149,7 +149,10 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
 
         pbar = tqdm(train_loader, desc=f'Epoch {epoch}/{args.n_epochs}', leave=True)
 
-        for i, (a_input, v_input, labels, video_ids, frame_indices) in enumerate(pbar):
+        for i, batch in enumerate(pbar):
+            if batch is None:
+                continue
+            (a_input, v_input, labels, video_ids, frame_indices) = batch
             B = a_input.size(0)
             a_input = a_input.to(device, non_blocking=True)
             v_input = v_input.to(device, non_blocking=True)
@@ -463,7 +466,10 @@ def validate(audio_model, val_loader, args, run, global_step):
 
     with torch.no_grad():
         pbar = tqdm(val_loader, desc='Validation', leave=True)
-        for i, (a_input, v_input, labels, video_ids, frame_indices) in enumerate(pbar):
+        for i, batch in enumerate(pbar):
+            if batch is None:
+                continue
+            (a_input, v_input, labels, video_ids, frame_indices) = batch
             # print(f"Batch {i}: a_input shape: {a_input.shape}, v_input shape: {v_input.shape}")
             # print(f"Number of video_ids: {len(video_ids)}")
             # print(f"Number of unique video_ids: {len(set(video_ids))}")
