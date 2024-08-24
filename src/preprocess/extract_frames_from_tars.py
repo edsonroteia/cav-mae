@@ -64,8 +64,8 @@ def main(tar_list_file, num_workers, output_base_dir):
     # If there's only one tar file, process it directly without multiprocessing
     if total_tars == 1:
         logging.info("Processing single tar file without multiprocessing")
-        process_tar_chunk(tar_files, output_base_dir)
-        processed_tars = 1
+        results = process_tar_chunk(tar_files, output_base_dir)
+        processed_tars = results
     else:
         # Process tar chunks in parallel with a progress bar
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
