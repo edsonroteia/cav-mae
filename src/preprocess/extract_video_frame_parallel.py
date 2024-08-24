@@ -13,7 +13,7 @@ import torch
 import uuid
 
 # Ensure this path matches where you mounted the RAM disk
-RAM_DISK_PATH = '/mnt/ramdisk'
+RAM_DISK_PATH = '/mnt/tmpfs'
 
 # Move this outside the function to avoid recreating it for each video
 preprocess = T.Compose([
