@@ -22,49 +22,55 @@ def extract_frame(input_video_path, target_fold, extract_frame_num=16, memory_fs
     video_id = os.path.splitext(os.path.basename(input_video_path))[0]
     logging.info(f"Video ID: {video_id}")
     
-    if memory_fs and input_video_path in memory_fs:
-        video_bytes = memory_fs[input_video_path].getvalue()
-        video_array = np.frombuffer(video_bytes, dtype=np.uint8)
-        vidcap = cv2.VideoCapture()
-        vidcap.open(video_array)
-    else:
-        vidcap = cv2.VideoCapture(input_video_path)
-    
-    if not vidcap.isOpened():
-        logging.error(f"Failed to open video: {input_video_path}")
-        return
+    try:
+        if memory_fs and input_video_path in memory_fs:
+            video_bytes = memory_fs[input_video_path].getvalue()
+            # Convert bytes to numpy array
+            nparr = np.frombuffer(video_bytes, np.uint8)
+            # Decode the numpy array as a video file
+            vidcap = cv2.VideoCapture()
+            vidcap.open(cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED))
+        else:
+            vidcap = cv2.VideoCapture(input_video_path)
+        
+        if not vidcap.isOpened():
+            logging.error(f"Failed to open video: {input_video_path}")
+            return
 
-    total_frames = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
-    frame_indices = np.linspace(0, total_frames - 1, extract_frame_num, dtype=int)
+        total_frames = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
+        frame_indices = np.linspace(0, total_frames - 1, extract_frame_num, dtype=int)
+        
+        frames = []
+        for idx in frame_indices:
+            vidcap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            success, frame = vidcap.read()
+            if not success:
+                logging.warning(f"Failed to read frame at index {idx} from {input_video_path}")
+                continue
+            frames.append(frame)
+        
+        vidcap.release()
+        
+        if not frames:
+            logging.error(f"No frames extracted from {input_video_path}")
+            return
+        
+        # Process all frames at once
+        frames = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames]
+        frames = [Image.fromarray(frame) for frame in frames]
+        image_tensors = torch.stack([preprocess(frame) for frame in frames])
+        
+        # Save all frames at once
+        for i, image_tensor in enumerate(image_tensors):
+            frame_dir = os.path.join(target_fold, f'frame_{i}')
+            os.makedirs(frame_dir, exist_ok=True)
+            output_path = os.path.join(frame_dir, f'{video_id}.jpg')
+            save_image(image_tensor, output_path)
+        
+        logging.info(f"Extracted and saved {len(frames)} frames from {input_video_path}")
     
-    frames = []
-    for idx in frame_indices:
-        vidcap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-        success, frame = vidcap.read()
-        if not success:
-            logging.warning(f"Failed to read frame at index {idx} from {input_video_path}")
-            continue
-        frames.append(frame)
-    
-    vidcap.release()
-    
-    if not frames:
-        logging.error(f"No frames extracted from {input_video_path}")
-        return
-    
-    # Process all frames at once
-    frames = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames]
-    frames = [Image.fromarray(frame) for frame in frames]
-    image_tensors = torch.stack([preprocess(frame) for frame in frames])
-    
-    # Save all frames at once
-    for i, image_tensor in enumerate(image_tensors):
-        frame_dir = os.path.join(target_fold, f'frame_{i}')
-        os.makedirs(frame_dir, exist_ok=True)
-        output_path = os.path.join(frame_dir, f'{video_id}.jpg')
-        save_image(image_tensor, output_path)
-    
-    logging.info(f"Extracted and saved {len(frames)} frames from {input_video_path}")
+    except Exception as e:
+        logging.error(f"Error processing video {input_video_path}: {str(e)}")
 
 def process_videos(input_file_list, target_fold, memory_fs=None):
     logging.info(f"Processing {len(input_file_list)} videos")
