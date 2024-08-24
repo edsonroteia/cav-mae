@@ -32,3 +32,4 @@ egs/audioset/visualizations
 visualizations
 wandb
 reconstruction*
+exp/*
