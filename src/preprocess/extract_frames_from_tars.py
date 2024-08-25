@@ -2,10 +2,7 @@ import os
 import tarfile
 import io
 import argparse
-from concurrent.futures import ProcessPoolExecutor
-from extract_video_frame_parallel import process_videos
 from tqdm import tqdm
-import multiprocessing
 import logging
 
 def process_tar_chunk(tar_files_chunk, output_base_dir):
@@ -47,46 +44,24 @@ def process_tar_chunk(tar_files_chunk, output_base_dir):
     
     return results
 
-def main(tar_list_file, num_workers, output_base_dir):
-    logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
+def main(tar_list_file, output_base_dir):
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     
     # Read tar files from the input file
     with open(tar_list_file, 'r') as f:
         tar_files = [line.strip() for line in f.readlines()]
     
-    # Calculate chunk size based on available memory and number of workers
-    total_tars = len(tar_files)
-    chunk_size = max(1, min(50, total_tars // num_workers))
+    # Process tar files one at a time
+    for tar_file in tqdm(tar_files, desc="Processing tar files", unit="tar"):
+        process_tar_chunk([tar_file], output_base_dir)
     
-    # Split tar files into chunks
-    tar_chunks = [tar_files[i:i + chunk_size] for i in range(0, total_tars, chunk_size)]
-    
-    # If there's only one tar file, process it directly without multiprocessing
-    if total_tars == 1:
-        logging.info("Processing single tar file without multiprocessing")
-        results = process_tar_chunk(tar_files, output_base_dir)
-        processed_tars = results
-    else:
-        # Process tar chunks in parallel with a progress bar
-        with ProcessPoolExecutor(max_workers=num_workers) as executor:
-            results = list(tqdm(
-                executor.map(process_tar_chunk, tar_chunks, [output_base_dir] * len(tar_chunks)),
-                total=len(tar_chunks),
-                desc="Processing tar chunks",
-                unit="chunk"
-            ))
-        
-        # Flatten results
-        processed_tars = [item for sublist in results for item in sublist]
-    
-    logging.info(f"Processed {len(processed_tars)} tar files out of {total_tars}")
+    logging.info(f"Processed {len(tar_files)} tar files")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process tar files and extract video frames.")
     parser.add_argument("tar_list_file", help="Path to the text file containing the list of tar files")
-    parser.add_argument("num_workers", type=int, help="Number of worker processes")
     parser.add_argument("output_base_dir", help="Base output directory for extracted frames")
     
     args = parser.parse_args()
     
-    main(args.tar_list_file, args.num_workers, args.output_base_dir)
+    main(args.tar_list_file, args.output_base_dir)
