@@ -25,6 +25,10 @@ from sklearn import metrics
 from traintest_ft_sync import train, validate
 from dataloader_sync import eval_collate_fn, train_collate_fn
 import neptune
+import matplotlib.pyplot as plt
+import seaborn as sns
+import io
+from PIL import Image
 
 # finetune cav-mae model
 
