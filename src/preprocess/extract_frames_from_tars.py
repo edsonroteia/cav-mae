@@ -4,6 +4,7 @@ import io
 import argparse
 from tqdm import tqdm
 import logging
+from extract_video_frame_parallel import process_videos
 
 def process_tar_chunk(tar_files_chunk, output_base_dir):
     results = []
