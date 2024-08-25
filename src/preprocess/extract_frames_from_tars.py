@@ -46,7 +46,7 @@ def process_tar_chunk(tar_files_chunk, output_base_dir):
     return results
 
 def main(tar_list_file, output_base_dir):
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.disable(logging.CRITICAL)
     
     # Read tar files from the input file
     with open(tar_list_file, 'r') as f:
