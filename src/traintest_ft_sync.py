@@ -69,13 +69,14 @@ def visualize_roc_curve(y_true, y_score, step, run):
     
     log_plot_to_neptune(run, "roc_curve", fig, step)
 
-def visualize_prediction_distribution(predictions, step, run):
+def visualize_class_distribution(y_true, step, run):
+    class_counts = np.sum(y_true, axis=0)
     fig, ax = plt.subplots()
-    sns.histplot(predictions, kde=True, ax=ax)
-    ax.set_title('Distribution of Predictions')
-    ax.set_xlabel('Prediction Value')
+    ax.bar(range(len(class_counts)), class_counts)
+    ax.set_xlabel('Class')
     ax.set_ylabel('Count')
-    log_plot_to_neptune(run, "prediction_distribution", fig, step)
+    ax.set_title('Class Distribution')
+    log_plot_to_neptune(run, "class_distribution", fig, step)
 
 def train(audio_model, train_loader, test_loader, args, run):
     params = vars(args)
@@ -220,36 +221,36 @@ def train(audio_model, train_loader, test_loader, args, run):
         mAUC = np.mean([stat['auc'] for stat in stats])
         acc = stats[0]['acc'] # this is just a trick, acc of each class entry is the same, which is the accuracy of all classes, not class-wise accuracy
 
-        if main_metrics == 'mAP':
-            print("mAP: {:.6f}".format(mAP))
-        else:
-            print("acc: {:.6f}".format(acc))
+        print("mAP: {:.6f}".format(mAP))
         print("AUC: {:.6f}".format(mAUC))
         print("d_prime: {:.6f}".format(d_prime(mAUC)))
         print("train_loss: {:.6f}".format(loss_meter.avg))
         print("valid_loss: {:.6f}".format(valid_loss))
-        run['valid/mAP'].log(mAP, step=global_step)
-        run['valid/acc'].log(acc, step=global_step)
-        run['valid/auc'].log(mAUC, step=global_step)
-        run['valid/d_prime'].log(d_prime(mAUC), step=global_step)
-        run['valid/loss'].log(valid_loss, step=global_step)
+
+        # Log important metrics
+        run['valid/mAP'].log(mAP, step=epoch)
+        run['valid/AUC'].log(mAUC, step=epoch)
+        run['valid/d_prime'].log(d_prime(mAUC), step=epoch)
+        run['train/loss'].log(loss_meter.avg, step=epoch)
+        run['valid/loss'].log(valid_loss, step=epoch)
 
         # Visualizations
         try:
-            # Confusion Matrix
-            y_true = np.argmax(np.concatenate([stat['target'] for stat in stats]), axis=1)
-            y_pred = np.argmax(np.concatenate([stat['prediction'] for stat in stats]), axis=1)
+            y_true = np.concatenate([stat['target'] for stat in stats])
+            y_pred = np.concatenate([stat['prediction'] for stat in stats])
+            y_pred_classes = np.argmax(y_pred, axis=1)
+            y_true_classes = np.argmax(y_true, axis=1)
+
             class_names = [f'Class {i}' for i in range(args.n_class)]
-            visualize_confusion_matrix(y_true, y_pred, class_names, global_step, run)
 
-            # ROC Curve (one-vs-rest for multi-class)
-            y_true_bin = label_binarize(y_true, classes=range(args.n_class))
-            y_score = np.concatenate([stat['prediction'] for stat in stats])
-            visualize_roc_curve(y_true_bin, y_score, global_step, run)
+            # Confusion Matrix
+            visualize_confusion_matrix(y_true_classes, y_pred_classes, class_names, epoch, run)
 
-            # Prediction Distribution
-            all_predictions = y_score.flatten()  # Flatten for multi-class
-            visualize_prediction_distribution(all_predictions, global_step, run)
+            # ROC Curve
+            visualize_roc_curve(y_true, y_pred, epoch, run)
+
+            # Class Distribution
+            visualize_class_distribution(y_true, epoch, run)
 
         except Exception as e:
             print(f"Error in visualization: {e}")
@@ -296,10 +297,6 @@ def train(audio_model, train_loader, test_loader, args, run):
         run['valid/epoch_mAP'].log(mAP, step=epoch)
         run['valid/epoch_acc'].log(acc, step=epoch)
         run['valid/epoch_auc'].log(mAUC, step=epoch)
-
-        for i, stat in enumerate(stats):
-            run[f'valid/class_{i}_AP'].log(stat['AP'], step=global_step)
-            run[f'valid/class_{i}_AUC'].log(stat['auc'], step=global_step)
 
         epoch += 1
 
