@@ -248,22 +248,9 @@ def train(audio_model, train_loader, test_loader, args, run):
             print("Starting visualizations...")
             print(f"Stats keys: {stats[0].keys()}")  # Print available keys in stats
 
-            if 'target' not in stats[0]:
-                print("Warning: 'target' key not found in stats. Available keys:", stats[0].keys())
-                # Try to use an alternative key if 'target' is not available
-                target_key = 'label' if 'label' in stats[0] else next(iter(stats[0]))
-            else:
-                target_key = 'target'
-
-            if 'prediction' not in stats[0]:
-                print("Warning: 'prediction' key not found in stats. Available keys:", stats[0].keys())
-                # Try to use an alternative key if 'prediction' is not available
-                pred_key = 'output' if 'output' in stats[0] else next(iter(stats[0]))
-            else:
-                pred_key = 'prediction'
-
-            y_true = np.concatenate([stat[target_key] for stat in stats])
-            y_pred = np.concatenate([stat[pred_key] for stat in stats])
+            # Use A_predictions and A_targets instead of stats for raw data
+            y_pred = torch.cat(A_predictions).cpu().numpy()
+            y_true = torch.cat(A_targets).cpu().numpy()
             
             print(f"y_true shape: {y_true.shape}, y_pred shape: {y_pred.shape}")
             
@@ -280,6 +267,11 @@ def train(audio_model, train_loader, test_loader, args, run):
 
             # Class Distribution
             visualize_class_distribution(y_true, epoch, run)
+
+            # Log additional metrics from stats
+            for i, stat in enumerate(stats):
+                run[f'valid/class_{i}_AP'].log(stat['AP'], step=epoch)
+                run[f'valid/class_{i}_AUC'].log(stat['auc'], step=epoch)
 
         except Exception as e:
             print(f"Error in visualization: {str(e)}")
