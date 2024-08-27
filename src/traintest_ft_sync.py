@@ -35,6 +35,8 @@ def log_plot_to_neptune(run, plot_name, fig, step):
     plt.close(fig)
 
 def visualize_confusion_matrix(y_true, y_pred, class_names, step, run):
+    print("Visualizing Confusion Matrix...")
+    print(f"y_true shape: {y_true.shape}, y_pred shape: {y_pred.shape}")
     cm = confusion_matrix(y_true, y_pred)
     fig, ax = plt.subplots(figsize=(10, 10))
     sns.heatmap(cm, annot=True, fmt='d', ax=ax, cmap='Blues')
@@ -46,6 +48,8 @@ def visualize_confusion_matrix(y_true, y_pred, class_names, step, run):
     log_plot_to_neptune(run, "confusion_matrix", fig, step)
 
 def visualize_roc_curve(y_true, y_score, step, run):
+    print("Visualizing ROC Curve...")
+    print(f"y_true shape: {y_true.shape}, y_score shape: {y_score.shape}")
     n_classes = y_true.shape[1]
     fpr = dict()
     tpr = dict()
@@ -70,6 +74,8 @@ def visualize_roc_curve(y_true, y_score, step, run):
     log_plot_to_neptune(run, "roc_curve", fig, step)
 
 def visualize_class_distribution(y_true, step, run):
+    print("Visualizing Class Distribution...")
+    print(f"y_true shape: {y_true.shape}")
     class_counts = np.sum(y_true, axis=0)
     fig, ax = plt.subplots()
     ax.bar(range(len(class_counts)), class_counts)
