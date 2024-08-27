@@ -191,9 +191,12 @@ def train(audio_model, train_loader, test_loader, args, run):
             scaler.step(optimizer)
             scaler.update()
 
-            run['train/loss'].log(loss.item(), step=global_step)
-            run['train/batch_time'].log(time.time() - end_time, step=global_step)
-            run['train/learning_rate'].log(optimizer.param_groups[0]['lr'], step=global_step)
+            # Use a combination of epoch and batch index for unique step values
+            current_step = epoch * len(train_loader) + i
+
+            run['train/loss'].log(loss.item(), step=current_step)
+            run['train/batch_time'].log(time.time() - end_time, step=current_step)
+            run['train/learning_rate'].log(optimizer.param_groups[0]['lr'], step=current_step)
 
             loss_meter.update(loss.item(), B)
             batch_time.update(time.time() - end_time)
@@ -242,8 +245,28 @@ def train(audio_model, train_loader, test_loader, args, run):
 
         # Visualizations
         try:
-            y_true = np.concatenate([stat['target'] for stat in stats])
-            y_pred = np.concatenate([stat['prediction'] for stat in stats])
+            print("Starting visualizations...")
+            print(f"Stats keys: {stats[0].keys()}")  # Print available keys in stats
+
+            if 'target' not in stats[0]:
+                print("Warning: 'target' key not found in stats. Available keys:", stats[0].keys())
+                # Try to use an alternative key if 'target' is not available
+                target_key = 'label' if 'label' in stats[0] else next(iter(stats[0]))
+            else:
+                target_key = 'target'
+
+            if 'prediction' not in stats[0]:
+                print("Warning: 'prediction' key not found in stats. Available keys:", stats[0].keys())
+                # Try to use an alternative key if 'prediction' is not available
+                pred_key = 'output' if 'output' in stats[0] else next(iter(stats[0]))
+            else:
+                pred_key = 'prediction'
+
+            y_true = np.concatenate([stat[target_key] for stat in stats])
+            y_pred = np.concatenate([stat[pred_key] for stat in stats])
+            
+            print(f"y_true shape: {y_true.shape}, y_pred shape: {y_pred.shape}")
+            
             y_pred_classes = np.argmax(y_pred, axis=1)
             y_true_classes = np.argmax(y_true, axis=1)
 
@@ -259,7 +282,10 @@ def train(audio_model, train_loader, test_loader, args, run):
             visualize_class_distribution(y_true, epoch, run)
 
         except Exception as e:
-            print(f"Error in visualization: {e}")
+            print(f"Error in visualization: {str(e)}")
+            print(f"Stats structure: {stats[0]}")  # Print the structure of the first stats entry
+            import traceback
+            traceback.print_exc()  # Print the full traceback for more detailed error information
 
         result[epoch-1, :] = [acc, mAP, mAUC, optimizer.param_groups[0]['lr']]
         np.savetxt(exp_dir + '/result.csv', result, delimiter=',')
