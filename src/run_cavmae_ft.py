@@ -23,6 +23,7 @@ import warnings
 import json
 from sklearn import metrics
 from traintest_ft import train, validate
+import neptune
 
 # finetune cav-mae model
 
@@ -143,8 +144,14 @@ with open("%s/args.pkl" % args.exp_dir, "wb") as f:
 with open(args.exp_dir + '/args.json', 'w') as f:
     json.dump(args.__dict__, f, indent=2)
 
+# Initialize Neptune run
+run = neptune.init_run(
+    project="junioroteia/CAV-MAE",
+    api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJmNGE4NDA2NS1hYmE2LTQ3YWYtODllMC02ODk4NGNlODY0MDUifQ==",
+)
+
 print('Now starting training for {:d} epochs.'.format(args.n_epochs))
-train(audio_model, train_loader, val_loader, args)
+train(audio_model, train_loader, val_loader, args, run)
 
 # average the model weights of checkpoints, note it is not ensemble, and does not increase computational overhead
 def wa_model(exp_dir, start_epoch, end_epoch):
@@ -179,7 +186,7 @@ if args.skip_frame_agg == True:
     val_loader = torch.utils.data.DataLoader(
         dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
         batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
-    stats, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
+    stats, audio_output, target = validate(audio_model, val_loader, args, run, output_pred=True)
     if args.metrics == 'mAP':
         cur_res = np.mean([stat['AP'] for stat in stats])
         print('mAP is {:.4f}'.format(cur_res))
@@ -195,7 +202,7 @@ else:
         val_loader = torch.utils.data.DataLoader(
             dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
             batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
-        stats, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
+        stats, audio_output, target = validate(audio_model, val_loader, args, run, output_pred=True)
         print(audio_output.shape)
         if args.metrics == 'acc':
             audio_output = torch.nn.functional.softmax(audio_output.float(), dim=-1)
@@ -228,3 +235,12 @@ else:
         print('multi-frame mAP is {:.4f}'.format(mAP))
         res.append(mAP)
     np.savetxt(args.exp_dir + '/mul_frame_res.csv', res, delimiter=',')
+
+# Log final results to Neptune
+run['final/mAP'].log(mAP)
+# run['final/AUC'].log(mAUC)
+# run['final/d_prime'].log(d_prime(mAUC))
+run['final/acc'].log(acc)
+
+# Stop the Neptune run
+run.stop()

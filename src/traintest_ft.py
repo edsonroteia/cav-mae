@@ -18,6 +18,7 @@ import pickle
 from torch.cuda.amp import autocast,GradScaler
 import wandb
 from tqdm import tqdm
+from traintest_ft_sync import visualize_confusion_matrix, visualize_roc_curve, visualize_class_distribution
 
 
 def train(audio_model, train_loader, test_loader, args, run):
