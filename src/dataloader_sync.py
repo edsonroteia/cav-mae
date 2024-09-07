@@ -74,8 +74,8 @@ class AudiosetDataset(Dataset):
         if num_samples is not None:
             self.data = self.data[:num_samples]
         self.data = self.pro_data(self.data)
-        print('Dataset has {:d} samples'.format(self.data.shape[0]))
-        self.num_samples = self.data.shape[0]
+        self.num_samples = len(self.data)  # Update this line
+        print('Dataset has {:d} samples'.format(self.num_samples))
         self.audio_conf = audio_conf
         self.label_smooth = self.audio_conf.get('label_smooth', 0.0)
         print('Using Label Smoothing: ' + str(self.label_smooth))
@@ -268,6 +268,9 @@ class AudiosetDataset(Dataset):
         Note:
             In case of errors during processing, dummy data may be returned in training mode.
         """
+        if index >= self.num_samples:
+            raise IndexError(f"Index {index} is out of bounds for dataset with {self.num_samples} samples")
+        
         datum = self.decode_data(self.data[index])
         
         if self.mode == 'eval':
