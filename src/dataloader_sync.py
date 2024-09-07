@@ -71,11 +71,12 @@ class AudiosetDataset(Dataset):
 
         num_samples = audio_conf.get('num_samples')
         self.data = data_json['data']
+        print(f"Original data length: {len(self.data)}")
         if num_samples is not None:
             self.data = self.data[:num_samples]
         self.data = self.pro_data(self.data)
-        self.num_samples = len(self.data)  # Update this line
-        print('Dataset has {:d} samples'.format(self.num_samples))
+        self.num_samples = len(self.data)
+        print(f'Dataset has {self.num_samples} samples after processing')
         self.audio_conf = audio_conf
         self.label_smooth = self.audio_conf.get('label_smooth', 0.0)
         print('Using Label Smoothing: ' + str(self.label_smooth))

@@ -39,8 +39,8 @@ batch_size=256
 lr_adapt=False
 
 dataset=audioset
-tr_data=datafilles/cluster_nodes/audioset_2m_cleaned_aug24.json
-te_data=datafilles/cluster_nodes/audioset_eval_cleaned_aug24.json
+tr_data=datafilles/audioset_2m/cluster_nodes/audioset_2m_cleaned_aug24.json
+te_data=datafilles/audioset_2m/cluster_nodes/audioset_eval_cleaned_aug24.json
 label_csv=datafilles/class_labels_indices.csv
 
 exp_dir=/data1/edson/cavmae/exp/sync-${dataset}-${model}-bal${bal}-lr${lr}-epoch${epoch}-bs${batch_size}-norm${norm_pix_loss}-c${contrast_loss_weight}-p${mae_loss_weight}-tp${tr_pos}-mr-${mask_mode}-${masking_ratio}-$(date +%Y%m%d_%H%M%S)
