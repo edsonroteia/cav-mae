@@ -52,7 +52,7 @@ label_csv=datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv
 exp_dir=./exp/testmae02-${dataset}-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-a5-$(date +%Y%m%d_%H%M%S)
 mkdir -p $exp_dir
 
-CUDA_CACHE_DISABLE=1 python -W ignore ../../src/run_cavmae_ft.py --model ${model} --dataset ${dataset} \
+CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft.py --model ${model} --dataset ${dataset} \
 --data-train ${tr_data} --data-val ${te_data} --exp-dir $exp_dir \
 --label-csv ${label_csv} --n_class 309 \
 --lr $lr --n-epochs ${epoch} --batch-size $batch_size --save_model True \
