@@ -102,26 +102,38 @@ audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm':
 val_audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': args.dataset,
                   'mode':'eval', 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': im_res}
 
-if args.bal == 'bal':
-    print('balanced sampler is being used')
-    if args.weight_file == None:
+def get_loader(args, audio_conf, train_csv, val_csv):
+    print('Now process ' + args.dataset)
+    train_dataset = dataloader.AudiosetDataset(train_csv, audio_conf, label_csv=args.label_csv)
+    val_dataset = dataloader.AudiosetDataset(val_csv, audio_conf, label_csv=args.label_csv)
+    
+    print('Number of training samples: {}'.format(len(train_dataset)))
+    print('Number of validation samples: {}'.format(len(val_dataset)))
+
+    if args.bal == 'bal':
+        print('Using balanced sampler')
         samples_weight = np.loadtxt(args.data_train[:-5]+'_weight.csv', delimiter=',')
+        if args.num_samples is not None:
+            samples_weight = samples_weight[:args.num_samples]
+            if len(samples_weight) != len(train_dataset):
+                raise ValueError(f"Number of weights ({len(samples_weight)}) does not match number of samples in dataset ({len(train_dataset)})")
+        sampler = WeightedRandomSampler(samples_weight, len(samples_weight), replacement=True)
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=args.batch_size, sampler=sampler, num_workers=args.num_workers, 
+            pin_memory=True, drop_last=True, collate_fn=train_collate_fn)
     else:
-        samples_weight = np.loadtxt(args.data_train[:-5] + '_' + args.weight_file + '.csv', delimiter=',')
-    sampler = WeightedRandomSampler(samples_weight, len(samples_weight), replacement=True)
+        print('Using random sampler')
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, 
+            pin_memory=True, drop_last=True, collate_fn=train_collate_fn)
 
-    train_loader = torch.utils.data.DataLoader(
-        dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
-        batch_size=args.batch_size, sampler=sampler, num_workers=args.num_workers, pin_memory=True, drop_last=True, collate_fn=train_collate_fn)
-else:
-    print('balanced sampler is not used')
-    train_loader = torch.utils.data.DataLoader(
-        dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
-        batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True, drop_last=True, collate_fn=train_collate_fn)
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, 
+        pin_memory=True, collate_fn=eval_collate_fn)
+    
+    return train_loader, val_loader
 
-val_loader = torch.utils.data.DataLoader(
-    dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
-    batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True, drop_last=True, collate_fn=eval_collate_fn)
+train_loader, val_loader = get_loader(args, audio_conf, args.data_train, args.data_val)
 
 if args.data_eval != None:
     eval_loader = torch.utils.data.DataLoader(
