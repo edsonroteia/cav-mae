@@ -5,7 +5,7 @@ from dataloader import AudiosetDataset as OldDataset
 from dataloader_sync import AudiosetDataset as NewDataset
 import argparse
 
-def compare_dataloaders(dataset_json_file):
+def compare_dataloaders(dataset_json_file, class_labels_indices):
     # Common configuration
     audio_conf = {
         "num_mel_bins": 128,
@@ -19,11 +19,11 @@ def compare_dataloaders(dataset_json_file):
         "noise": True,
         "skip_norm": False
     }
-    label_csv = "data/class_labels_indices.csv"  # Adjust this path if needed
+    label_csv = class_labels_indices  # Adjust this path if needed
 
     # Initialize both datasets
-    old_dataset = OldDataset(args.data_val, label_csv=args.label_csv, audio_conf=audio_conf)
-    new_dataset = NewDataset(args.data_val, label_csv=args.label_csv, audio_conf=audio_conf)
+    old_dataset = OldDataset(args.data_val, label_csv=label_csv, audio_conf=audio_conf)
+    new_dataset = NewDataset(args.data_val, label_csv=label_csv, audio_conf=audio_conf)
 
     # Create DataLoaders
     old_loader = DataLoader(old_dataset, batch_size=1, shuffle=False)
@@ -65,6 +65,7 @@ def compare_dataloaders(dataset_json_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare dataloaders using a specified dataset JSON file.")
     parser.add_argument("dataset_json", type=str, help="Path to the dataset JSON file")
+    parser.add_argument("class_labels_indices", type=str, help="Path to the dataset csv file")
     args = parser.parse_args()
 
-    compare_dataloaders(args.dataset_json)
+    compare_dataloaders(args.dataset_json, args.class_labels_indices)
