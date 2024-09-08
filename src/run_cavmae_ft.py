@@ -186,7 +186,7 @@ if args.skip_frame_agg == True:
     val_loader = torch.utils.data.DataLoader(
         dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
         batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
-    stats, audio_output, target = validate(audio_model, val_loader, args, run, output_pred=True)
+    stats, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
     if args.metrics == 'mAP':
         cur_res = np.mean([stat['AP'] for stat in stats])
         print('mAP is {:.4f}'.format(cur_res))
@@ -202,7 +202,7 @@ else:
         val_loader = torch.utils.data.DataLoader(
             dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
             batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
-        stats, audio_output, target = validate(audio_model, val_loader, args, run, output_pred=True)
+        stats, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
         print(audio_output.shape)
         if args.metrics == 'acc':
             audio_output = torch.nn.functional.softmax(audio_output.float(), dim=-1)
