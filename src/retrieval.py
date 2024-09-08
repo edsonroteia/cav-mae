@@ -18,6 +18,7 @@ from torch.cuda.amp import autocast
 from torch import nn
 from numpy import dot
 from numpy.linalg import norm
+from tqdm import tqdm
 
 def get_immediate_subdirectories(a_dir):
     return [name for name in os.listdir(a_dir) if os.path.isdir(os.path.join(a_dir, name))]
@@ -69,7 +70,8 @@ def get_retrieval_result(audio_model, val_loader, direction='audio'):
 
     A_a_feat, A_v_feat = [], []
     with torch.no_grad():
-        for i, (a_input, v_input, labels) in enumerate(val_loader):
+        # Add tqdm progress bar
+        for i, (a_input, v_input, labels) in tqdm(enumerate(val_loader), total=len(val_loader), desc="Processing batches"):
             audio_input, video_input = a_input.to(device), v_input.to(device)
             with autocast():
                 audio_output, video_output = audio_model.module.forward_feat(audio_input, video_input)
