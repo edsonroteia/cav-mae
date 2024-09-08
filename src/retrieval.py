@@ -109,7 +109,9 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     args.loss_fn = torch.nn.BCELoss()
     val_loader = torch.utils.data.DataLoader(dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
     # cav-mae only been ssl pretrained
-    if model_type == 'pretrain':
+    if model_type == 'sync_pretrain':
+        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11)
+    elif model_type == 'pretrain':
         audio_model = models.CAVMAE(modality_specific_depth=11)
     # cav-mae only been ssl pretrained + supervisedly finetuned
     elif model_type == 'finetune':
@@ -129,6 +131,7 @@ if __name__ == "__main__":
     data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
     label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
     dataset = 'vggsound'
+    model_type='sync'
 
     res = []
 
@@ -137,15 +140,15 @@ if __name__ == "__main__":
         for direction in ['video', 'audio']:
             audio_conf = {'num_mel_bins': 128, 'target_length': 1024, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
                         'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5}
-            r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=309, direction=direction, model_type='pretrain', batch_size=100)
+            r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=309, direction=direction, model_type=model_type, batch_size=100)
             res.append([dataset, direction, r1, r5, r10, mr])
 
     elif dataset == "vggsound":
         # for vggsound
         for direction in ['video', 'audio']:
-            audio_conf = {'num_mel_bins': 128, 'target_length': 1024, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
+            audio_conf = {'num_mel_bins': 128, 'target_length': 96, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
                         'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5}
-            r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=309, direction=direction, model_type='pretrain', batch_size=100)
+            r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=309, direction=direction, model_type=model_type, batch_size=100)
             res.append([dataset, direction, r1, r5, r10, mr])
     else:
         print(f"Unsupported dataset: {dataset}")
