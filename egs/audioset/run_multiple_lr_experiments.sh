@@ -13,6 +13,7 @@ run_and_monitor() {
 
     echo "Starting experiment: $exp_name (Learning Rate: $lr, Batch Size: $batch_size, FT Mode: $ftmode)"
     echo "Output file: $output_file"
+    echo "Running command: $base_command $lr $batch_size $ftmode"
 
     # Run the experiment in the background and capture its PID
     $base_command $lr $batch_size $ftmode > "$output_file" 2>&1 &

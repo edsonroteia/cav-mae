@@ -16,14 +16,14 @@ from torch import nn
 import numpy as np
 import pickle
 from torch.cuda.amp import autocast,GradScaler
-import wandb
+# import wandb
 from tqdm import tqdm
 from traintest_ft_sync import visualize_confusion_matrix, visualize_roc_curve, visualize_class_distribution
 
 
 def train(audio_model, train_loader, test_loader, args, run):
     params = vars(args)
-    wandb.init(project="cavmaev2", entity="edsonroteia", name=args.wandb_name, config=params)  
+    # wandb.init(project="cavmaev2", entity="edsonroteia", name=args.wandb_name, config=params)  
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print('running on ' + str(device))
     torch.set_grad_enabled(True)
@@ -127,7 +127,7 @@ def train(audio_model, train_loader, test_loader, args, run):
 
             run['train/loss'].log(loss.item())
             run['train/batch_time'].log(time.time() - end_time)
-            wandb.log({'train/loss': loss.item(), 'train/batch_time': time.time() - end_time})
+            # wandb.log({'train/loss': loss.item(), 'train/batch_time': time.time() - end_time})
 
             loss_meter.update(loss.item(), B)
             batch_time.update(time.time() - end_time)
@@ -174,7 +174,7 @@ def train(audio_model, train_loader, test_loader, args, run):
         run['valid/auc'].log(mAUC)
         run['valid/d_prime'].log(d_prime(mAUC))
         run['valid/loss'].log(valid_loss)
-        wandb.log({'valid/mAP': mAP, 'valid/acc': acc, 'valid/auc': mAUC, 'valid/d_prime': d_prime(mAUC), 'valid/loss': valid_loss})
+        # wandb.log({'valid/mAP': mAP, 'valid/acc': acc, 'valid/auc': mAUC, 'valid/d_prime': d_prime(mAUC), 'valid/loss': valid_loss})
         
         result[epoch-1, :] = [acc, mAP, mAUC, optimizer.param_groups[0]['lr']]
         np.savetxt(exp_dir + '/result.csv', result, delimiter=',')
