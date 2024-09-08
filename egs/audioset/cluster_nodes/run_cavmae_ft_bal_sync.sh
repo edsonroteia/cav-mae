@@ -46,7 +46,7 @@ label_smooth=0.1
 dataset=audioset
 tr_data=datafilles/audioset_20k/cluster_nodes/audioset_20k_cleaned.json
 te_data=datafilles/audioset_20k/cluster_nodes/audioset_eval_cleaned_aug24.json
-label_csv=datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv
+label_csv=datafilles/audioset_20k/cluster_nodes/class_labels_indices.csv
 
 exp_dir=./exp/testmae02-${dataset}-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-a5-$(date +%Y%m%d_%H%M%S)
 mkdir -p $exp_dir
