@@ -1,8 +1,8 @@
 import torch
 from torch.utils.data import DataLoader
 import numpy as np
-from src.dataloader import AudiosetDataset as OldDataset
-from src.dataloader_sync import AudiosetDataset as NewDataset
+from dataloader import AudiosetDataset as OldDataset
+from dataloader_sync import AudiosetDataset as NewDataset
 import argparse
 
 def compare_dataloaders(dataset_json_file):
@@ -22,8 +22,10 @@ def compare_dataloaders(dataset_json_file):
     label_csv = "data/class_labels_indices.csv"  # Adjust this path if needed
 
     # Initialize both datasets
-    old_dataset = OldDataset(dataset_json_file, audio_conf, label_csv)
-    new_dataset = NewDataset(dataset_json_file, audio_conf, label_csv)
+    old_dataset = OldDataset(args.data_val, label_csv=args.label_csv, audio_conf=audio_conf),
+    batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True, drop_last=True)
+    new_dataset = NewDataset(args.data_val, label_csv=args.label_csv, audio_conf=audio_conf),
+    batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True, drop_last=True)
 
     # Create DataLoaders
     old_loader = DataLoader(old_dataset, batch_size=1, shuffle=False)
