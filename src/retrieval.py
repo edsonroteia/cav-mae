@@ -88,7 +88,7 @@ def get_retrieval_result(audio_model, val_loader, direction='audio'):
     A_a_feat = torch.cat(A_a_feat)
     A_v_feat = torch.cat(A_v_feat)
     if direction == 'audio':
-        # audio->visual retrieval
+        # audio->visual retrieval 
         sim_mat = get_sim_mat(A_a_feat, A_v_feat)
     elif direction == 'video':
         # visual->audio retrieval
