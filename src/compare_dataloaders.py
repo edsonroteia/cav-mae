@@ -22,10 +22,8 @@ def compare_dataloaders(dataset_json_file):
     label_csv = "data/class_labels_indices.csv"  # Adjust this path if needed
 
     # Initialize both datasets
-    old_dataset = OldDataset(args.data_val, label_csv=args.label_csv, audio_conf=audio_conf),
-    batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True, drop_last=True)
-    new_dataset = NewDataset(args.data_val, label_csv=args.label_csv, audio_conf=audio_conf),
-    batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True, drop_last=True)
+    old_dataset = OldDataset(args.data_val, label_csv=args.label_csv, audio_conf=audio_conf)
+    new_dataset = NewDataset(args.data_val, label_csv=args.label_csv, audio_conf=audio_conf)
 
     # Create DataLoaders
     old_loader = DataLoader(old_dataset, batch_size=1, shuffle=False)
