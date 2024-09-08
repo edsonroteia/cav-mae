@@ -129,7 +129,7 @@ def get_loader(args, audio_conf, train_csv, val_csv):
 
     val_loader = torch.utils.data.DataLoader(
         val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, 
-        pin_memory=True, collate_fn=eval_collate_fn)
+        pin_memory=True, collate_fn=train_collate_fn)
     
     return train_loader, val_loader
 
