@@ -14,7 +14,6 @@
 export TORCH_HOME=../../pretrained_models
 
 model=cav-mae-ft
-ftmode=multimodal
 
 # you can replace with any checkpoint you want, but by default, we use cav-mae-scale++
 pretrain_dir=/local/$SLURM_JOB_ID/models/
@@ -26,6 +25,7 @@ head_lr=100 # newly initialized ft layers uses 10 times larger than the base lr
 bal=None
 lr=${1:-5e-5}  # Use the first argument as lr, default to 1e-4 if not provided
 batch_size=${2:-48}  # Use the second argument as batch_size, default to 24 if not provided
+ftmode=${3:-multimodal}
 epoch=15
 lrscheduler_start=5
 lrscheduler_decay=0.5

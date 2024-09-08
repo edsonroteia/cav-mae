@@ -14,7 +14,6 @@
 export TORCH_HOME=../../pretrained_models
 
 model=cav-mae-ft
-ftmode=multimodal
 
 # you can replace with any checkpoint you want, but by default, we use cav-mae-scale++
 cur_dir=$(pwd)
@@ -25,7 +24,9 @@ freeze_base=False
 head_lr=10 # newly initialized ft layers uses 10 times larger than the base lr
 
 bal=bal
-lr=1e-4
+lr=${1:-1e-4}  # Use the first argument as lr, default to 1e-4 if not provided
+batch_size=${2:-48}  # Use the second argument as batch_size, default to 24 if not provided
+ftmode=${3:-multimodal}
 epoch=10
 lrscheduler_start=2
 lrscheduler_decay=0.5
@@ -41,7 +42,6 @@ noise=True
 freqm=48
 timem=192
 mixup=0.5
-batch_size=48
 label_smooth=0.1
 
 dataset=vggsound
