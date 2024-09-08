@@ -10,14 +10,16 @@ def compare_dataloaders(dataset_json_file, class_labels_indices):
     audio_conf = {
         "num_mel_bins": 128,
         "target_length": 1024,
-        "freqm": 48,
-        "timem": 192,
+        "freqm": 0,  # Updated from 48 to 0
+        "timem": 0,  # Updated from 192 to 0
         "mixup": 0,
-        "mode": "train",
-        "mean": -4.2677393,
-        "std": 4.5689974,
-        "noise": True,
-        "skip_norm": False
+        "mode": "eval",  # Updated from "train" to "eval"
+        "mean": 0,  # Updated from -4.2677393 to 0
+        "std": 0,  # Updated from 4.5689974 to 0
+        "noise": False,  # Updated from True to False
+        "skip_norm": False,
+        "dataset": "vggsound",  # Added new key-value pair
+        "im_res": 224  # Added new key-value pair
     }
     label_csv = class_labels_indices  # Adjust this path if needed
 
