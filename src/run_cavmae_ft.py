@@ -225,6 +225,7 @@ else:
         acc = metrics.accuracy_score(np.argmax(target, 1), np.argmax(multiframe_pred, 1))
         print('multi-frame acc is {:f}'.format(acc))
         res.append(acc)
+        run['final/acc'].log(acc)
     elif args.metrics == 'mAP':
         AP = []
         for k in range(args.n_class):
@@ -233,14 +234,11 @@ else:
             AP.append(avg_precision)
         mAP = np.mean(AP)
         print('multi-frame mAP is {:.4f}'.format(mAP))
+        run['final/mAP'].log(mAP)
         res.append(mAP)
     np.savetxt(args.exp_dir + '/mul_frame_res.csv', res, delimiter=',')
 
-# Log final results to Neptune
-run['final/mAP'].log(mAP)
-# run['final/AUC'].log(mAUC)
-# run['final/d_prime'].log(d_prime(mAUC))
-run['final/acc'].log(acc)
+
 
 # Stop the Neptune run
 run.stop()
