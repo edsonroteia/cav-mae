@@ -297,7 +297,10 @@ class AudiosetDataset(Dataset):
                     images.append(image)
                     frame_indices.append(frame_idx)
                 except Exception as e:
-                    pass
+                    print(f"Error processing frame {frame_idx} for video {datum['video_id']}: {str(e)}")
+            
+            if not fbanks:
+                raise RuntimeError(f"No valid frames found for video {datum['video_id']}")
             
             label_indices = np.zeros(self.label_num) + (self.label_smooth / self.label_num)
             for label_str in datum['labels'].split(','):
