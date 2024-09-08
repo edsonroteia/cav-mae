@@ -123,21 +123,12 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     r1, r5, r10, mr = get_retrieval_result(audio_model, val_loader, direction)
     return r1, r5, r10, mr
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Audio-Visual Retrieval Evaluation")
-    parser.add_argument("--model", type=str, required=True, help="Path to the model file")
-    parser.add_argument("--data", type=str, required=True, help="Path to the data file")
-    parser.add_argument("--label_csv", type=str, required=True, help="Path to the label CSV file")
-    parser.add_argument("--dataset", type=str, required=True, help="Dataset name (e.g., 'vggsound' or 'audioset')")
-    return parser.parse_args()
-
 if __name__ == "__main__":
-    args = parse_args()
-    
-    model = args.model
-    data = args.data
-    label_csv = args.label_csv
-    dataset = args.dataset
+    # Hardcoded values
+    model = '/local/1306531/models/best_audio_model.pth'
+    data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
+    label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
+    dataset = 'vggsound'
 
     res = []
 
