@@ -48,7 +48,7 @@ tr_data=datafilles/audioset_20k_cleaned.json
 te_data=datafilles/audioset_eval_cleaned.json
 label_csv=datafilles/class_labels_indices.csv
 
-exp_dir=/scratch/ssml/araujo/code/aug24/cav-mae/exp/testmae06-bal-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}
+exp_dir=/scratch/ssml/araujo/code/aug24/cav-mae/exp/testmae06-bal-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-$(date +%Y%m%d_%H%M%S)
 mkdir -p $exp_dir
 
 CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py \
