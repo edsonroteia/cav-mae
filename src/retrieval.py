@@ -128,33 +128,38 @@ def parse_args():
     parser.add_argument("--model", type=str, required=True, help="Path to the model file")
     parser.add_argument("--data", type=str, required=True, help="Path to the data file")
     parser.add_argument("--label_csv", type=str, required=True, help="Path to the label CSV file")
-    parser.add_argument("--dataset", type=str, required=True, help="dataset name")
+    parser.add_argument("--dataset", type=str, required=True, help="Dataset name (e.g., 'vggsound' or 'audioset')")
     return parser.parse_args()
 
+if __name__ == "__main__":
+    args = parse_args()
+    
+    model = args.model
+    data = args.data
+    label_csv = args.label_csv
+    dataset = args.dataset
 
-args = parse_args()
-model = args.model
-data = args.data
-dataset = args.dataset
-label_csv = args.label_csv
+    res = []
 
-res = []
+    if dataset == "audioset":
+        # for audioset
+        for direction in ['video', 'audio']:
+            data = '/data/sls/scratch/yuangong/cav-mae/pretrained_model/datafiles/audioset/audioset_eval_5_per_class_for_retrieval_cleaned.json'
+            label_csv = '/data/sls/scratch/yuangong/cav-mae/pretrained_model/datafiles/audioset/class_labels_indices.csv'
+            audio_conf = {'num_mel_bins': 128, 'target_length': 1024, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
+                        'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5}
+            r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=309, direction=direction, model_type='pretrain', batch_size=100)
+            res.append([dataset, direction, r1, r5, r10, mr])
 
-if args.dataset == "audioset":
-# for audioset
-    for direction in ['video', 'audio']:
-        data = '/data/sls/scratch/yuangong/cav-mae/pretrained_model/datafiles/audioset/audioset_eval_5_per_class_for_retrieval_cleaned.json'
-        label_csv = '/data/sls/scratch/yuangong/cav-mae/pretrained_model/datafiles/audioset/class_labels_indices.csv'
-        audio_conf = {'num_mel_bins': 128, 'target_length': 1024, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
-                    'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5}
-        r1, r5, r10, mr = eval_retrieval (model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=309, direction=direction, model_type='pretrain', batch_size=100)
-        res.append([dataset, direction, r1, r5, r10, mr])
+    elif dataset == "vggsound":
+        # for vggsound
+        for direction in ['video', 'audio']:
+            audio_conf = {'num_mel_bins': 128, 'target_length': 1024, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
+                        'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5}
+            r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=309, direction=direction, model_type='pretrain', batch_size=100)
+            res.append([dataset, direction, r1, r5, r10, mr])
+    else:
+        print(f"Unsupported dataset: {dataset}")
+        exit(1)
 
-if args.dataset == "vggsound":
-# for vggsound
-    for direction in ['video', 'audio']:
-        audio_conf = {'num_mel_bins': 128, 'target_length': 1024, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
-                    'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5}
-        r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=309, direction=direction, model_type='pretrain', batch_size=100)
-        res.append([dataset, direction, r1, r5, r10, mr])
     np.savetxt('./retrieval_result.csv', res, delimiter=',', fmt='%s')
