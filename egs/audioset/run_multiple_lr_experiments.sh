@@ -4,17 +4,18 @@
 run_and_monitor() {
     local lr=$1
     local batch_size=$2
-    local exp_name=$3
-    local timestamp=$4
-    local base_command=$5
+    local ftmode=$3
+    local exp_name=$4
+    local timestamp=$5
+    local base_command=$6
     local output_file="output_${exp_name}_${timestamp}.log"
     local pid_file="pid_${exp_name}_${timestamp}.txt"
 
-    echo "Starting experiment: $exp_name (Learning Rate: $lr, Batch Size: $batch_size)"
+    echo "Starting experiment: $exp_name (Learning Rate: $lr, Batch Size: $batch_size, FT Mode: $ftmode)"
     echo "Output file: $output_file"
 
     # Run the experiment in the background and capture its PID
-    $base_command $lr $batch_size > "$output_file" 2>&1 &
+    $base_command $lr $batch_size $ftmode > "$output_file" 2>&1 &
     local pid=$!
     echo $pid > "$pid_file"
 
@@ -61,7 +62,7 @@ run_and_monitor() {
         echo "Experiment $exp_name crashed or was terminated due to inactivity."
     fi
 
-    echo "$lr,$batch_size,$final_result" >> results.csv
+    echo "$lr,$batch_size,$ftmode,$final_result" >> results.csv
     echo "Experiment $exp_name completed. Result: $final_result"
 
     return $crashed
@@ -69,56 +70,70 @@ run_and_monitor() {
 
 # Function to print usage
 print_usage() {
-    echo "Usage: $0 <base_command> <batch_size> <learning_rate1> [learning_rate2] [learning_rate3] ..."
-    echo "Example: $0 './run_cavmae_ft_sync.sh' 24 1e-5 5e-5 1e-4"
+    echo "Usage: $0 <base_command> <batch_size> <ftmode> <learning_rate1> [learning_rate2] [learning_rate3] ..."
+    echo "       If <ftmode> is 'all', it will run experiments for all ftmodes: multimodal, audioonly, videoonly"
+    echo "Example: $0 './run_cavmae_ft_sync.sh' 48 multimodal 1e-5 5e-5 1e-4"
+    echo "         $0 './run_cavmae_ft_sync.sh' 48 all 1e-5 5e-5 1e-4"
     exit 1
 }
 
-# Check if at least three arguments are provided (base command, batch size, and at least one learning rate)
-if [ $# -lt 3 ]; then
+# Check if at least four arguments are provided (base command, batch size, ftmode, and at least one learning rate)
+if [ $# -lt 4 ]; then
     print_usage
 fi
 
-# Extract the base command (first argument) and batch size (second argument)
+# Extract the base command (first argument), batch size (second argument), and ftmode (third argument)
 base_command="$1"
 batch_size="$2"
-shift 2
+ftmode="$3"
+shift 3
 
 # Use remaining command-line arguments as learning rates
 learning_rates=("$@")
 
 # Initialize results file
-echo "Learning Rate,Batch Size,Final Result (multi-frame mAP)" > results.csv
+echo "Learning Rate,Batch Size,FT Mode,Final Result (multi-frame mAP)" > results.csv
 
-# Display total number of experiments
-total_experiments=${#learning_rates[@]}
+# If ftmode is 'all', set up an array of all ftmodes
+if [ "$ftmode" = "all" ]; then
+    ftmodes=("multimodal" "audioonly" "videoonly")
+else
+    ftmodes=("$ftmode")
+fi
+
+# Calculate total number of experiments
+total_experiments=$((${#learning_rates[@]} * ${#ftmodes[@]}))
 echo "Total experiments to run: $total_experiments"
 echo "Batch size for all experiments: $batch_size"
 
-# Loop through each learning rate
-for index in "${!learning_rates[@]}"
+# Loop through each ftmode
+for mode in "${ftmodes[@]}"
 do
-    lr=${learning_rates[$index]}
-    # Get current timestamp
-    timestamp=$(date +"%Y%m%d_%H%M%S")
-    # Construct the experiment name
-    exp_name="experiment_lr${lr}_bs${batch_size}"
+    # Loop through each learning rate
+    for lr in "${learning_rates[@]}"
+    do
+        # Get current timestamp
+        timestamp=$(date +"%Y%m%d_%H%M%S")
+        # Construct the experiment name
+        exp_name="experiment_lr${lr}_bs${batch_size}_${mode}"
 
-    echo "------------------------------"
-    echo "Running experiment $((index+1)) of $total_experiments"
-    echo "Learning rate: $lr"
+        echo "------------------------------"
+        echo "Running experiment: $exp_name"
+        echo "Learning rate: $lr"
+        echo "FT Mode: $mode"
 
-    # Run the experiment with monitoring
-    run_and_monitor $lr $batch_size $exp_name $timestamp "$base_command"
-    if [ $? -eq 1 ]; then
-        echo "WARNING: Experiment $exp_name may have crashed or terminated unexpectedly."
-    fi
+        # Run the experiment with monitoring
+        run_and_monitor $lr $batch_size $mode $exp_name $timestamp "$base_command"
+        if [ $? -eq 1 ]; then
+            echo "WARNING: Experiment $exp_name may have crashed or terminated unexpectedly."
+        fi
 
-    echo "Experiment $((index+1)) of $total_experiments completed"
-    echo "------------------------------"
+        echo "Experiment $exp_name completed"
+        echo "------------------------------"
 
-    # Optional: add a delay between job submissions if needed
-    sleep 5
+        # Optional: add a delay between job submissions if needed
+        sleep 5
+    done
 done
 
 # Generate a formatted table of results
