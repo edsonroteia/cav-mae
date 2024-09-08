@@ -11,6 +11,7 @@ import argparse
 import os
 import models
 import dataloader as dataloader
+import dataloader_sync
 import torch
 import numpy as np
 from torch.cuda.amp import autocast
@@ -107,7 +108,10 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     args.label_csv = label_csv
     args.exp_dir = './exp/dummy'
     args.loss_fn = torch.nn.BCELoss()
-    val_loader = torch.utils.data.DataLoader(dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
+    if model_type == 'sync_pretrained':
+        val_loader = torch.utils.data.DataLoader(dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
+    else:
+        val_loader = torch.utils.data.DataLoader(dataloader_sync.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
     # cav-mae only been ssl pretrained
     if model_type == 'sync_pretrain':
         audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11)
@@ -131,7 +135,7 @@ if __name__ == "__main__":
     data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
     label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
     dataset = 'vggsound'
-    model_type='sync'
+    model_type='sync_pretrain'
 
     res = []
 
