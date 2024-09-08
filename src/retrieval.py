@@ -69,7 +69,7 @@ def get_retrieval_result(audio_model, val_loader, direction='audio'):
 
     A_a_feat, A_v_feat = [], []
     with torch.no_grad():
-        for i, (a_input, v_input, labels) in enumerate(val_loader):
+        for i, (a_input, v_input, labels, _) in enumerate(val_loader):
             audio_input, video_input = a_input.to(device), v_input.to(device)
             with autocast():
                 audio_output, video_output = audio_model.module.forward_feat(audio_input, video_input)
