@@ -97,7 +97,7 @@ echo "Learning Rate,Batch Size,FT Mode,Final Result (multi-frame mAP)" > results
 
 # If ftmode is 'all', set up an array of all ftmodes
 if [ "$ftmode" = "all" ]; then
-    ftmodes=("multimodal" "audioonly" "videoonly")
+    ftmodes=("audioonly" "videoonly" "multimodal")
 else
     ftmodes=("$ftmode")
 fi
