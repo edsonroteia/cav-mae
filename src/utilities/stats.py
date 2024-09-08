@@ -29,8 +29,7 @@ def calculate_stats(output, target):
     for k in range(classes_num):
 
         # Average precision
-        avg_precision = metrics.average_precision_score(
-            target[:, k], output[:, k], average=None)
+        avg_precision = metrics.average_precision_score(target[:, k], output[:, k], average=None)
 
         # AUC
         try:
