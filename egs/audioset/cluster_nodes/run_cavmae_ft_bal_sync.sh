@@ -43,7 +43,7 @@ timem=192
 mixup=0.5
 label_smooth=0.1
 
-dataset=vggsound
+dataset=audioset
 tr_data=datafilles/audioset_20k/cluster_nodes/audioset_20k_cleaned.json
 te_data=datafilles/audioset_20k/cluster_nodes/audioset_eval_cleaned_aug24.json
 label_csv=datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv
