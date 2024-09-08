@@ -9,6 +9,9 @@ run_and_monitor() {
     local output_file="output_${exp_name}_${timestamp}.log"
     local pid_file="pid_${exp_name}_${timestamp}.txt"
 
+    echo "Starting experiment: $exp_name (Learning Rate: $lr)"
+    echo "Output file: $output_file"
+
     # Run the experiment in the background and capture its PID
     LR=$lr EXP_NAME=$exp_name TIMESTAMP=$timestamp $base_command > "$output_file" 2>&1 &
     echo $! > "$pid_file"
@@ -37,6 +40,7 @@ run_and_monitor() {
         echo "Warning: Could not extract multi-frame mAP for $exp_name"
     fi
     echo "$lr,$final_result" >> results.csv
+    echo "Experiment $exp_name completed. Result: $final_result"
 }
 
 # Function to print usage
@@ -61,23 +65,32 @@ learning_rates=("$@")
 # Initialize results file
 echo "Learning Rate,Final Result (multi-frame mAP)" > results.csv
 
+# Display total number of experiments
+total_experiments=${#learning_rates[@]}
+echo "Total experiments to run: $total_experiments"
+
 # Loop through each learning rate
-for lr in "${learning_rates[@]}"
+for index in "${!learning_rates[@]}"
 do
+    lr=${learning_rates[$index]}
     # Get current timestamp
     timestamp=$(date +"%Y%m%d_%H%M%S")
     # Construct the experiment name
     exp_name="experiment_lr${lr}"
 
+    echo "------------------------------"
+    echo "Running experiment $((index+1)) of $total_experiments"
+    echo "Learning rate: $lr"
+
     # Run the experiment with monitoring
-    run_and_monitor $lr $exp_name $timestamp "$base_command" &
+    run_and_monitor $lr $exp_name $timestamp "$base_command"
+
+    echo "Experiment $((index+1)) of $total_experiments completed"
+    echo "------------------------------"
 
     # Optional: add a delay between job submissions if needed
     sleep 5
 done
-
-# Wait for all background processes to finish
-wait
 
 # Generate a formatted table of results
 echo "Results Table:"
