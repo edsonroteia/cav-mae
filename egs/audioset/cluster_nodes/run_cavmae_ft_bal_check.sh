@@ -18,8 +18,8 @@ ftmode=multimodal
 
 # you can replace with any checkpoint you want, but by default, we use cav-mae-scale++
 cur_dir=$(pwd)
-# wget -nc https://www.dropbox.com/s/l5t5geufdy3qvnv/audio_model.21.pth?dl=1 -O cav-mae-scale++.pth
-pretrain_path=/data1/edson/cavmae/finetune_models/original_cavmae/best_audio_model.pth
+wget -nc https://www.dropbox.com/s/l5t5geufdy3qvnv/audio_model.21.pth?dl=1 -O cav-mae-scale++.pth
+pretrain_path=cav-mae-scale++.pth
 
 freeze_base=False
 head_lr=100 # newly initialized ft layers uses 10 times larger than the base lr
