@@ -69,7 +69,7 @@ def get_retrieval_result(audio_model, val_loader, direction='audio'):
 
     A_a_feat, A_v_feat = [], []
     with torch.no_grad():
-        for i, (a_input, v_input, labels, _) in enumerate(val_loader):
+        for i, (a_input, v_input, labels) in enumerate(val_loader):
             audio_input, video_input = a_input.to(device), v_input.to(device)
             with autocast():
                 audio_output, video_output = audio_model.module.forward_feat(audio_input, video_input)
@@ -108,7 +108,7 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     args.label_csv = label_csv
     args.exp_dir = './exp/dummy'
     args.loss_fn = torch.nn.BCELoss()
-    if model_type == 'sync_pretrained':
+    if model_type == 'sync_pretrain':
         val_loader = torch.utils.data.DataLoader(dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
     else:
         val_loader = torch.utils.data.DataLoader(dataloader_sync.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
