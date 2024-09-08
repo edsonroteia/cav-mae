@@ -23,7 +23,7 @@ pretrain_path=${pretrain_dir}/best_audio_model.pth
 freeze_base=False
 head_lr=10 # newly initialized ft layers uses 10 times larger than the base lr
 
-bal=bal
+bal=None
 lr=${1:-5e-5}  # Use the first argument as lr, default to 1e-4 if not provided
 batch_size=${2:-48}  # Use the second argument as batch_size, default to 24 if not provided
 epoch=15
