@@ -199,11 +199,13 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     return r1, r5, r10, mr
 
 if __name__ == "__main__":
-    model = 'cav-mae-scale++.pth'
+    # model = 'cav-mae-scale++.pth'
+    model = '/local/1306531/models/best_audio_model.pth'
     data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
     label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
     dataset = 'vggsound'
-    model_type = 'pretrain'
+    # model_type = 'pretrain'
+    model_type = 'sync_pretrain'
 
     target_length = 1024 if model_type != 'sync_pretrain' else 96
 
