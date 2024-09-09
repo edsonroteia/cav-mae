@@ -90,7 +90,7 @@ def get_retrieval_result(audio_model, val_loader, direction='audio'):
     print_computed_metrics(result)
     return result['R1'], result['R5'], result['R10'], result['MR']
 
-def get_sync_retrieval_result(audio_model, val_loader, direction='audio', aggregate=True):
+def get_sync_retrieval_result(audio_model, val_loader, direction='audio'):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if not isinstance(audio_model, nn.DataParallel):
         audio_model = nn.DataParallel(audio_model)
@@ -112,15 +112,9 @@ def get_sync_retrieval_result(audio_model, val_loader, direction='audio', aggreg
                 audio_output = torch.nn.functional.normalize(audio_output, dim=-1)
                 video_output = torch.nn.functional.normalize(video_output, dim=-1)
             
-            if not aggregate:
-                # Flatten the batch dimension and frame dimension
-                audio_output = audio_output.view(-1, audio_output.size(-1))
-                video_output = video_output.view(-1, video_output.size(-1))
-                batch_video_ids = [vid for vid in batch_video_ids for _ in range(audio_output.size(0) // len(batch_video_ids))]
-            else:
-                # Reshape outputs to (batch_size, num_frames, feature_dim)
-                audio_output = audio_output.view(len(batch_video_ids), -1, audio_output.size(-1))
-                video_output = video_output.view(len(batch_video_ids), -1, video_output.size(-1))
+            # Reshape outputs to (batch_size, num_frames, feature_dim)
+            audio_output = audio_output.view(len(batch_video_ids), -1, audio_output.size(-1))
+            video_output = video_output.view(len(batch_video_ids), -1, video_output.size(-1))
             
             A_a_feat.append(audio_output.cpu())
             A_v_feat.append(video_output.cpu())
@@ -130,48 +124,44 @@ def get_sync_retrieval_result(audio_model, val_loader, direction='audio', aggreg
     A_v_feat = torch.cat(A_v_feat, dim=0)
 
     if direction == 'audio':
-        sim_mat = get_sync_sim_mat(A_a_feat, A_v_feat, video_ids, aggregate=aggregate)
+        sim_mat = get_sync_sim_mat(A_a_feat, A_v_feat, video_ids)
     elif direction == 'video':
-        sim_mat = get_sync_sim_mat(A_v_feat, A_a_feat, video_ids, is_video_query=True, aggregate=aggregate)
+        sim_mat = get_sync_sim_mat(A_v_feat, A_a_feat, video_ids, is_video_query=True)
 
     result = compute_metrics(sim_mat)
     print_computed_metrics(result)
     return result['R1'], result['R5'], result['R10'], result['MR']
 
-def get_sync_sim_mat(query_feat, target_feat, video_ids, is_video_query=False, aggregate=True):
-    if aggregate:
-        unique_video_ids = list(set(video_ids))
-        num_queries = len(unique_video_ids)
-        num_targets = len(unique_video_ids)
-    else:
-        num_queries = len(query_feat)
-        num_targets = len(target_feat)
-    
+def get_sync_sim_mat(query_feat, target_feat, video_ids, is_video_query=False):
+    unique_video_ids = list(set(video_ids))
+    num_queries = len(unique_video_ids)
+    num_targets = len(unique_video_ids)
     sim_mat = torch.zeros((num_queries, num_targets))
 
-    if aggregate:
-        for i, query_video_id in tqdm(enumerate(unique_video_ids), desc="Computing sync similarity matrix", total=num_queries):
-            query_mask = torch.tensor([vid == query_video_id for vid in video_ids])
-            query_features = query_feat[query_mask]
+    for i, query_video_id in tqdm(enumerate(unique_video_ids), desc="Computing sync similarity matrix", total=num_queries):
+        query_mask = torch.tensor([vid == query_video_id for vid in video_ids])
+        query_features = query_feat[query_mask]
 
-            for j, target_video_id in enumerate(unique_video_ids):
-                target_mask = torch.tensor([vid == target_video_id for vid in video_ids])
-                target_features = target_feat[target_mask]
+        for j, target_video_id in enumerate(unique_video_ids):
+            target_mask = torch.tensor([vid == target_video_id for vid in video_ids])
+            target_features = target_feat[target_mask]
 
-                # Compute similarities for all frame combinations
-                frame_similarities = torch.matmul(query_features.view(-1, query_features.size(-1)), 
-                                                  target_features.view(-1, target_features.size(-1)).t())
-                frame_similarities = frame_similarities.view(query_features.size(0), query_features.size(1), 
-                                                             target_features.size(0), target_features.size(1))
+            # Compute similarities for all frame combinations
+            # Reshape tensors to 2D for matmul operation
+            q_feat = query_features.view(-1, query_features.size(-1))
+            t_feat = target_features.view(-1, target_features.size(-1))
+            frame_similarities = torch.matmul(q_feat, t_feat.t())
 
-                # Max pooling over all frame combinations
-                sim_mat[i, j] = frame_similarities.max()
-    else:
-        sim_mat = torch.matmul(query_feat, target_feat.t())
+            # Reshape frame_similarities to 3D tensor
+            frame_similarities = frame_similarities.view(query_features.size(0), query_features.size(1), 
+                                                         target_features.size(0), target_features.size(1))
+
+            # Max pooling over all frame combinations
+            sim_mat[i, j] = frame_similarities.max()
 
     return sim_mat.numpy()
 
-def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, model_type='pretrain', batch_size=48, aggregate=True):
+def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, model_type='pretrain', batch_size=48):
     print(model)
     print(data)
     frame_use = 10  # Use all frames (0 to 9)
@@ -217,7 +207,7 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     audio_model.eval()
     
     if model_type == 'sync_pretrain':
-        r1, r5, r10, mr = get_sync_retrieval_result(audio_model, val_loader, direction, aggregate)
+        r1, r5, r10, mr = get_sync_retrieval_result(audio_model, val_loader, direction)
     else:
         r1, r5, r10, mr = get_retrieval_result(audio_model, val_loader, direction)
     
@@ -226,7 +216,9 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
 import argparse
 
 if __name__ == "__main__":
-
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--num_samples', type=int, default=100, help='Number of samples to use')
+    args = parser.parse_args()
 
     model = '/local/1306531/models/best_audio_model.pth'
     data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
@@ -235,7 +227,6 @@ if __name__ == "__main__":
     model_type = 'sync_pretrain'
     # directions = ['video', 'audio']
     directions = ['video']
-    aggregate = False
 
     target_length = 1024 if model_type != 'sync_pretrain' else 96
 
@@ -255,7 +246,7 @@ if __name__ == "__main__":
             'noise': False, 
             'im_res': 224, 
             'frame_use': 10,
-            'num_samples': 100
+            'num_samples': args.num_samples
         }
         
         if dataset == "audioset":
@@ -266,7 +257,7 @@ if __name__ == "__main__":
             print(f"Unsupported dataset: {dataset}")
             exit(1)
 
-        r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, aggregate=aggregate)
+        r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100)
         res.append([dataset, direction, r1, r5, r10, mr])
 
     np.savetxt('./retrieval_result.csv', res, delimiter=',', fmt='%s')
