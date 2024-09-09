@@ -108,15 +108,20 @@ def get_sync_retrieval_result(audio_model, val_loader, direction='audio'):
             with autocast():
                 audio_output, video_output = audio_model.module.forward_feat(fbanks, images)
                 
+                # Normalize features
                 audio_output = torch.nn.functional.normalize(audio_output, dim=-1)
                 video_output = torch.nn.functional.normalize(video_output, dim=-1)
+            
+            # Reshape outputs to (batch_size, num_frames, feature_dim)
+            audio_output = audio_output.view(len(batch_video_ids), -1, audio_output.size(-1))
+            video_output = video_output.view(len(batch_video_ids), -1, video_output.size(-1))
             
             A_a_feat.append(audio_output.cpu())
             A_v_feat.append(video_output.cpu())
             video_ids.extend(batch_video_ids)
 
-    A_a_feat = torch.cat(A_a_feat)
-    A_v_feat = torch.cat(A_v_feat)
+    A_a_feat = torch.cat(A_a_feat, dim=0)
+    A_v_feat = torch.cat(A_v_feat, dim=0)
 
     if direction == 'audio':
         sim_mat = get_sync_sim_mat(A_a_feat, A_v_feat, video_ids)
@@ -141,7 +146,17 @@ def get_sync_sim_mat(query_feat, target_feat, video_ids, is_video_query=False):
             target_mask = torch.tensor([vid == target_video_id for vid in video_ids])
             target_features = target_feat[target_mask]
 
-            frame_similarities = torch.matmul(query_features, target_features.t())
+            # Compute similarities for all frame combinations
+            # Reshape tensors to 2D for matmul operation
+            q_feat = query_features.view(-1, query_features.size(-1))
+            t_feat = target_features.view(-1, target_features.size(-1))
+            frame_similarities = torch.matmul(q_feat, t_feat.t())
+
+            # Reshape frame_similarities to 3D tensor
+            frame_similarities = frame_similarities.view(query_features.size(0), query_features.size(1), 
+                                                         target_features.size(0), target_features.size(1))
+
+            # Max pooling over all frame combinations
             sim_mat[i, j] = frame_similarities.max()
 
     return sim_mat.numpy()
