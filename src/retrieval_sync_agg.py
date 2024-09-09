@@ -33,7 +33,7 @@ def get_similarity(a, b):
 def get_sim_mat(a, b):
     B = a.shape[0]
     sim_mat = np.empty([B, B])
-    for i in range(B):
+    for i in tqdm(range(B), desc="Computing similarity matrix"):
         for j in range(B):
             sim_mat[i, j] = get_similarity(a[i, :], b[j, :])
     return sim_mat
@@ -138,7 +138,7 @@ def get_sync_sim_mat(query_feat, target_feat, video_ids, is_video_query=False):
     num_targets = len(unique_video_ids)
     sim_mat = torch.zeros((num_queries, num_targets))
 
-    for i, query_video_id in enumerate(unique_video_ids):
+    for i, query_video_id in tqdm(enumerate(unique_video_ids), desc="Computing sync similarity matrix", total=num_queries):
         query_mask = torch.tensor([vid == query_video_id for vid in video_ids])
         query_features = query_feat[query_mask]
 
