@@ -46,7 +46,7 @@ label_csv=datafilles/class_labels_indices.csv
 sed -i "s|<SLURM_JOB_ID>|$SLURM_JOB_ID|g" ${tr_data}
 sed -i "s|<SLURM_JOB_ID>|$SLURM_JOB_ID|g" ${te_data}
 
-exp_dir=exp/sync-${dataset}-${model}-bal${bal}-lr${lr}-epoch${epoch}-bs${batch_size}-norm${norm_pix_loss}-c${contrast_loss_weight}-p${mae_loss_weight}-tp${tr_pos}-mr-${mask_mode}-${masking_ratio}-$(date +%Y%m%d_%H%M%S)
+exp_dir=/scratch/ssml/araujo/exp/sync-${dataset}-${model}-bal${bal}-lr${lr}-epoch${epoch}-bs${batch_size}-norm${norm_pix_loss}-c${contrast_loss_weight}-p${mae_loss_weight}-tp${tr_pos}-mr-${mask_mode}-${masking_ratio}-$(date +%Y%m%d_%H%M%S)
 mkdir -p $exp_dir
 
 CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_pretrain_sync.py --model ${model} --dataset ${dataset} \
