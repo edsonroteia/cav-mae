@@ -133,11 +133,13 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
 
 if __name__ == "__main__":
     # Hardcoded values
-    model = '/local/1306531/models/best_audio_model.pth'
+    # model = '/local/1306531/models/best_audio_model.pth'
+    model = 'cav-mae-scale++.pth'
     data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
     label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
     dataset = 'vggsound'
-    model_type='sync_pretrain'
+    # model_type='sync_pretrain'
+    model_type = 'pretrain'
 
     res = []
 
