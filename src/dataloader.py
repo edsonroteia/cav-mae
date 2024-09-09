@@ -69,6 +69,11 @@ class AudiosetDataset(Dataset):
         with open(dataset_json_file, 'r') as fp:
             data_json = json.load(fp)
 
+        num_samples = audio_conf.get('num_samples')
+        if num_samples is not None:
+            self.data = self.data[:num_samples]
+            print(f"Limiting dataset to {num_samples} samples for debugging")
+
         self.data = data_json['data']#[:200000]
         self.data = self.pro_data(self.data)
         print('Dataset has {:d} samples'.format(self.data.shape[0]))
