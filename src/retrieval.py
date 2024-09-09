@@ -142,9 +142,9 @@ if __name__ == "__main__":
     model_type = 'pretrain'
 
     if model_type == 'sync_pretrain':
-        target_length = 1024
-    else:
         target_length = 96
+    else:
+        target_length = 1024
 
     res = []
 
