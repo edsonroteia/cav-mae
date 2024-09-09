@@ -226,10 +226,7 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
 import argparse
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--num_samples', type=int, default=100, help='Number of samples to use')
-    parser.add_argument('--aggregate', action='store_true', help='Whether to aggregate features or not')
-    args = parser.parse_args()
+
 
     model = '/local/1306531/models/best_audio_model.pth'
     data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
@@ -238,6 +235,7 @@ if __name__ == "__main__":
     model_type = 'sync_pretrain'
     # directions = ['video', 'audio']
     directions = ['video']
+    aggregate = False
 
     target_length = 1024 if model_type != 'sync_pretrain' else 96
 
@@ -257,7 +255,7 @@ if __name__ == "__main__":
             'noise': False, 
             'im_res': 224, 
             'frame_use': 10,
-            'num_samples': args.num_samples
+            'num_samples': 100
         }
         
         if dataset == "audioset":
@@ -268,7 +266,7 @@ if __name__ == "__main__":
             print(f"Unsupported dataset: {dataset}")
             exit(1)
 
-        r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, aggregate=args.aggregate)
+        r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, aggregate=aggregate)
         res.append([dataset, direction, r1, r5, r10, mr])
 
     np.savetxt('./retrieval_result.csv', res, delimiter=',', fmt='%s')
