@@ -213,26 +213,20 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     
     return r1, r5, r10, mr
 
-import argparse
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--num_samples', type=int, default=100, help='Number of samples to use')
-    args = parser.parse_args()
-
+    # model = 'cav-mae-scale++.pth'
     model = '/local/1306531/models/best_audio_model.pth'
     data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
     label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
     dataset = 'vggsound'
+    # model_type = 'pretrain'
     model_type = 'sync_pretrain'
-    # directions = ['video', 'audio']
-    directions = ['video']
 
     target_length = 1024 if model_type != 'sync_pretrain' else 96
 
     res = []
 
-    for direction in directions:
+    for direction in ['video', 'audio']:
         audio_conf = {
             'num_mel_bins': 128, 
             'target_length': target_length, 
@@ -246,7 +240,7 @@ if __name__ == "__main__":
             'noise': False, 
             'im_res': 224, 
             'frame_use': 10,
-            'num_samples': args.num_samples
+            'num_samples': 100
         }
         
         if dataset == "audioset":
