@@ -40,14 +40,30 @@ def get_sim_mat(a, b):
             sim_mat[i, j] = get_similarity(a[i, :], b[j, :])
     return sim_mat
 
-# get mean
-def get_agg_sim_mat(a, b):
-    import pdb ; pdb.set_trace()
+def get_agg_sim_mat(a, b, strategy='max'):
+    # a and b are tensors of shape (batch_size, num_frames, feature_dim)
+    # e.g., torch.Size([100, 10, 768])
     B = a.shape[0]
+    num_frames = a.shape[1]  # All videos have the same number of frames
     sim_mat = np.empty([B, B])
+    
     for i in range(B):
         for j in range(B):
-            sim_mat[i, j] = get_similarity(a[i, :], b[j, :])
+            # Compute similarity for all frame pairs
+            frame_similarities = np.array([[get_similarity(a[i, k], b[j, l]) for l in range(num_frames)] for k in range(num_frames)])
+            
+            # Aggregate similarities based on the chosen strategy
+            if strategy == 'max':
+                sim_mat[i, j] = np.max(frame_similarities)
+            elif strategy == 'mean':
+                sim_mat[i, j] = np.mean(frame_similarities)
+            elif strategy == 'diagonal':
+                # Compare elements from the diagonal of the video submatrix
+                diagonal_similarities = [get_similarity(a[i, k], b[j, k]) for k in range(num_frames)]
+                sim_mat[i, j] = np.mean(diagonal_similarities)
+            else:
+                raise ValueError(f"Unknown aggregation strategy: {strategy}")
+    
     return sim_mat
 
 def compute_metrics(x):
@@ -72,7 +88,7 @@ def print_computed_metrics(metrics):
     print('R@1: {:.4f} - R@5: {:.4f} - R@10: {:.4f} - Median R: {}'.format(r1, r5, r10, mr))
 
 # direction: 'audio' means audio->visual retrieval, 'video' means visual->audio retrieval
-def get_retrieval_result(audio_model, val_loader, direction='audio', model_type='pretrain'):
+def get_retrieval_result(audio_model, val_loader, direction='audio', model_type='pretrain', strategy='max'):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if not isinstance(audio_model, nn.DataParallel):
         audio_model = nn.DataParallel(audio_model)
@@ -119,10 +135,10 @@ def get_retrieval_result(audio_model, val_loader, direction='audio', model_type=
     A_v_feat = torch.cat(A_v_feat)
     if direction == 'audio':
         # audio->visual retrieval
-        sim_mat = get_agg_sim_mat(A_a_feat, A_v_feat) if model_type == 'sync_pretrain' else get_sim_mat(A_a_feat, A_v_feat)
+        sim_mat = get_agg_sim_mat(A_a_feat, A_v_feat, strategy=strategy) if model_type == 'sync_pretrain' else get_sim_mat(A_a_feat, A_v_feat)
     elif direction == 'video':
         # visual->audio retrieval
-        sim_mat = get_agg_sim_mat(A_v_feat, A_a_feat) if model_type == 'sync_pretrain' else get_sim_mat(A_v_feat, A_a_feat)
+        sim_mat = get_agg_sim_mat(A_v_feat, A_a_feat, strategy=strategy) if model_type == 'sync_pretrain' else get_sim_mat(A_v_feat, A_a_feat)
     result = compute_metrics(sim_mat)
     print_computed_metrics(result)
     return result['R1'], result['R5'], result['R10'], result['MR']
