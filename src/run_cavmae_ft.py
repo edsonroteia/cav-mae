@@ -97,16 +97,28 @@ if args.bal == 'bal':
         samples_weight = np.loadtxt(args.data_train[:-5]+'_weight.csv', delimiter=',')
     else:
         samples_weight = np.loadtxt(args.data_train[:-5] + '_' + args.weight_file + '.csv', delimiter=',')
-    sampler = WeightedRandomSampler(samples_weight, len(samples_weight), replacement=True)
+    
+    # Create the dataset
+    train_dataset = dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf)
+    
+    # Adjust samples_weight if num_samples is set
+    if audio_conf.get('num_samples') is not None:
+        samples_weight = samples_weight[:audio_conf['num_samples']]
+    
+    # Create the sampler with the correct length
+    sampler = WeightedRandomSampler(samples_weight, len(train_dataset), replacement=True)
 
     train_loader = torch.utils.data.DataLoader(
-        dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
-        batch_size=args.batch_size, sampler=sampler, num_workers=args.num_workers, pin_memory=True, drop_last=True)
+        train_dataset,
+        batch_size=args.batch_size, sampler=sampler, num_workers=args.num_workers, 
+        pin_memory=True, drop_last=True)
 else:
     print('balanced sampler is not used')
+    train_dataset = dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf)
     train_loader = torch.utils.data.DataLoader(
-        dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
-        batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True, drop_last=True)
+        train_dataset,
+        batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, 
+        pin_memory=True, drop_last=True)
 
 val_loader = torch.utils.data.DataLoader(
     dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
