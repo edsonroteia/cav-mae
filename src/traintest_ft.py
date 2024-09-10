@@ -106,7 +106,8 @@ def train(audio_model, train_loader, test_loader, args, run):
         print('---------------')
         print(datetime.datetime.now())
         print("current #epochs=%s, #steps=%s" % (epoch, global_step))
-
+        print(f"Length of train_loader: {len(train_loader)}")
+        print(f"Length of dataset: {len(train_loader.dataset)}")
         for i, (a_input, v_input, labels) in tqdm(enumerate(train_loader)):
 
             B = a_input.size(0)
