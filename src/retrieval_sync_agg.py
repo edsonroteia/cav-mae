@@ -232,7 +232,7 @@ if __name__ == "__main__":
         for direction in ['video', 'audio']:
             audio_conf = {'num_mel_bins': 128, 'target_length': target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
                         'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5, 'num_samples': 100}
-            r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=309, direction=direction, model_type=model_type, batch_size=100)
+            r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=309, direction=direction, model_type=model_type, batch_size=100, strategy=strategy)
             res.append([dataset, direction, r1, r5, r10, mr])
     else:
         print(f"Unsupported dataset: {dataset}")
