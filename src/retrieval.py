@@ -50,17 +50,21 @@ def get_agg_sim_mat(a, b, strategy='max'):
     for i in range(B):
         for j in range(B):
             # Compute similarity for all frame pairs
-            frame_similarities = np.array([[get_similarity(a[i, k], b[j, l]) for l in range(num_frames)] for k in range(num_frames)])
-            
+            if strategy == 'max' or strategy == 'mean':    
+                frame_similarities = np.array([[get_similarity(a[i, k], b[j, l]) for l in range(num_frames)] for k in range(num_frames)])
             # Aggregate similarities based on the chosen strategy
             if strategy == 'max':
                 sim_mat[i, j] = np.max(frame_similarities)
             elif strategy == 'mean':
                 sim_mat[i, j] = np.mean(frame_similarities)
-            elif strategy == 'diagonal':
+            elif strategy == 'diagonal_mean':
                 # Compare elements from the diagonal of the video submatrix
                 diagonal_similarities = [get_similarity(a[i, k], b[j, k]) for k in range(num_frames)]
                 sim_mat[i, j] = np.mean(diagonal_similarities)
+            elif strategy == 'diagonal_max':
+                # Compare elements from the diagonal of the video submatrix
+                diagonal_similarities = [get_similarity(a[i, k], b[j, k]) for k in range(num_frames)]
+                sim_mat[i, j] = np.max(diagonal_similarities)
             else:
                 raise ValueError(f"Unknown aggregation strategy: {strategy}")
     
@@ -143,7 +147,7 @@ def get_retrieval_result(audio_model, val_loader, direction='audio', model_type=
     print_computed_metrics(result)
     return result['R1'], result['R5'], result['R10'], result['MR']
 
-def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, model_type='pretrain', batch_size=48):
+def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, model_type='pretrain', batch_size=48, strategy='max'):
     print(model)
     print(data)
     frame_use = 5
@@ -174,7 +178,7 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     msg = audio_model.load_state_dict(sdA, strict=False)
     print(msg)
     audio_model.eval()
-    r1, r5, r10, mr = get_retrieval_result(audio_model, val_loader, direction, model_type)
+    r1, r5, r10, mr = get_retrieval_result(audio_model, val_loader, direction, model_type, strategy)
     return r1, r5, r10, mr
 
 if __name__ == "__main__":
@@ -186,6 +190,7 @@ if __name__ == "__main__":
     dataset = 'vggsound'
     model_type='sync_pretrain'
     #model_type = 'pretrain'
+    strategy = 'max'
 
     if model_type == 'sync_pretrain':
         target_length = 96
@@ -199,7 +204,7 @@ if __name__ == "__main__":
         for direction in ['video', 'audio']:
             audio_conf = {'num_mel_bins': 128, 'target_length': target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
                         'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5}
-            r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=527, direction=direction, model_type=model_type, batch_size=100)
+            r1, r5, r10, mr = eval_retrieval(model, data, audio_conf=audio_conf, label_csv=label_csv, num_class=527, direction=direction, model_type=model_type, batch_size=100, strategy=strategy)
             res.append([dataset, direction, r1, r5, r10, mr])
 
     elif dataset == "vggsound":
