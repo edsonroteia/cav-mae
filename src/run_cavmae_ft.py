@@ -78,6 +78,8 @@ parser.add_argument("--ftmode", type=str, default='multimodal', help="how to fin
 parser.add_argument("--head_lr", type=float, default=50.0, help="learning rate ratio the newly initialized layers / pretrained weights")
 parser.add_argument('--freeze_base', help='freeze the backbone or not', type=ast.literal_eval)
 parser.add_argument('--skip_frame_agg', help='if do frame agg', type=ast.literal_eval)
+parser.add_argument("--num_samples", type=int, default=None, help="number of samples")
+
 
 args = parser.parse_args()
 
@@ -85,9 +87,9 @@ args = parser.parse_args()
 im_res = 224
 audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': args.freqm, 'timem': args.timem, 'mixup': args.mixup,
               'dataset': args.dataset, 'mode':'train', 'mean':args.dataset_mean, 'std':args.dataset_std,
-              'noise':args.noise, 'label_smooth': args.label_smooth, 'im_res': im_res}
+              'noise':args.noise, 'label_smooth': args.label_smooth, 'im_res': im_res, 'num_samples': args.num_samples}
 val_audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': args.dataset,
-                  'mode':'eval', 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': im_res}
+                  'mode':'eval', 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': im_res, 'num_samples': args.num_samples}
 
 if args.bal == 'bal':
     print('balanced sampler is being used')
