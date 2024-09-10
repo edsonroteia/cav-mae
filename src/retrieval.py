@@ -40,6 +40,16 @@ def get_sim_mat(a, b):
             sim_mat[i, j] = get_similarity(a[i, :], b[j, :])
     return sim_mat
 
+# get mean
+def get_agg_sim_mat(a, b):
+    import pdb ; pdb.set_trace()
+    B = a.shape[0]
+    sim_mat = np.empty([B, B])
+    for i in range(B):
+        for j in range(B):
+            sim_mat[i, j] = get_similarity(a[i, :], b[j, :])
+    return sim_mat
+
 def compute_metrics(x):
     sx = np.sort(-x, axis=1)
     d = np.diag(-x)
@@ -77,6 +87,14 @@ def get_retrieval_result(audio_model, val_loader, direction='audio', model_type=
                 a_input, v_input, labels, video_id, frame_indices = batch
             else:
                 (a_input, v_input, labels) = batch
+            if i == 0:
+                print("A_shape", a_input.shape)
+                print("V_shape", v_input.shape)
+            if model_type == 'sync_pretrain':
+                # flatten batch so we process all frames at the same time
+                a_input = a_input.reshape(a_input.shape[0] * a_input.shape[1], a_input.shape[2], a_input.shape[3])
+                v_input = v_input.reshape(v_input.shape[0] * v_input.shape[1], v_input.shape[2], v_input.shape[3], v_input.shape[4])
+
             audio_input, video_input = a_input.to(device), v_input.to(device)
             with autocast():
                 audio_output, video_output = audio_model.module.forward_feat(audio_input, video_input)
@@ -88,16 +106,23 @@ def get_retrieval_result(audio_model, val_loader, direction='audio', model_type=
                 video_output = torch.nn.functional.normalize(video_output, dim=-1)
             audio_output = audio_output.to('cpu').detach()
             video_output = video_output.to('cpu').detach()
+            
+            if model_type == 'sync_pretrain':
+                # Group features from the same video together
+                num_frames = audio_output.shape[0] // len(video_id)
+                audio_output = audio_output.view(len(video_id), num_frames, -1)
+                A_a_feat.append(audio_output)
+            
             A_a_feat.append(audio_output)
             A_v_feat.append(video_output)
     A_a_feat = torch.cat(A_a_feat)
     A_v_feat = torch.cat(A_v_feat)
     if direction == 'audio':
-        # audio->visual retrieval 
-        sim_mat = get_sim_mat(A_a_feat, A_v_feat)
+        # audio->visual retrieval
+        sim_mat = get_agg_sim_mat(A_a_feat, A_v_feat) if model_type == 'sync_pretrain' else get_sim_mat(A_a_feat, A_v_feat)
     elif direction == 'video':
         # visual->audio retrieval
-        sim_mat = get_sim_mat(A_v_feat, A_a_feat)
+        sim_mat = get_agg_sim_mat(A_v_feat, A_a_feat) if model_type == 'sync_pretrain' else get_sim_mat(A_v_feat, A_a_feat)
     result = compute_metrics(sim_mat)
     print_computed_metrics(result)
     return result['R1'], result['R5'], result['R10'], result['MR']
@@ -115,7 +140,7 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     args.label_csv = label_csv
     args.exp_dir = './exp/dummy'
     args.loss_fn = torch.nn.BCELoss()
-    if model_type == 'sync_pretrain':   
+    if model_type == 'sync_pretrain':
         val_loader = torch.utils.data.DataLoader(dataloader_sync.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True, collate_fn=train_collate_fn)
     else:
         val_loader = torch.utils.data.DataLoader(dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
@@ -133,18 +158,18 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     msg = audio_model.load_state_dict(sdA, strict=False)
     print(msg)
     audio_model.eval()
-    r1, r5, r10, mr = get_retrieval_result(audio_model, val_loader, direction)
+    r1, r5, r10, mr = get_retrieval_result(audio_model, val_loader, direction, model_type)
     return r1, r5, r10, mr
 
 if __name__ == "__main__":
     # Hardcoded values
-    # model = '/local/1306531/models/best_audio_model.pth'
-    model = 'cav-mae-scale++.pth'
+    model = '/local/1306531/models/best_audio_model.pth'
+    #model = 'cav-mae-scale++.pth'
     data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
     label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
     dataset = 'vggsound'
-    # model_type='sync_pretrain'
-    model_type = 'pretrain'
+    model_type='sync_pretrain'
+    #model_type = 'pretrain'
 
     if model_type == 'sync_pretrain':
         target_length = 96
