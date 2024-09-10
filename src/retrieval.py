@@ -12,6 +12,7 @@ import os
 import models
 import dataloader as dataloader
 import dataloader_sync
+from dataloader_sync import train_collate_fn
 import torch
 import numpy as np
 from torch.cuda.amp import autocast
@@ -61,7 +62,7 @@ def print_computed_metrics(metrics):
     print('R@1: {:.4f} - R@5: {:.4f} - R@10: {:.4f} - Median R: {}'.format(r1, r5, r10, mr))
 
 # direction: 'audio' means audio->visual retrieval, 'video' means visual->audio retrieval
-def get_retrieval_result(audio_model, val_loader, direction='audio'):
+def get_retrieval_result(audio_model, val_loader, direction='audio', model_type='pretrain'):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if not isinstance(audio_model, nn.DataParallel):
         audio_model = nn.DataParallel(audio_model)
@@ -71,7 +72,11 @@ def get_retrieval_result(audio_model, val_loader, direction='audio'):
     A_a_feat, A_v_feat = [], []
     with torch.no_grad():
         # Add tqdm progress bar
-        for i, (a_input, v_input, labels) in tqdm(enumerate(val_loader), total=len(val_loader), desc="Processing batches"):
+        for i, batch in tqdm(enumerate(val_loader), total=len(val_loader), desc="Processing batches"):
+            if model_type == 'sync_pretrain':
+                a_input, v_input, labels, video_id, frame_indices = batch
+            else:
+                (a_input, v_input, labels) = batch
             audio_input, video_input = a_input.to(device), v_input.to(device)
             with autocast():
                 audio_output, video_output = audio_model.module.forward_feat(audio_input, video_input)
@@ -110,8 +115,10 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     args.label_csv = label_csv
     args.exp_dir = './exp/dummy'
     args.loss_fn = torch.nn.BCELoss()
-    
-    val_loader = torch.utils.data.DataLoader(dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
+    if model_type == 'sync_pretrain':   
+        val_loader = torch.utils.data.DataLoader(dataloader_sync.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True, collate_fn=train_collate_fn)
+    else:
+        val_loader = torch.utils.data.DataLoader(dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
     # cav-mae only been ssl pretrained
     if model_type == 'sync_pretrain':
         audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11)
