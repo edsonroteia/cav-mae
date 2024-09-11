@@ -20,10 +20,11 @@ def load_pretrained_model(args):
         raise ValueError('Model not supported')
 
     # Load the model weights
-    sdA = torch.load(args.weight_file, map_location='cpu')
+    sdA = torch.load(args.weight_file, map_location='cuda')  # Load directly to GPU
     if not isinstance(audio_model, torch.nn.DataParallel):
         audio_model = torch.nn.DataParallel(audio_model)
     audio_model.load_state_dict(sdA, strict=True)
+    audio_model = audio_model.cuda()  # Move model to GPU
     audio_model.eval()
     return audio_model
 
@@ -46,7 +47,7 @@ def multi_frame_evaluate(audio_model, val_loader, args):
         elif args.metrics == 'mAP':
             audio_output = torch.nn.functional.sigmoid(audio_output.float())
 
-        audio_output, target = audio_output.numpy(), target.numpy()
+        audio_output, target = audio_output.cpu().numpy(), target.cpu().numpy()  # Move to CPU before converting to numpy
         multiframe_pred.append(audio_output)
         if args.metrics == 'mAP':
             cur_res = np.mean([stat['AP'] for stat in stats])
@@ -101,8 +102,15 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    val_audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': args.dataset,
-                      'mode': 'eval', 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': 224, 'num_samples': args.num_samples}
+    # Set the device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    args.device = device
+
+    val_audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': args.freqm,
+                      'timem': args.timem, 'mixup': 0, 'dataset': args.dataset,
+                      'mode': 'eval', 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': args.noise,
+                      'im_res': 224, 'num_samples': args.num_samples}
+    
     val_loader = torch.utils.data.DataLoader(
         dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
         batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
@@ -111,8 +119,8 @@ if __name__ == "__main__":
     
     # Set up loss function
     if args.loss == 'BCE':
-        args.loss_fn = torch.nn.BCEWithLogitsLoss()
+        args.loss_fn = torch.nn.BCEWithLogitsLoss().to(device)
     elif args.loss == 'CE':
-        args.loss_fn = torch.nn.CrossEntropyLoss()
+        args.loss_fn = torch.nn.CrossEntropyLoss().to(device)
     
     multi_frame_evaluate(audio_model, val_loader, args)
