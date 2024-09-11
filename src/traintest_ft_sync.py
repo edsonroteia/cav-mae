@@ -350,19 +350,26 @@ def validate(audio_model, val_loader, args, output_pred=False):
                     print(f"Skipping empty batch {i}")
                     continue
                 a_input, v_input, labels, _, _ = batch
-                a_input = a_input.to(device)
-                v_input = v_input.to(device)
+                
+                # Reshape inputs
+                B, T, C, H, W = v_input.shape
+                a_input = a_input.view(B * T, -1, a_input.shape[-1]).to(device)
+                v_input = v_input.view(B * T, C, H, W).to(device)
 
                 with autocast():
                     audio_output = audio_model(a_input, v_input, args.ftmode)
 
-                predictions = audio_output.to('cpu').detach()
+                # Reshape output back to (B, T, num_classes)
+                audio_output = audio_output.view(B, T, -1)
+                
+                # Aggregate predictions across time dimension (e.g., mean)
+                predictions = audio_output.mean(dim=1).to('cpu').detach()
 
                 A_predictions.append(predictions)
                 A_targets.append(labels)
 
                 labels = labels.to(device)
-                loss = args.loss_fn(audio_output, labels)
+                loss = args.loss_fn(predictions, labels)
                 A_loss.append(loss.to('cpu').detach())
 
                 batch_time.update(time.time() - end)
