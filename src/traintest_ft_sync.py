@@ -350,7 +350,8 @@ def validate(audio_model, val_loader, args, output_pred=False):
                     print(f"Skipping empty batch {i}")
                     continue
                 a_input, v_input, labels, _, _ = batch
-                
+                a_input, v_input = a_input.to(device, non_blocking=True), v_input.to(device, non_blocking=True)
+                labels = labels.to(device, non_blocking=True)
                 # Reshape inputs
                 B, T, C, H, W = v_input.shape
                 a_input = a_input.view(B * T, -1, a_input.shape[-1]).to(device)
