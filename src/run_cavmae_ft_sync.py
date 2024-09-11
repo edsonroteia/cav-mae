@@ -100,12 +100,12 @@ audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm':
               'dataset': args.dataset, 'mode':'train', 'mean':args.dataset_mean, 'std':args.dataset_std,
               'noise':args.noise, 'label_smooth': args.label_smooth, 'im_res': im_res, 'num_samples': args.num_samples}
 val_audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': args.dataset,
-                  'mode':'eval', 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': im_res}
+                  'mode':'eval', 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': im_res, 'num_samples': args.num_samples}
 
-def get_loader(args, audio_conf, train_csv, val_csv):
+def get_loader(args, audio_conf, val_audio_conf, train_csv, val_csv):
     print('Now process ' + args.dataset)
     train_dataset = dataloader.AudiosetDataset(train_csv, audio_conf, label_csv=args.label_csv)
-    val_dataset = dataloader.AudiosetDataset(val_csv, audio_conf, label_csv=args.label_csv)
+    val_dataset = dataloader.AudiosetDataset(val_csv, val_audio_conf, label_csv=args.label_csv)
     
     print('Number of training samples: {}'.format(len(train_dataset)))
     print('Number of validation samples: {}'.format(len(val_dataset)))
@@ -133,7 +133,7 @@ def get_loader(args, audio_conf, train_csv, val_csv):
     
     return train_loader, val_loader
 
-train_loader, val_loader = get_loader(args, audio_conf, args.data_train, args.data_val)
+train_loader, val_loader = get_loader(args, audio_conf, val_audio_conf, args.data_train, args.data_val)
 
 if args.data_eval != None:
     eval_loader = torch.utils.data.DataLoader(

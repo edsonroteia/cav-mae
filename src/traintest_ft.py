@@ -256,7 +256,9 @@ def validate(audio_model, val_loader, args, output_pred=False):
         audio_output = torch.cat(A_predictions)
         target = torch.cat(A_targets)
         loss = np.mean(A_loss)
-
+        # audio_output.shape -> (samples, classes)
+        # target.shape -> (samples, classes)
+        # target is a one-hot encoding vector for each sample
         stats = calculate_stats(audio_output, target)
 
     if output_pred == False:
