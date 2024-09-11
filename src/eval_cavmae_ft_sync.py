@@ -90,6 +90,14 @@ if __name__ == "__main__":
     parser.add_argument("--weight_file", type=str, default=None, help="path to weight file")
     parser.add_argument("--num_samples", type=int, default=None, help="Number of samples to use (default: use all samples)")
     parser.add_argument("--ftmode", type=str, default="multimodal", help="finetuning mode")
+    
+    # New arguments
+    parser.add_argument("--loss", type=str, default="CE", help="loss function", choices=["CE", "BCE"])
+    parser.add_argument("--freqm", type=int, default=0, help="frequency mask max length")
+    parser.add_argument("--timem", type=int, default=0, help="time mask max length")
+    parser.add_argument("--noise", type=bool, default=False, help="if add noise in data augmentation")
+    parser.add_argument("--freeze_base", type=bool, default=False, help="if freeze the base model")
+    parser.add_argument("--head_lr", type=float, default=1.0, help="learning rate multiplier for head")
 
     args = parser.parse_args()
 
@@ -100,4 +108,11 @@ if __name__ == "__main__":
         batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
 
     audio_model = load_pretrained_model(args)
+    
+    # Set up loss function
+    if args.loss == 'BCE':
+        args.loss_fn = torch.nn.BCEWithLogitsLoss()
+    elif args.loss == 'CE':
+        args.loss_fn = torch.nn.CrossEntropyLoss()
+    
     multi_frame_evaluate(audio_model, val_loader, args)
