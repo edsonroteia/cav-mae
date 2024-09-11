@@ -345,37 +345,34 @@ def validate(audio_model, val_loader, args, output_pred=False):
     A_predictions, A_targets, A_loss = [], [], []
     with torch.no_grad():
         for i, batch in tqdm(enumerate(val_loader), total=len(val_loader), desc="Validation"):
-            try:
-                if batch is None:
-                    print(f"Skipping empty batch {i}")
-                    continue
-                a_input, v_input, labels, _, _ = batch
-                
-                # Reshape inputs
-                B, T, C, H, W = v_input.shape
-                a_input = a_input.view(B * T, -1, a_input.shape[-1]).to(device)
-                v_input = v_input.view(B * T, C, H, W).to(device)
-
-                with autocast():
-                    audio_output = audio_model(a_input, v_input, args.ftmode)
-
-                # Reshape output back to (B, T, num_classes)
-                audio_output = audio_output.view(B, T, -1)
-                
-                # Aggregate predictions across time dimension (e.g., mean)
-                predictions = audio_output.mean(dim=1).to(device).detach()
-
-                A_predictions.append(predictions)
-                A_targets.append(labels)
-
-                loss = args.loss_fn(predictions, labels)
-                A_loss.append(loss.to('cpu').detach())
-
-                batch_time.update(time.time() - end)
-                end = time.time()
-            except Exception as e:
-                print(f"Error in validation batch {i}: {e}")
+            if batch is None:
+                print(f"Skipping empty batch {i}")
                 continue
+            a_input, v_input, labels, _, _ = batch
+            
+            # Reshape inputs
+            B, T, C, H, W = v_input.shape
+            a_input = a_input.view(B * T, -1, a_input.shape[-1]).to(device)
+            v_input = v_input.view(B * T, C, H, W).to(device)
+
+            with autocast():
+                audio_output = audio_model(a_input, v_input, args.ftmode)
+
+            # Reshape output back to (B, T, num_classes)
+            audio_output = audio_output.view(B, T, -1)
+            
+            # Aggregate predictions across time dimension (e.g., mean)
+            predictions = audio_output.mean(dim=1).to(device).detach()
+
+            A_predictions.append(predictions)
+            A_targets.append(labels)
+
+            loss = args.loss_fn(predictions, labels)
+            A_loss.append(loss.to('cpu').detach())
+
+            batch_time.update(time.time() - end)
+            end = time.time()
+
 
     try:
         audio_output = torch.cat(A_predictions)
