@@ -89,6 +89,7 @@ if __name__ == "__main__":
     parser.add_argument("--metrics", type=str, default="mAP", help="the main evaluation metrics in finetuning", choices=["mAP", "acc"])
     parser.add_argument("--weight_file", type=str, default=None, help="path to weight file")
     parser.add_argument("--num_samples", type=int, default=None, help="Number of samples to use (default: use all samples)")
+    parser.add_argument("--ftmode", type=str, default="multimodal", help="finetuning mode")
 
     args = parser.parse_args()
 
