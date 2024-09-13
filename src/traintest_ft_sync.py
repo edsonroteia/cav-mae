@@ -37,14 +37,26 @@ def log_plot_to_neptune(run, plot_name, fig, step):
 def visualize_confusion_matrix(y_true, y_pred, class_names, step, run):
     print("Visualizing Confusion Matrix...")
     print(f"y_true shape: {y_true.shape}, y_pred shape: {y_pred.shape}")
-    cm = confusion_matrix(y_true, y_pred)
-    fig, ax = plt.subplots(figsize=(10, 10))
-    sns.heatmap(cm, annot=True, fmt='d', ax=ax, cmap='Blues')
+    
+    # Get the number of classes from class_names
+    n_classes = len(class_names)
+    
+    # Compute confusion matrix with explicit label ordering
+    cm = confusion_matrix(y_true, y_pred, labels=range(n_classes))
+    
+    fig, ax = plt.subplots(figsize=(20, 20))  # Increased figure size
+    sns.heatmap(cm, annot=False, cmap='Blues', square=True, ax=ax)  # Removed annot for better visibility
     ax.set_xlabel('Predicted labels')
     ax.set_ylabel('True labels')
     ax.set_title('Confusion Matrix')
-    ax.xaxis.set_ticklabels(class_names, rotation=90)
-    ax.yaxis.set_ticklabels(class_names, rotation=0)
+    
+    # Set ticks to show every 10th class
+    tick_positions = np.arange(0, n_classes, 50)
+    ax.set_xticks(tick_positions)
+    ax.set_yticks(tick_positions)
+    ax.set_xticklabels([class_names[i] for i in tick_positions], rotation=90)
+    ax.set_yticklabels([class_names[i] for i in tick_positions], rotation=0)
+    
     log_plot_to_neptune(run, "confusion_matrix", fig, step)
 
 def visualize_roc_curve(y_true, y_score, step, run):
@@ -249,8 +261,8 @@ def train(audio_model, train_loader, test_loader, args, run):
             print(f"Stats keys: {stats[0].keys()}")  # Print available keys in stats
 
             # Use A_predictions and A_targets instead of stats for raw data
-            y_pred = torch.cat(A_predictions).cpu().numpy()
-            y_true = torch.cat(A_targets).cpu().numpy()
+            y_pred = A_predictions.cpu().numpy()
+            y_true = A_targets.cpu().numpy()
             
             print(f"y_true shape: {y_true.shape}, y_pred shape: {y_pred.shape}")
             
