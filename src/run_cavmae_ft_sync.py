@@ -208,13 +208,13 @@ msg = audio_model.load_state_dict(sdA, strict=True)
 print(msg)
 audio_model.eval()
 
-# skil multi-frame evaluation, for audio-only model
+# skip multi-frame evaluation, for audio-only model
 if args.skip_frame_agg == True:
     val_audio_conf['frame_use'] = 5
     val_loader = torch.utils.data.DataLoader(
         dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
         batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
-    stats, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
+    stats, _, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
     if args.metrics == 'mAP':
         cur_res = np.mean([stat['AP'] for stat in stats])
         print('mAP is {:.4f}'.format(cur_res))
@@ -222,23 +222,36 @@ if args.skip_frame_agg == True:
         cur_res = stats[0]['acc']
         print('acc is {:.4f}'.format(cur_res))
 else:
+    # Initialize lists to store results and predictions
     res = []
     multiframe_pred = []
-    total_frames = 10 # change if your total frame is different
+    total_frames = 10 # Total number of frames to process
+
+    # Loop through each frame
     for frame in range(total_frames):
+        # Set the current frame in the audio configuration
         val_audio_conf['frame_use'] = frame
+        
+        # Create a DataLoader for validation data
         val_loader = torch.utils.data.DataLoader(
             dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
             batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
-        stats, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
+        
+        # Validate the model and get outputs
+        stats, _, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
         print(audio_output.shape)
+        
+        # Apply softmax or sigmoid based on the evaluation metric
         if args.metrics == 'acc':
             audio_output = torch.nn.functional.softmax(audio_output.float(), dim=-1)
         elif args.metrics == 'mAP':
             audio_output = torch.nn.functional.sigmoid(audio_output.float())
 
+        # Convert outputs to numpy arrays
         audio_output, target = audio_output.numpy(), target.numpy()
         multiframe_pred.append(audio_output)
+        
+        # Calculate and store the current frame's performance
         if args.metrics == 'mAP':
             cur_res = np.mean([stat['AP'] for stat in stats])
             print('mAP of frame {:d} is {:.4f}'.format(frame, cur_res))
@@ -247,19 +260,24 @@ else:
             print('acc of frame {:d} is {:.4f}'.format(frame, cur_res))
         res.append(cur_res)
 
-    # ensemble over frames
+    # Ensemble predictions by averaging across frames
     multiframe_pred = np.mean(multiframe_pred, axis=0)
+
+    # Calculate final multi-frame performance
     if args.metrics == 'acc':
+        # For accuracy, use argmax to get class predictions
         acc = metrics.accuracy_score(np.argmax(target, 1), np.argmax(multiframe_pred, 1))
         print('multi-frame acc is {:f}'.format(acc))
         res.append(acc)
     elif args.metrics == 'mAP':
+        # For mAP, calculate average precision for each class
         AP = []
         for k in range(args.n_class):
-            # Average precision
             avg_precision = metrics.average_precision_score(target[:, k], multiframe_pred[:, k], average=None)
             AP.append(avg_precision)
         mAP = np.mean(AP)
         print('multi-frame mAP is {:.4f}'.format(mAP))
         res.append(mAP)
+
+    # Save all results to a CSV file
     np.savetxt(args.exp_dir + '/mul_frame_res.csv', res, delimiter=',')

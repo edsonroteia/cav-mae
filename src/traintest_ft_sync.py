@@ -360,32 +360,30 @@ def validate(audio_model, val_loader, args, output_pred=False):
 
             # Reshape output back to (B, T, num_classes)
             audio_output = audio_output.view(B, T, -1)
+            audio_output = audio_output.mean(dim=1)
             
             # Aggregate predictions across time dimension (e.g., mean)
-            predictions = audio_output.mean(dim=1).to(device).detach()
+            predictions = audio_output.to('cpu').detach()
 
             A_predictions.append(predictions)
             A_targets.append(labels)
 
-            loss = args.loss_fn(predictions, labels)
+            labels = labels.to(device)
+            loss = args.loss_fn(audio_output, labels)
             A_loss.append(loss.to('cpu').detach())
 
             batch_time.update(time.time() - end)
             end = time.time()
 
-
-    try:
         audio_output = torch.cat(A_predictions)
         target = torch.cat(A_targets)
         loss = np.mean(A_loss)
 
-        stats = calculate_stats(audio_output, target)
-    except Exception as e:
-        print(f"Error in calculating validation stats: {e}")
-        stats, loss = None, None
+        stats = calculate_stats(audio_output.cpu().detach(), target)
+
 
     if output_pred == False:
         return stats, loss
     else:
         # used for multi-frame evaluation (i.e., ensemble over frames), so return prediction and target
-        return stats, loss, A_predictions, A_targets
+        return stats, loss, audio_output, target
