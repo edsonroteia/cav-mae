@@ -102,6 +102,8 @@ def train(audio_model, train_loader, test_loader, args, run):
         project="junioroteia/CAV-MAE",
         api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJmNGE4NDA2NS1hYmE2LTQ3YWYtODllMC02ODk4NGNlODY0MDUifQ==",
     )
+    # Log parameters at the beginning of the run
+    run["parameters"] = params
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print('running on ' + str(device))
     torch.set_grad_enabled(True)
@@ -191,11 +193,14 @@ def train(audio_model, train_loader, test_loader, args, run):
             a_input, v_input = a_input.to(device, non_blocking=True), v_input.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
             data_time.update(time.time() - end_time)
-            per_sample_data_time.update((time.time() - end_time) / a_input.shape[0])
+            per_sample_data_time.update((time.time() - end_time) / B)
             dnn_start_time = time.time()
 
             with autocast():
                 audio_output = audio_model(a_input, v_input, args.ftmode)
+                if args.aggregate != 'None':
+                    # Reshape labels to match the new shape of audio_output
+                    labels = labels.view(B//10, 10, -1)[:, 0, :]  # Take the first frame's label for each video
                 loss = loss_fn(audio_output, labels)
             
             optimizer.zero_grad()
@@ -204,16 +209,18 @@ def train(audio_model, train_loader, test_loader, args, run):
             scaler.update()
 
             # Use a combination of epoch and batch index for unique step values
-            current_step = epoch * len(train_loader) + i
+            current_step = (epoch - 1) * len(train_loader) + i
 
-            run['train/loss'].log(loss.item(), step=current_step)
-            run['train/batch_time'].log(time.time() - end_time, step=current_step)
-            run['train/learning_rate'].log(optimizer.param_groups[0]['lr'], step=current_step)
+            run["train/loss"].log(loss.item(), step=current_step)
+            run["train/batch_time"].log(time.time() - end_time, step=current_step)
+            run["train/learning_rate"].log(optimizer.param_groups[0]["lr"], step=current_step)
 
+            if args.aggregate != 'None':
+                B = B // 10  # Adjust B to reflect the number of videos, not frames
             loss_meter.update(loss.item(), B)
             batch_time.update(time.time() - end_time)
-            per_sample_time.update((time.time() - end_time)/a_input.shape[0])
-            per_sample_dnn_time.update((time.time() - dnn_start_time)/a_input.shape[0])
+            per_sample_time.update((time.time() - end_time)/B)
+            per_sample_dnn_time.update((time.time() - dnn_start_time)/B)
 
             print_step = global_step % args.n_print_steps == 0
             early_print_step = epoch == 0 and global_step % (args.n_print_steps/10) == 0
@@ -249,11 +256,11 @@ def train(audio_model, train_loader, test_loader, args, run):
         print("valid_loss: {:.6f}".format(valid_loss))
 
         # Log important metrics
-        run['valid/mAP'].log(mAP, step=epoch)
-        run['valid/AUC'].log(mAUC, step=epoch)
-        run['valid/d_prime'].log(d_prime(mAUC), step=epoch)
-        run['train/loss'].log(loss_meter.avg, step=epoch)
-        run['valid/loss'].log(valid_loss, step=epoch)
+        run["valid/mAP"].log(mAP, step=epoch)
+        run["valid/AUC"].log(mAUC, step=epoch)
+        run["valid/d_prime"].log(d_prime(mAUC), step=epoch)
+        run["train/epoch_loss"].log(loss_meter.avg, step=epoch)
+        run["valid/loss"].log(valid_loss, step=epoch)
 
         # Visualizations
         try:
@@ -282,8 +289,8 @@ def train(audio_model, train_loader, test_loader, args, run):
 
             # Log additional metrics from stats
             for i, stat in enumerate(stats):
-                run[f'valid/class_{i}_AP'].log(stat['AP'], step=epoch)
-                run[f'valid/class_{i}_AUC'].log(stat['auc'], step=epoch)
+                run[f"valid/class_{i}_AP"].log(stat["AP"], step=epoch)
+                run[f"valid/class_{i}_AUC"].log(stat["auc"], step=epoch)
 
         except Exception as e:
             print(f"Error in visualization: {str(e)}")
@@ -328,11 +335,10 @@ def train(audio_model, train_loader, test_loader, args, run):
         finish_time = time.time()
         print('epoch {:d} training time: {:.3f}'.format(epoch, finish_time-begin_time))
 
-        run['train/epoch_loss'].log(loss_meter.avg, step=epoch)
-        run['train/epoch_time'].log(finish_time - begin_time, step=epoch)
-        run['valid/epoch_mAP'].log(mAP, step=epoch)
-        run['valid/epoch_acc'].log(acc, step=epoch)
-        run['valid/epoch_auc'].log(mAUC, step=epoch)
+        run["train/epoch_time"].log(finish_time - begin_time, step=epoch)
+        run["valid/epoch_mAP"].log(mAP, step=epoch)
+        run["valid/epoch_acc"].log(acc, step=epoch)
+        run["valid/epoch_auc"].log(mAUC, step=epoch)
 
         epoch += 1
 
@@ -362,26 +368,21 @@ def validate(audio_model, val_loader, args, output_pred=False):
                 continue
             a_input, v_input, labels, _, _ = batch
             
-            # Reshape inputs
-            B, T, C, H, W = v_input.shape
-            a_input = a_input.view(B * T, -1, a_input.shape[-1]).to(device)
-            v_input = v_input.view(B * T, C, H, W).to(device)
+            a_input, v_input = a_input.to(device, non_blocking=True), v_input.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
 
             with autocast():
                 audio_output = audio_model(a_input, v_input, args.ftmode)
-
-            # Reshape output back to (B, T, num_classes)
-            audio_output = audio_output.view(B, T, -1)
-            audio_output = audio_output.mean(dim=1)
+                
+            if args.aggregate != 'None':
+                # Reshape labels to match the new shape of audio_output
+                B = a_input.size(0)
+                labels = labels.view(B//10, 10, -1)[:, 0, :]  # Take the first frame's label for each video
             
-            # Aggregate predictions across time dimension (e.g., mean)
-            predictions = audio_output.to('cpu').detach()
-
-            A_predictions.append(predictions)
-            A_targets.append(labels)
-
-            labels = labels.to(device)
             loss = args.loss_fn(audio_output, labels)
+            
+            A_predictions.append(audio_output.to('cpu').detach())
+            A_targets.append(labels.to('cpu').detach())
             A_loss.append(loss.to('cpu').detach())
 
             batch_time.update(time.time() - end)
@@ -389,10 +390,9 @@ def validate(audio_model, val_loader, args, output_pred=False):
 
         audio_output = torch.cat(A_predictions)
         target = torch.cat(A_targets)
-        loss = np.mean(A_loss)
+        loss = torch.stack(A_loss).mean().item()
 
-        stats = calculate_stats(audio_output.cpu().detach(), target)
-
+        stats = calculate_stats(audio_output, target)
 
     if output_pred == False:
         return stats, loss

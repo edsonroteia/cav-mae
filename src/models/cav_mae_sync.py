@@ -510,7 +510,7 @@ class CAVMAE(nn.Module):
 # the finetuned CAV-MAE model
 class CAVMAEFT(nn.Module):
     def __init__(self, label_dim, img_size=224, audio_length=1024, patch_size=16, in_chans=3,
-                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True):
+                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True, aggregate='None'):
         super().__init__()
         timm.models.vision_transformer.Block = Block
         print('Use norm_pix_loss: ', norm_pix_loss)
@@ -523,6 +523,8 @@ class CAVMAEFT(nn.Module):
 
         self.patch_embed_a.num_patches = int(audio_length * 128 / 256)
         print('Number of Audio Patches: {:d}, Visual Patches: {:d}'.format(self.patch_embed_a.num_patches, self.patch_embed_v.num_patches))
+
+        self.aggregate = aggregate
 
         self.modality_a = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.modality_v = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -538,7 +540,10 @@ class CAVMAEFT(nn.Module):
         self.norm_v = norm_layer(embed_dim)
         self.norm = norm_layer(embed_dim)
 
-        self.mlp_head = nn.Sequential(nn.LayerNorm(embed_dim), nn.Linear(embed_dim, label_dim))
+        if self.aggregate != "None":
+            self.mlp_head = nn.Sequential(nn.LayerNorm(embed_dim * 10), nn.Linear(embed_dim * 10, label_dim))
+        else:
+            self.mlp_head = nn.Sequential(nn.LayerNorm(embed_dim), nn.Linear(embed_dim, label_dim))
 
         self.initialize_weights()
 
@@ -604,7 +609,20 @@ class CAVMAEFT(nn.Module):
                 x = blk(x)
             x = self.norm(x)
 
-            x = x.mean(dim=1)
+            if self.aggregate != "None":
+                # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
+                batch_size = x.shape[0] // 10  # Assuming 10 frames per video
+                x = x.view(batch_size, 10, -1, x.shape[-1])
+                
+                # Average across patches
+                x = x.mean(dim=2)
+                
+                # Concatenate frames
+                # Expected dimension: (batch_size, 10 * embed_dim)
+                x = x.view(batch_size, -1)
+            else:
+                x = x.mean(dim=1)
+
             x = self.mlp_head(x)
             return x
 
