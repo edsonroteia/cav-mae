@@ -188,7 +188,7 @@ def train(audio_model, train_loader, test_loader, args, run):
         print("current #epochs=%s, #steps=%s" % (epoch, global_step))
 
         for i, (a_input, v_input, labels, _, _) in tqdm(enumerate(train_loader)):
-
+                
             B = a_input.size(0)
             a_input, v_input = a_input.to(device, non_blocking=True), v_input.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
@@ -197,6 +197,7 @@ def train(audio_model, train_loader, test_loader, args, run):
             dnn_start_time = time.time()
 
             with autocast():
+                # print(a_input.shape, v_input.shape)
                 audio_output = audio_model(a_input, v_input, args.ftmode)
                 if args.aggregate != 'None':
                     # Reshape labels to match the new shape of audio_output
@@ -370,7 +371,7 @@ def validate(audio_model, val_loader, args, output_pred=False):
             
             a_input, v_input = a_input.to(device, non_blocking=True), v_input.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
-
+            # print(a_input.shape, v_input.shape)
             with autocast():
                 audio_output = audio_model(a_input, v_input, args.ftmode)
                 

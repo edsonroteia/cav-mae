@@ -141,7 +141,7 @@ def get_loader(args, audio_conf, val_audio_conf, train_csv, val_csv):
 
     val_loader = torch.utils.data.DataLoader(
         val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, 
-        pin_memory=True, collate_fn=collate_fn)
+        pin_memory=True, drop_last=True, collate_fn=collate_fn)
     
     return train_loader, val_loader
 
@@ -234,7 +234,7 @@ else:
     # Initialize lists to store results and predictions
     # Validate the model and get outputs
     stats, _, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
-    print(audio_output.shape)
+    # print(audio_output.shape)
     
     # Apply softmax or sigmoid based on the evaluation metric
     if args.metrics == 'acc':
