@@ -65,6 +65,8 @@ parser.add_argument("--lr_adapt", help='if use adaptive learning rate', type=ast
 parser.add_argument("--metrics", type=str, default="mAP", help="the main evaluation metrics in finetuning", choices=["mAP", "acc"])
 parser.add_argument("--loss", type=str, default="BCE", help="the loss function for finetuning, depend on the task", choices=["BCE", "CE"])
 parser.add_argument('--warmup', help='if use warmup learning rate scheduler', type=ast.literal_eval, default='True')
+parser.add_argument("--lr_scheduler", type=str, default="step", help="learning rate scheduler", choices=["step", "cosine"])
+
 parser.add_argument("--lrscheduler_start", default=2, type=int, help="when to start decay in finetuning")
 parser.add_argument("--lrscheduler_step", default=1, type=int, help="the number of step to decrease the learning rate in finetuning")
 parser.add_argument("--lrscheduler_decay", default=0.5, type=float, help="the learning rate decay ratio in finetuning")
@@ -255,4 +257,4 @@ else:
 
 
     # # Save all results to a CSV file
-    np.savetxt(args.exp_dir + '/mul_frame_res.csv', cur_res, delimiter=',')
+    

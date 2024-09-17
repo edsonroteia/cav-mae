@@ -156,13 +156,16 @@ def train(audio_model, train_loader, test_loader, args, run):
     print('Total newly initialized MLP parameter number is : {:.3f} million'.format(sum(p.numel() for p in mlp_params) / 1e6))
     print('Total pretrained backbone parameter number is : {:.3f} million'.format(sum(p.numel() for p in base_params) / 1e6))
 
-    # only for preliminary test, formal exps should use fixed learning rate scheduler
-    if args.lr_adapt == True:
+    # Configure learning rate scheduler
+    if args.lr_adapt:
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=args.lr_patience, verbose=True)
-        print('Override to use adaptive learning rate scheduler.')
+        print('Using adaptive learning rate scheduler with patience {:d}'.format(args.lr_patience))
+    elif args.lr_scheduler == 'cosine':
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.n_epochs, eta_min=5e-7)
+        print('Using cosine annealing learning rate scheduler over {:d} epochs with minimum lr of 1e-6'.format(args.n_epochs))
     else:
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, list(range(args.lrscheduler_start, 1000, args.lrscheduler_step)),gamma=args.lrscheduler_decay)
-        print('The learning rate scheduler starts at {:d} epoch with decay rate of {:.3f} every {:d} epoches'.format(args.lrscheduler_start, args.lrscheduler_decay, args.lrscheduler_step))
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(args.n_epochs*0.5), int(args.n_epochs*0.75)], gamma=0.1)
+        print('Using step learning rate scheduler with milestones at 50% and 75% of training, decay rate of 0.1')
     main_metrics = args.metrics
     if args.loss == 'BCE':
         loss_fn = nn.BCEWithLogitsLoss()

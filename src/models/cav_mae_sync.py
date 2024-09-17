@@ -637,15 +637,28 @@ class CAVMAEFT(nn.Module):
             for blk in self.blocks_a:
                 a = blk(a)
 
-            # note here uses the 'a' normalization, it is used in both training and inference, so it is fine
             for blk in self.blocks_u:
-                a = blk(a, 'a')
-            a = self.norm_a(a)
-            x = a.mean(dim=1)
+                a = blk(a)
+            a = self.norm(a)
+
+            if self.aggregate != "None":
+                # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
+                batch_size = a.shape[0] // 10  # Assuming 10 frames per video
+                a = a.view(batch_size, 10, -1, a.shape[-1])
+                
+                # Average across patches
+                a = a.mean(dim=2)
+                
+                # Concatenate frames
+                # Expected dimension: (batch_size, 10 * embed_dim)
+                x = a.view(batch_size, -1)
+            else:
+                x = a.mean(dim=1)
+
             x = self.mlp_head(x)
             return x
 
-        # finetune with only image (and inference with only audio when the model is finetuned with only image)
+        # finetune with only image (and inference with only image when the model is finetuned with only image)
         elif mode == 'videoonly':
             v = self.patch_embed_v(v)
             v = v + self.pos_embed_v
@@ -654,11 +667,24 @@ class CAVMAEFT(nn.Module):
             for blk in self.blocks_v:
                 v = blk(v)
 
-            # note here uses the 'v' normalization, it is used in both training and inference, so it is fine
             for blk in self.blocks_u:
-                v = blk(v, 'v')
-            v = self.norm_v(v)
-            x = v.mean(dim=1)
+                v = blk(v)
+            v = self.norm(v)
+
+            if self.aggregate != "None":
+                # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
+                batch_size = v.shape[0] // 10  # Assuming 10 frames per video
+                v = v.view(batch_size, 10, -1, v.shape[-1])
+                
+                # Average across patches
+                v = v.mean(dim=2)
+                
+                # Concatenate frames
+                # Expected dimension: (batch_size, 10 * embed_dim)
+                x = v.view(batch_size, -1)
+            else:
+                x = v.mean(dim=1)
+
             x = self.mlp_head(x)
             return x
 
