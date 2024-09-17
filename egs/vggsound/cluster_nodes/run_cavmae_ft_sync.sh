@@ -16,7 +16,8 @@ export TORCH_HOME=../../pretrained_models
 model=cav-mae-ft
 
 # you can replace with any checkpoint you want, but by default, we use cav-mae-scale++
-pretrain_dir=/local/$SLURM_JOB_ID/models/
+# pretrain_dir=/local/$SLURM_JOB_ID/models/
+pretrain_dir=/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_021700/models/
 pretrain_path=${pretrain_dir}/best_audio_model.pth
 
 freeze_base=False
@@ -42,6 +43,7 @@ freqm=48
 timem=192
 mixup=0.5
 label_smooth=0.1
+lr_scheduler=step
 
 dataset=vggsound
 tr_data=datafilles/vggsound/cluster_nodes/vgg_train_cleaned.json
@@ -63,4 +65,4 @@ CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model}
 --wa ${wa} --wa_start ${wa_start} --wa_end ${wa_end} --lr_adapt ${lr_adapt} \
 --pretrain_path ${pretrain_path} --ftmode ${ftmode} \
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
---num-workers 32
+--num-workers 32 --aggregate True --lr_scheduler ${lr_scheduler}
