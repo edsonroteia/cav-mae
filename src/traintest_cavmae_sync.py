@@ -122,6 +122,9 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
     if args.lr_adapt == True:
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=args.lr_patience, verbose=True)
         print('Override to use adaptive learning rate scheduler.')
+    elif args.lr_scheduler == 'cosine':
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.n_epochs, eta_min=5e-6)
+        print('Using cosine annealing learning rate scheduler over {:d} epochs with minimum lr of 1e-6'.format(args.n_epochs))
     else:
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, list(range(args.lrscheduler_start, 1000, args.lrscheduler_step)),gamma=args.lrscheduler_decay)
         print('The learning rate scheduler starts at {:d} epoch with decay rate of {:.3f} every {:d} epoches'.format(args.lrscheduler_start, args.lrscheduler_decay, args.lrscheduler_step))

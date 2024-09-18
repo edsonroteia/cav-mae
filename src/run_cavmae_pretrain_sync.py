@@ -61,6 +61,8 @@ parser.add_argument('--warmup', help='if use warmup learning rate scheduler', ty
 parser.add_argument("--lrscheduler_start", default=10, type=int, help="when to start decay in finetuning")
 parser.add_argument("--lrscheduler_step", default=5, type=int, help="the number of step to decrease the learning rate in finetuning")
 parser.add_argument("--lrscheduler_decay", default=0.5, type=float, help="the learning rate decay ratio in finetuning")
+parser.add_argument("--lr_scheduler", type=str, default="step", help="learning rate scheduler", choices=["step", "cosine"])
+
 parser.add_argument("--n-print-steps", type=int, default=100, help="number of steps to print statistics")
 parser.add_argument('--save_model', help='save the model or not', type=ast.literal_eval)
 
