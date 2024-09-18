@@ -540,7 +540,7 @@ class CAVMAEFT(nn.Module):
         self.norm_v = norm_layer(embed_dim)
         self.norm = norm_layer(embed_dim)
 
-        if self.aggregate != "None":
+        if self.aggregate == "concat_mlp":
             self.mlp_head = nn.Sequential(
                 nn.LayerNorm(embed_dim * 10),
                 nn.Linear(embed_dim * 10, embed_dim * 5),
@@ -551,6 +551,14 @@ class CAVMAEFT(nn.Module):
                 nn.GELU(),
                 nn.Linear(embed_dim, label_dim)
             )
+        elif self.aggregate == "self_attention_cls":
+            self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
+            self.classifier_layers = nn.ModuleList([
+                Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer)
+                for _ in range(2)  # You can adjust the number of layers as needed
+            ])
+            self.classifier_norm = norm_layer(embed_dim)
+            self.classifier_head = nn.Linear(embed_dim, label_dim)
         else:
             self.mlp_head = nn.Sequential(nn.LayerNorm(embed_dim), nn.Linear(embed_dim, label_dim))
 
@@ -618,7 +626,25 @@ class CAVMAEFT(nn.Module):
                 x = blk(x)
             x = self.norm(x)
 
-            if self.aggregate != "None":
+            if self.aggregate == "self_attention_cls":
+                # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
+                batch_size = x.shape[0] // 10  # Assuming 10 frames per video
+                x = x.view(batch_size, 10, -1, x.shape[-1])
+                
+                # Average across patches
+                x = x.mean(dim=2)
+                
+                # Add CLS token
+                cls_tokens = self.cls_token.expand(batch_size, -1, -1)
+                x = torch.cat((cls_tokens, x), dim=1)
+                
+                # Apply classifier layers
+                for block in self.classifier_layers:
+                    x = block(x)
+                
+                x = self.classifier_norm(x)
+                x = self.classifier_head(x[:, 0])  # Use CLS token for classification
+            elif self.aggregate != "None":
                 # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
                 batch_size = x.shape[0] // 10  # Assuming 10 frames per video
                 x = x.view(batch_size, 10, -1, x.shape[-1])
@@ -629,10 +655,11 @@ class CAVMAEFT(nn.Module):
                 # Concatenate frames
                 # Expected dimension: (batch_size, 10 * embed_dim)
                 x = x.view(batch_size, -1)
+                x = self.mlp_head(x)
             else:
                 x = x.mean(dim=1)
+                x = self.mlp_head(x)
 
-            x = self.mlp_head(x)
             return x
 
         # finetune with only audio (and inference with only audio when the model is finetuned with only audio)
