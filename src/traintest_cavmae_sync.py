@@ -186,7 +186,8 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-            scheduler.step()
+            if args.lr_scheduler == 'cosine':
+                scheduler.step()
             
             # Update meters
             loss_av_meter.update(loss.item(), B)
@@ -290,11 +291,11 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
 
         if args.save_model == True:
             torch.save(audio_model.state_dict(), "%s/models/audio_model.%d.pth" % (exp_dir, epoch))
-
-        # if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-        #     scheduler.step(-eval_loss_av)
-        # else:
-        #     scheduler.step()
+        if args.lr_scheduler != 'cosine':
+            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                scheduler.step(-eval_loss_av)
+            else:
+                scheduler.step()
 
         print('Epoch-{0} lr: {1}'.format(epoch, optimizer.param_groups[0]['lr']))
 
