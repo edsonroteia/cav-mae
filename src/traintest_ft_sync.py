@@ -24,6 +24,7 @@ import io
 from PIL import Image
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 from sklearn.preprocessing import label_binarize
+from cosine_scheduler import CosineWarmupScheduler
 
 def log_plot_to_neptune(run, plot_name, fig, step):
     """Log a matplotlib figure to Neptune without saving to disk."""
@@ -161,7 +162,16 @@ def train(audio_model, train_loader, test_loader, args, run):
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=args.lr_patience, verbose=True)
         print('Using adaptive learning rate scheduler with patience {:d}'.format(args.lr_patience))
     elif args.lr_scheduler == 'cosine':
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.n_epochs, eta_min=5e-7)
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.n_epochs, eta_min=5e-6)
+        max_iter = args.n_epochs * len(train_loader)
+        print("Max Iterations {} = epochs {} * iter_per_epoch{}".format(max_iter, args.n_epochs, len(train_loader)))
+        scheduler = scheduler = CosineWarmupScheduler(
+            optimizer,
+            warmup_epochs=max_iter * 0.1,
+            max_epochs=max_iter,
+            min_lr=args.lr * 0.1,
+            max_lr=args.lr
+        )
         print('Using cosine annealing learning rate scheduler over {:d} epochs with minimum lr of 1e-6'.format(args.n_epochs))
     else:
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(args.n_epochs*0.5), int(args.n_epochs*0.75)], gamma=0.1)
@@ -211,6 +221,8 @@ def train(audio_model, train_loader, test_loader, args, run):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
+            if args.lr_scheduler == 'cosine':
+                scheduler.step()
 
             # Use a combination of epoch and batch index for unique step values
             current_step = (epoch - 1) * len(train_loader) + i
@@ -321,14 +333,14 @@ def train(audio_model, train_loader, test_loader, args, run):
             torch.save(optimizer.state_dict(), "%s/models/best_optim_state.pth" % (exp_dir))
         if args.save_model == True:
             torch.save(audio_model.state_dict(), "%s/models/audio_model.%d.pth" % (exp_dir, epoch))
-
-        if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-            if main_metrics == 'mAP':
-                scheduler.step(mAP)
-            elif main_metrics == 'acc':
-                scheduler.step(acc)
-        else:
-            scheduler.step()
+        if args.lr_scheduler != 'cosine':
+            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                if main_metrics == 'mAP':
+                    scheduler.step(mAP)
+                elif main_metrics == 'acc':
+                    scheduler.step(acc)
+            else:
+                scheduler.step()
 
         print('Epoch-{0} lr: {1}'.format(epoch, optimizer.param_groups[0]['lr']))
 
