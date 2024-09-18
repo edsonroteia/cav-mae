@@ -541,7 +541,16 @@ class CAVMAEFT(nn.Module):
         self.norm = norm_layer(embed_dim)
 
         if self.aggregate != "None":
-            self.mlp_head = nn.Sequential(nn.LayerNorm(embed_dim * 10), nn.Linear(embed_dim * 10, label_dim))
+            self.mlp_head = nn.Sequential(
+                nn.LayerNorm(embed_dim * 10),
+                nn.Linear(embed_dim * 10, embed_dim * 5),
+                nn.GELU(),
+                nn.Linear(embed_dim * 5, embed_dim * 2),
+                nn.GELU(),
+                nn.Linear(embed_dim * 2, embed_dim),
+                nn.GELU(),
+                nn.Linear(embed_dim, label_dim)
+            )
         else:
             self.mlp_head = nn.Sequential(nn.LayerNorm(embed_dim), nn.Linear(embed_dim, label_dim))
 
