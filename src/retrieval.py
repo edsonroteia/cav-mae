@@ -201,9 +201,13 @@ if __name__ == "__main__":
         # 'model_1794_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.5-p1.0-tpFalse-mr-unstructured-0.75-20240915_010633/models/best_audio_model.pth'    
     }
 
-    data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
-    label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
-    dataset = 'vggsound'
+    # data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
+    # label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
+    data = 'datafilles/audioset_20k/cluster_nodes/audioset_eval_5_per_class_for_retrieval_cleaned.json'
+    label_csv = 'datafilles/audioset_20k/cluster_nodes/class_labels_indices.csv'
+
+    # dataset = 'vggsound'
+    dataset = 'audioset'
     model_type='sync_pretrain'
     strategy = 'diagonal_mean'
     directions = ['video']
