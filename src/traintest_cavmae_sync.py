@@ -26,6 +26,8 @@ import seaborn as sns
 from scipy.optimize import linear_sum_assignment
 import io
 from PIL import Image
+from cosine_scheduler import CosineWarmupScheduler
+
 
 def log_plot_to_neptune(run, plot_name, fig, step):
     """Log a matplotlib figure to Neptune without saving to disk."""
@@ -123,7 +125,16 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=args.lr_patience, verbose=True)
         print('Override to use adaptive learning rate scheduler.')
     elif args.lr_scheduler == 'cosine':
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.n_epochs, eta_min=5e-6)
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.n_epochs, eta_min=5e-6)
+        max_iter = args.n_epochs * len(train_loader)
+        print("Max Iterations {} = epochs {} * iter_per_epoch{}".format(max_iter, args.n_epochs, len(train_loader)))
+        scheduler = scheduler = CosineWarmupScheduler(
+            optimizer,
+            warmup_epochs=max_iter * 0.1,
+            max_epochs=max_iter,
+            min_lr=args.lr * 0.1,
+            max_lr=args.lr
+        )
         print('Using cosine annealing learning rate scheduler over {:d} epochs with minimum lr of 1e-6'.format(args.n_epochs))
     else:
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, list(range(args.lrscheduler_start, 1000, args.lrscheduler_step)),gamma=args.lrscheduler_decay)
