@@ -21,6 +21,7 @@ from numpy import dot
 from numpy.linalg import norm
 from tqdm import tqdm
 from tabulate import tabulate
+import argparse
 
 def get_immediate_subdirectories(a_dir):
     return [name for name in os.listdir(a_dir) if os.path.isdir(os.path.join(a_dir, name))]
@@ -155,16 +156,10 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     # eval setting
     val_audio_conf = audio_conf
     val_audio_conf['frame_use'] = frame_use
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    args = parser.parse_args()
-    args.data_val = data
-    args.label_csv = label_csv
-    args.exp_dir = './exp/dummy'
-    args.loss_fn = torch.nn.BCELoss()
     if model_type == 'sync_pretrain':
-        val_loader = torch.utils.data.DataLoader(dataloader_sync.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True, collate_fn=train_collate_fn)
+        val_loader = torch.utils.data.DataLoader(dataloader_sync.AudiosetDataset(data, label_csv=label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True, collate_fn=train_collate_fn)
     else:
-        val_loader = torch.utils.data.DataLoader(dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
+        val_loader = torch.utils.data.DataLoader(dataloader.AudiosetDataset(data, label_csv=label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
     # cav-mae only been ssl pretrained
     if model_type == 'sync_pretrain':
         audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11)
@@ -180,10 +175,38 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     print(msg)
     audio_model.eval()
     r1, r5, r10, mr = get_retrieval_result(audio_model, val_loader, direction, model_type, strategy)
-    return r1, r5, r10, mr
+    return r1 * 100, r5 * 100, r10 * 100, mr
 
-if __name__ == "__main__":
-    # Hardcoded values
+if __name__ == "__main__": 
+    parser = argparse.ArgumentParser(description='Toy example for argument parsing')
+    
+    parser.add_argument('--dataset', type=str, choices=['audioset', 'vggsound'], 
+                        help='Dataset to use for retrieval')
+    parser.add_argument('--model_type', type=str, choices=['sync_pretrain', 'pretrain', 'finetune'], 
+                        help='Type of model to use')
+    parser.add_argument('--strategy', type=str, 
+                        help='Strategy for aggregation')
+    parser.add_argument('--directions', type=str, nargs='+', 
+                        help='Directions for evaluation')
+    parser.add_argument('--nums_samples', type=int, nargs='+', 
+                        help='Number of samples to test')
+
+    args = parser.parse_args()
+
+    # Print out the parsed arguments
+    print(f"Dataset: {args.dataset}")
+    print(f"Model Type: {args.model_type}")
+    print(f"Strategy: {args.strategy}")
+    print(f"Directions: {args.directions}")
+    print(f"Number of Samples: {args.nums_samples}")
+
+    dataset = args.dataset
+    model_type = args.model_type
+    strategy = args.strategy
+    directions = args.directions
+    nums_samples = args.nums_samples
+
+    # Hardcoded values for model paths (you may want to add these as command-line arguments in the future)
     model_names = {
         # 'model_1626_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs256-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_023019/models/audio_model.25.pth',
         # 'model_1626_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs256-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_023019/models/best_audio_model.pth',
@@ -194,31 +217,14 @@ if __name__ == "__main__":
         # 'model_1628_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.5-p1.0-tpFalse-mr-unstructured-0.75-20240912_024238/models/audio_model.25.pth',
         # 'model_1628_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.5-p1.0-tpFalse-mr-unstructured-0.75-20240912_024238/models/best_audio_model.pth',
         # 'model_1624_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_021700/models/audio_model.25.pth',
-        'model_1624_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_021700/models/best_audio_model.pth',
+        # 'model_1624_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_021700/models/best_audio_model.pth',
         # 'model_1627_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_024000/models/audio_model.25.pth',
         # 'model_1627_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_024000/models/best_audio_model.pth',
         # 'model_1794_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.5-p1.0-tpFalse-mr-unstructured-0.75-20240915_010633/models/audio_model.21.pth',
-        # 'model_1794_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.5-p1.0-tpFalse-mr-unstructured-0.75-20240915_010633/models/best_audio_model.pth'    
+        # 'model_1794_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.5-p1.0-tpFalse-mr-unstructured-0.75-20240915_010633/models/best_audio_model.pth',
+        # 'model_1890_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/best_audio_model.pth',
+        'model_1890_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/audio_model.25.pth'   
     }
-
-    # data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
-    # label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
-    data = 'datafilles/audioset_20k/cluster_nodes/audioset_eval_5_per_class_for_retrieval_cleaned.json'
-    label_csv = 'datafilles/audioset_20k/cluster_nodes/class_labels_indices.csv'
-
-    # dataset = 'vggsound'
-    dataset = 'audioset'
-    model_type='sync_pretrain'
-    strategy = 'diagonal_mean'
-    directions = ['video']
-    nums_samples = [
-                # 100, 
-                # 200,
-                # 500, 
-                # 1000
-                None,
-                ]
-
 
     if model_type == 'sync_pretrain':
         target_length = 96
@@ -228,30 +234,25 @@ if __name__ == "__main__":
     res = []
 
     if dataset == "audioset":
-        # for audioset
-        for model_name, model_path in tqdm(model_names.items(), desc="Processing models for AudioSet"):
-            for direction in tqdm(directions, desc="Evaluating directions", leave=False):
-                for num_samples in tqdm(nums_samples, desc="Testing sample sizes", leave=False):    
-                    audio_conf = {'num_mel_bins': 128, 'target_length': target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
-                                'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5, 'num_samples': num_samples}
-                    r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=527, direction=direction, model_type=model_type, batch_size=100, strategy=strategy)
-                    res.append([model_name, dataset, direction, num_samples, r1, r5, r10, mr])
-                    print("\nCurrent Results Table:")
-                    print(tabulate(res, headers=["Model", "Dataset", "Direction", "Num Samples", "R@1", "R@5", "R@10", "MR"]))
-
+        data = 'datafilles/audioset_20k/cluster_nodes/audioset_eval_5_per_class_for_retrieval_cleaned.json'
+        label_csv = 'datafilles/audioset_20k/cluster_nodes/class_labels_indices.csv'
+        num_class = 527
     elif dataset == "vggsound":
-        # for vggsound
-        for model_name, model_path in tqdm(model_names.items(), desc="Processing models for VGGSound"):
-            for direction in tqdm(directions, desc="Evaluating directions", leave=False):
-                for num_samples in tqdm(nums_samples, desc="Testing sample sizes", leave=False):    
-                    audio_conf = {'num_mel_bins': 128, 'target_length': target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
-                                'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5, 'num_samples': num_samples}
-                    r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=309, direction=direction, model_type=model_type, batch_size=100, strategy=strategy)
-                    res.append([model_name, dataset, direction, num_samples, r1, r5, r10, mr])
-                    print("\nCurrent Results Table:")
-                    print(tabulate(res, headers=["Model", "Dataset", "Direction", "Num Samples", "R@1", "R@5", "R@10", "MR"]))
+        data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
+        label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
+        num_class = 309
     else:
         print(f"Unsupported dataset: {dataset}")
         exit(1)
+
+    for model_name, model_path in tqdm(model_names.items(), desc=f"Processing models for {dataset}"):
+        for direction in tqdm(directions, desc="Evaluating directions", leave=False):
+            for num_samples in tqdm(nums_samples, desc="Testing sample sizes", leave=False):    
+                audio_conf = {'num_mel_bins': 128, 'target_length': target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
+                            'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5, 'num_samples': num_samples}
+                r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, strategy=strategy)
+                res.append([model_name, dataset, direction, num_samples, r1, r5, r10, mr])
+                print("\nCurrent Results Table:")
+                print(tabulate(res, headers=["Model", "Dataset", "Direction", "Num Samples", "R@1", "R@5", "R@10", "MR"]))
 
     np.savetxt('./retrieval_result.csv', res, delimiter=',', fmt='%s')
