@@ -43,7 +43,7 @@ freqm=48
 timem=192
 mixup=0.5
 label_smooth=0.1
-lr_scheduler=step
+lr_scheduler=cosine
 
 dataset=vggsound
 tr_data=datafilles/vggsound/cluster_nodes/vgg_train_cleaned.json
@@ -65,4 +65,4 @@ CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model}
 --wa ${wa} --wa_start ${wa_start} --wa_end ${wa_end} --lr_adapt ${lr_adapt} \
 --pretrain_path ${pretrain_path} --ftmode ${ftmode} \
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
---num-workers 32 --aggregate True --lr_scheduler ${lr_scheduler}
+--num-workers 32 --aggregate self_attention_cls --lr_scheduler ${lr_scheduler}

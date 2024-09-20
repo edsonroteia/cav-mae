@@ -17,24 +17,24 @@ model=cav-mae-ft
 
 # you can replace with any checkpoint you want, but by default, we use cav-mae-scale++
 # pretrain_dir=/local/$SLURM_JOB_ID/models/
-pretrain_dir=/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_021700/models/
-# pretrain_path=${pretrain_dir}/audio_model.25.pth
-pretrain_path=${pretrain_dir}/best_audio_model.pth
+pretrain_dir=/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/
+pretrain_path=${pretrain_dir}/audio_model.25.pth
+# pretrain_path=${pretrain_dir}/best_audio_model.pth
 
 freeze_base=False
 head_lr=100 # newly initialized ft layers uses 10 times larger than the base lr
 
 bal=None
-lr=${1:-5e-5}  # Use the first argument as lr, default to 1e-4 if not provided
-batch_size=${2:-48}  # Use the second argument as batch_size, default to 24 if not provided
+lr=${1:-2e-4}  # Use the first argument as lr, default to 1e-4 if not provided
+batch_size=${2:-144}  # Use the second argument as batch_size, default to 24 if not provided
 ftmode=${3:-multimodal}
-epoch=15
+epoch=25
 lrscheduler_start=5
 lrscheduler_decay=0.5
 lrscheduler_step=1
 wa=True
-wa_start=3
-wa_end=15
+wa_start=13
+wa_end=25
 lr_adapt=False
 dataset_mean=-5.081
 dataset_std=4.4849
@@ -44,7 +44,7 @@ freqm=48
 timem=192
 mixup=0.5
 label_smooth=0.1
-lr_scheduler=step
+lr_scheduler=cosine
 
 dataset=audioset
 tr_data=datafilles/audioset_20k/cluster_nodes/audioset_20k_cleaned.json
@@ -66,4 +66,4 @@ CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model}
 --wa ${wa} --wa_start ${wa_start} --wa_end ${wa_end} --lr_adapt ${lr_adapt} \
 --pretrain_path ${pretrain_path} --ftmode ${ftmode} \
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
---num-workers 48 --aggregate True --lr_scheduler ${lr_scheduler}
+--num-workers 48 --aggregate self_attention_cls --lr_scheduler ${lr_scheduler}
