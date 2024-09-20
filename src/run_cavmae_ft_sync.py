@@ -76,6 +76,8 @@ parser.add_argument('--timem', help='time mask max length', type=int, default=0)
 parser.add_argument("--wa", help='if do weight averaging in finetuning', type=ast.literal_eval)
 parser.add_argument("--wa_start", type=int, default=1, help="which epoch to start weight averaging in finetuning")
 parser.add_argument("--wa_end", type=int, default=10, help="which epoch to end weight averaging in finetuning")
+parser.add_argument("--wa_interval", type=int, default=1, help="interval for weight averaging")
+
 
 parser.add_argument("--n-print-steps", type=int, default=100, help="number of steps to print statistics")
 parser.add_argument('--save_model', help='save the model or not', type=ast.literal_eval)
@@ -196,65 +198,68 @@ print('Now starting training for {:d} epochs.'.format(args.n_epochs))
 train(audio_model, train_loader, val_loader, args, run)
 
 # average the model weights of checkpoints, note it is not ensemble, and does not increase computational overhead
-def wa_model(exp_dir, start_epoch, end_epoch):
+def wa_model(exp_dir, start_epoch, end_epoch, interval):
     sdA = torch.load(exp_dir + '/models/audio_model.' + str(start_epoch) + '.pth', map_location='cpu')
     model_cnt = 1
-    for epoch in range(start_epoch+1, end_epoch+1):
+    for epoch in range(start_epoch+1, end_epoch+1, interval):
         sdB = torch.load(exp_dir + '/models/audio_model.' + str(epoch) + '.pth', map_location='cpu')
         for key in sdA:
             sdA[key] = sdA[key] + sdB[key]
         model_cnt += 1
-    print('wa {:d} models from {:d} to {:d}'.format(model_cnt, start_epoch, end_epoch))
+    print('wa {:d} models: {}'.format(model_cnt, range(start_epoch+1, end_epoch+1, interval)))
     for key in sdA:
         sdA[key] = sdA[key] / float(model_cnt)
     return sdA
 
-# evaluate with multiple frames
-if not isinstance(audio_model, torch.nn.DataParallel):
-    audio_model = torch.nn.DataParallel(audio_model)
-if args.wa == True:
-    sdA = wa_model(args.exp_dir, start_epoch=args.wa_start, end_epoch=args.wa_end)
-    torch.save(sdA, args.exp_dir + "/models/audio_model_wa.pth")
-else:
-    # if no wa, use the best checkpint
-    sdA = torch.load(args.exp_dir + '/models/best_audio_model.pth', map_location='cpu')
-msg = audio_model.load_state_dict(sdA, strict=True)
-print(msg)
-audio_model.eval()
 
-# skip multi-frame evaluation, for audio-only model
-if args.skip_frame_agg == True:
-    val_audio_conf['frame_use'] = 5
-    stats, _, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
-    if args.metrics == 'mAP':
-        cur_res = np.mean([stat['AP'] for stat in stats])
-        print('mAP is {:.4f}'.format(cur_res))
-    elif args.metrics == 'acc':
-        cur_res = stats[0]['acc']
-        print('acc is {:.4f}'.format(cur_res))
-else:
-    # Initialize lists to store results and predictions
-    # Validate the model and get outputs
-    stats, _, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
-    # print(audio_output.shape)
-    
-    # Apply softmax or sigmoid based on the evaluation metric
-    if args.metrics == 'acc':
-        audio_output = torch.nn.functional.softmax(audio_output.float(), dim=-1)
-    elif args.metrics == 'mAP':
-        audio_output = torch.nn.functional.sigmoid(audio_output.float())
+for wa_start in range(args.wa_start, args.n_epochs, 5):
+    for wa_interval in [1,3,5]:
+        # evaluate with multiple frames
+        if not isinstance(audio_model, torch.nn.DataParallel):
+            audio_model = torch.nn.DataParallel(audio_model)
+        if args.wa == True:
+            sdA = wa_model(args.exp_dir, start_epoch=wa_start, end_epoch=args.wa_end, interval=wa_interval)
+            torch.save(sdA, args.exp_dir + "/models/audio_model_wa_{}.pth".format(wa_interval))
+        else:
+            # if no wa, use the best checkpint
+            sdA = torch.load(args.exp_dir + '/models/best_audio_model.pth', map_location='cpu')
+        msg = audio_model.load_state_dict(sdA, strict=True)
+        print(msg)
+        audio_model.eval()
 
-    # Convert outputs to numpy arrays
-    audio_output, target = audio_output.numpy(), target.numpy()
-    
-    # Calculate and store the current frame's performance
-    if args.metrics == 'mAP':
-        cur_res = np.mean([stat['AP'] for stat in stats])
-        print('final mAP is {:.4f}'.format(cur_res))
-    elif args.metrics == 'acc':
-        cur_res = stats[0]['acc']
-        print('final acc is {:.4f}'.format(cur_res))
+        # skip multi-frame evaluation, for audio-only model
+        if args.skip_frame_agg == True:
+            val_audio_conf['frame_use'] = 5
+            stats, _, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
+            if args.metrics == 'mAP':
+                cur_res = np.mean([stat['AP'] for stat in stats])
+                print('mAP is {:.4f}'.format(cur_res))
+            elif args.metrics == 'acc':
+                cur_res = stats[0]['acc']
+                print('acc is {:.4f}'.format(cur_res))
+        else:
+            # Initialize lists to store results and predictions
+            # Validate the model and get outputs
+            stats, _, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
+            # print(audio_output.shape)
+            
+            # Apply softmax or sigmoid based on the evaluation metric
+            if args.metrics == 'acc':
+                audio_output = torch.nn.functional.softmax(audio_output.float(), dim=-1)
+            elif args.metrics == 'mAP':
+                audio_output = torch.nn.functional.sigmoid(audio_output.float())
+
+            # Convert outputs to numpy arrays
+            audio_output, target = audio_output.numpy(), target.numpy()
+            
+            # Calculate and store the current frame's performance
+            if args.metrics == 'mAP':
+                cur_res = np.mean([stat['AP'] for stat in stats])
+                print('final mAP is {:.4f}'.format(cur_res))
+            elif args.metrics == 'acc':
+                cur_res = stats[0]['acc']
+                print('final acc is {:.4f}'.format(cur_res))
 
 
-    # # Save all results to a CSV file
-    
+            # # Save all results to a CSV file
+            
