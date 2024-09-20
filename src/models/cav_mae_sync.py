@@ -67,7 +67,7 @@ class CAVMAE(nn.Module):
     """
     def __init__(self, img_size=224, audio_length=1024, patch_size=16, in_chans=3,
                  embed_dim=768, modality_specific_depth=11, num_heads=12,
-                 decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
+                 decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, num_register_tokens=4,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=False):
         super().__init__()
         print('A CAV-MAE Model')
@@ -85,11 +85,16 @@ class CAVMAE(nn.Module):
         self.patch_embed_a.num_patches = int(audio_length * 128 / 256)
         print('Number of Audio Patches: {:d}, Visual Patches: {:d}'.format(self.patch_embed_a.num_patches, self.patch_embed_v.num_patches))
 
+        self.num_register_tokens = num_register_tokens
+        print('Number of Registers: {:d}'.format(self.num_register_tokens))
+
         self.modality_a = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.modality_v = nn.Parameter(torch.zeros(1, 1, embed_dim))
 
         self.pos_embed_a = nn.Parameter(torch.zeros(1, self.patch_embed_a.num_patches, embed_dim), requires_grad=tr_pos)  # fixed sin-cos embedding
         self.pos_embed_v = nn.Parameter(torch.zeros(1, self.patch_embed_v.num_patches, embed_dim), requires_grad=tr_pos)  # fixed sin-cos embedding
+
+        self.register_tokens = nn.Parameter(torch.randn(num_register_tokens * 2, embed_dim))
 
         # audio-branch
         self.blocks_a = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
@@ -297,12 +302,26 @@ class CAVMAE(nn.Module):
         # visual branch always use unstructured masking
         v, mask_v, ids_restore_v = self.random_masking_unstructured(v, mask_ratio_v)
 
+
+
+       # Append register tokens
+        batch_size = a.shape[0]
+        r_a = self.register_tokens[:self.num_register_tokens].unsqueeze(0).expand(batch_size, -1, -1)
+        r_v = self.register_tokens[self.num_register_tokens:].unsqueeze(0).expand(batch_size, -1, -1)
+        
+        a = torch.cat([a, r_a], dim=1)
+        v = torch.cat([v, r_v], dim=1)
+
         # audio and visual stream, independent blocks
         for blk in self.blocks_a:
             a = blk(a)
 
         for blk in self.blocks_v:
             v = blk(v)
+
+        # Remove register tokens
+        a = a[:, :-self.num_register_tokens, :]
+        v = v[:, :-self.num_register_tokens, :]
 
         x = torch.cat((a, v), dim=1)
 
