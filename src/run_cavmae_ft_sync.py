@@ -212,23 +212,25 @@ def wa_model(exp_dir, start_epoch, end_epoch, interval):
     return sdA
 
 
+results = []  # List to store results
+
 for wa_start in range(args.wa_start, args.n_epochs, 5):
-    for wa_interval in [1,3,5]:
+    for wa_interval in [1, 3, 5]:
         # evaluate with multiple frames
         if not isinstance(audio_model, torch.nn.DataParallel):
             audio_model = torch.nn.DataParallel(audio_model)
-        if args.wa == True:
+        if args.wa:
             sdA = wa_model(args.exp_dir, start_epoch=wa_start, end_epoch=args.wa_end, interval=wa_interval)
             torch.save(sdA, args.exp_dir + "/models/audio_model_wa_{}.pth".format(wa_interval))
         else:
-            # if no wa, use the best checkpint
+            # if no wa, use the best checkpoint
             sdA = torch.load(args.exp_dir + '/models/best_audio_model.pth', map_location='cpu')
         msg = audio_model.load_state_dict(sdA, strict=True)
         print(msg)
         audio_model.eval()
 
         # skip multi-frame evaluation, for audio-only model
-        if args.skip_frame_agg == True:
+        if args.skip_frame_agg:
             val_audio_conf['frame_use'] = 5
             stats, _, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
             if args.metrics == 'mAP':
@@ -238,10 +240,8 @@ for wa_start in range(args.wa_start, args.n_epochs, 5):
                 cur_res = stats[0]['acc']
                 print('acc is {:.4f}'.format(cur_res))
         else:
-            # Initialize lists to store results and predictions
             # Validate the model and get outputs
             stats, _, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
-            # print(audio_output.shape)
             
             # Apply softmax or sigmoid based on the evaluation metric
             if args.metrics == 'acc':
@@ -260,6 +260,12 @@ for wa_start in range(args.wa_start, args.n_epochs, 5):
                 cur_res = stats[0]['acc']
                 print('final acc is {:.4f}'.format(cur_res))
 
+        # Save the results with the corresponding wa configuration
+        results.append((f"wa_start: {wa_start}, wa_interval: {wa_interval}", cur_res))
 
-            # # Save all results to a CSV file
+# Print results in a table format
+print("\nResults Summary:")
+print("{:<30} {:<10}".format("Models Aggregated", "Final Result"))
+for model_info, result in results:
+    print("{:<30} {:<10.4f}".format(model_info, result))
             
