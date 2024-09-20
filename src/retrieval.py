@@ -223,8 +223,25 @@ if __name__ == "__main__":
         # 'model_1794_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.5-p1.0-tpFalse-mr-unstructured-0.75-20240915_010633/models/audio_model.21.pth',
         # 'model_1794_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.5-p1.0-tpFalse-mr-unstructured-0.75-20240915_010633/models/best_audio_model.pth',
         # 'model_1890_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/best_audio_model.pth',
-        'model_1890_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/audio_model.25.pth'   
+        # 'model_1890_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/audio_model.25.pth'   
     }
+    if len(model_names) == 0:
+        print("Model names dictionary is empty. Searching for models in /scratch/ssml/araujo/exp/")
+        base_dir = '/scratch/ssml/araujo/exp/'
+        model_names = {}
+        
+        for root, dirs, files in os.walk(base_dir):
+            for file in files:
+                if file == 'best_audio_model.pth':
+                    full_path = os.path.join(root, file)
+                    timestamp = root.split('-')[-1]  # Extract timestamp from directory name
+                    model_names[timestamp] = full_path
+
+        if not model_names:
+            print("No models found. Exiting.")
+            exit(1)
+        
+        print(f"Found {len(model_names)} models to evaluate.")
 
     if model_type == 'sync_pretrain':
         target_length = 96
@@ -252,7 +269,8 @@ if __name__ == "__main__":
                             'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5, 'num_samples': num_samples}
                 r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, strategy=strategy)
                 res.append([model_name, dataset, direction, num_samples, r1, r5, r10, mr])
+                res_sorted = sorted(res, key=lambda x: x[-1])  # Sort by MR
                 print("\nCurrent Results Table:")
-                print(tabulate(res, headers=["Model", "Dataset", "Direction", "Num Samples", "R@1", "R@5", "R@10", "MR"]))
+                print(tabulate(res_sorted, headers=["Model", "Dataset", "Direction", "Num Samples", "R@1", "R@5", "R@10", "MR"]))
 
     np.savetxt('./retrieval_result.csv', res, delimiter=',', fmt='%s')
