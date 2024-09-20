@@ -105,6 +105,8 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
     start_time = time.time()
     exp_dir = args.exp_dir
 
+    run['model_path'] = exp_dir
+
     def _save_progress():
         progress.append([epoch, global_step, best_epoch, best_loss,
                 time.time() - start_time])
