@@ -268,4 +268,12 @@ print("\nResults Summary:")
 print("{:<30} {:<10}".format("Models Aggregated", "Final Result"))
 for model_info, result in results:
     print("{:<30} {:<10.4f}".format(model_info, result))
+
+import pandas as pd
+# Log the results summary table to Neptune
+table_data = {
+    "Models Aggregated": [model_info for model_info, _ in results],
+    "Final Result": [result for _, result in results]
+}
+run["results/summary"].upload(neptune.types.File.as_html(pd.DataFrame(table_data)))
             

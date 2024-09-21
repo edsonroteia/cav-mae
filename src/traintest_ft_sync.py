@@ -99,10 +99,6 @@ def visualize_class_distribution(y_true, step, run):
 
 def train(audio_model, train_loader, test_loader, args, run):
     params = vars(args)
-    run = neptune.init_run(
-        project="junioroteia/CAV-MAE",
-        api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJmNGE4NDA2NS1hYmE2LTQ3YWYtODllMC02ODk4NGNlODY0MDUifQ==",
-    )
     # Log parameters at the beginning of the run
     run["parameters"] = params
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -278,41 +274,41 @@ def train(audio_model, train_loader, test_loader, args, run):
         run["train/epoch_loss"].log(loss_meter.avg, step=epoch)
         run["valid/loss"].log(valid_loss, step=epoch)
 
-        # Visualizations
-        try:
-            print("Starting visualizations...")
-            print(f"Stats keys: {stats[0].keys()}")  # Print available keys in stats
+        # # Visualizations
+        # try:
+        #     print("Starting visualizations...")
+        #     print(f"Stats keys: {stats[0].keys()}")  # Print available keys in stats
 
-            # Use A_predictions and A_targets instead of stats for raw data
-            y_pred = A_predictions.cpu().numpy()
-            y_true = A_targets.cpu().numpy()
+        #     # Use A_predictions and A_targets instead of stats for raw data
+        #     y_pred = A_predictions.cpu().numpy()
+        #     y_true = A_targets.cpu().numpy()
             
-            print(f"y_true shape: {y_true.shape}, y_pred shape: {y_pred.shape}")
+        #     print(f"y_true shape: {y_true.shape}, y_pred shape: {y_pred.shape}")
             
-            y_pred_classes = np.argmax(y_pred, axis=1)
-            y_true_classes = np.argmax(y_true, axis=1)
+        #     y_pred_classes = np.argmax(y_pred, axis=1)
+        #     y_true_classes = np.argmax(y_true, axis=1)
 
-            class_names = [f'Class {i}' for i in range(args.n_class)]
+        #     class_names = [f'Class {i}' for i in range(args.n_class)]
 
-            # Confusion Matrix
-            visualize_confusion_matrix(y_true_classes, y_pred_classes, class_names, epoch, run)
+        #     # Confusion Matrix
+        #     visualize_confusion_matrix(y_true_classes, y_pred_classes, class_names, epoch, run)
 
-            # ROC Curve
-            visualize_roc_curve(y_true, y_pred, epoch, run)
+        #     # ROC Curve
+        #     visualize_roc_curve(y_true, y_pred, epoch, run)
 
-            # Class Distribution
-            visualize_class_distribution(y_true, epoch, run)
+        #     # Class Distribution
+        #     visualize_class_distribution(y_true, epoch, run)
 
-            # Log additional metrics from stats
-            for i, stat in enumerate(stats):
-                run[f"valid/class_{i}_AP"].log(stat["AP"], step=epoch)
-                run[f"valid/class_{i}_AUC"].log(stat["auc"], step=epoch)
+        #     # # Log additional metrics from stats
+        #     # for i, stat in enumerate(stats):
+        #     #     run[f"valid/class_{i}_AP"].log(stat["AP"], step=epoch)
+        #     #     run[f"valid/class_{i}_AUC"].log(stat["auc"], step=epoch)
 
-        except Exception as e:
-            print(f"Error in visualization: {str(e)}")
-            print(f"Stats structure: {stats[0]}")  # Print the structure of the first stats entry
-            import traceback
-            traceback.print_exc()  # Print the full traceback for more detailed error information
+        # except Exception as e:
+        #     print(f"Error in visualization: {str(e)}")
+        #     print(f"Stats structure: {stats[0]}")  # Print the structure of the first stats entry
+        #     import traceback
+        #     traceback.print_exc()  # Print the full traceback for more detailed error information
 
         result[epoch-1, :] = [acc, mAP, mAUC, optimizer.param_groups[0]['lr']]
         np.savetxt(exp_dir + '/result.csv', result, delimiter=',')
