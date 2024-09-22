@@ -26,7 +26,7 @@ pretrain_path=${cur_dir}/IN-initial.pth
 
 bal=None
 lr=2e-4
-epoch=50
+epoch=25
 lrscheduler_start=10
 lrscheduler_decay=0.5
 lrscheduler_step=5
@@ -65,5 +65,5 @@ CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_pretrain_sync.py --model ${
 --pretrain_path ${pretrain_path} \
 --mae_loss_weight ${mae_loss_weight} --contrast_loss_weight ${contrast_loss_weight} \
 --tr_pos ${tr_pos} --masking_ratio ${masking_ratio} --mask_mode ${mask_mode} \
---lr_scheduler ${lr_scheduler} --n_regster_tokens ${n_regster_tokens}
+--lr_scheduler ${lr_scheduler} --n_regster_tokens ${n_regster_tokens} --cls_token ${cls_token}
 # --wandb-name sync_pt_as2m_$(hostname)_lr${lr}_epoch${epoch}

@@ -131,6 +131,7 @@ class CAVMAE(nn.Module):
 
         self.cls_token = cls_token
         if self.cls_token:
+            print("Using CLS Token")
             self.cls_token_a = nn.Parameter(torch.randn(1, 1, embed_dim))
             self.cls_token_v = nn.Parameter(torch.randn(1, 1, embed_dim))
 
