@@ -68,7 +68,8 @@ class CAVMAE(nn.Module):
     def __init__(self, img_size=224, audio_length=1024, patch_size=16, in_chans=3,
                  embed_dim=768, modality_specific_depth=11, num_heads=12,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, num_register_tokens=4,
-                 mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=False, cls_token=False):
+                 mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=False, 
+                 cls_token=False, global_local_losses=False):
         super().__init__()
         print('A CAV-MAE Model')
         print('Use norm_pix_loss: ', norm_pix_loss)
@@ -134,6 +135,9 @@ class CAVMAE(nn.Module):
             print("Using CLS Token")
             self.cls_token_a = nn.Parameter(torch.randn(1, 1, embed_dim))
             self.cls_token_v = nn.Parameter(torch.randn(1, 1, embed_dim))
+        if self.global_local_losses:
+            print("Using Global and Local Losses")
+
 
         self.intermediate_outputs = {}
 
@@ -340,7 +344,8 @@ class CAVMAE(nn.Module):
             a = a[:, :-self.num_register_tokens, :]
             v = v[:, :-self.num_register_tokens, :]
 
-        x = torch.cat((a, v), dim=1)
+        # Concatenate audio and visual tokens without cls tokens
+        x = torch.cat((a[:, 1:] if self.cls_token else a, v[:, 1:] if self.cls_token else v), dim=1)
 
         # unified stream, shared blocks_u, but independent normalization layers
         for blk in self.blocks_u:
@@ -354,8 +359,8 @@ class CAVMAE(nn.Module):
         
         if self.cls_token:
             # Extract cls tokens after shared blocks
-            cls_a = x[:, 0, :].squeeze()  # This gets the audio CLS token (assuming it's the first token)
-            cls_v = x[:, a.size(1), :].squeeze()  # This gets the visual CLS token (assuming it's the first token after audio tokens)
+            cls_a = ca[:, 0, :].squeeze()  # This gets the audio CLS token from ca
+            cls_v = cv[:, 0, :].squeeze()  # This gets the visual CLS token from cv
 
             ca = self.norm_a(cls_a)
             cv = self.norm_v(cls_v)
