@@ -223,7 +223,9 @@ if __name__ == "__main__":
         # 'model_1794_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.5-p1.0-tpFalse-mr-unstructured-0.75-20240915_010633/models/audio_model.21.pth',
         # 'model_1794_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.5-p1.0-tpFalse-mr-unstructured-0.75-20240915_010633/models/best_audio_model.pth',
         # 'model_1890_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/best_audio_model.pth',
-        # 'model_1890_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/audio_model.25.pth'   
+        # 'model_1890_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/audio_model.25.pth',   
+        'model_1921_24': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240920_204943/models/audio_model.24.pth',
+        #'model_1921_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240920_204943/models/best_audio_model.pth',
     }
     if len(model_names) == 0:
         print("Model names dictionary is empty. Searching for models in /scratch/ssml/araujo/exp/")

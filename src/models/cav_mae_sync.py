@@ -508,14 +508,26 @@ class CAVMAE(nn.Module):
         v = self.patch_embed_v(v)
         v = v + self.pos_embed_v
         v = v + self.modality_v
+		
+		# Append register tokens
+        batch_size = a.shape[0]
+        r_a = self.register_tokens[:self.num_register_tokens].unsqueeze(0).expand(batch_size, -1, -1)
+        r_v = self.register_tokens[self.num_register_tokens:].unsqueeze(0).expand(batch_size, -1, -1)
+        
+        a = torch.cat([a, r_a], dim=1)
+        v = torch.cat([v, r_v], dim=1)
 
-        # the modality-specific stream
+        # audio and visual stream, independent blocks
         for blk in self.blocks_a:
             a = blk(a)
 
         for blk in self.blocks_v:
             v = blk(v)
 
+        # Remove register tokens
+        a = a[:, :-self.num_register_tokens, :]
+        v = v[:, :-self.num_register_tokens, :]
+        
         # use modality specific normalization,
         for blk in self.blocks_u:
             a = blk(a, 'a')
