@@ -39,6 +39,9 @@ batch_size=512
 lr_adapt=False
 lr_scheduler=cosine
 n_regster_tokens=4
+
+cls_token=True
+
 dataset=audioset
 tr_data=datafilles/audioset_2m/cluster_nodes/audioset_2m_cleaned_aug24.json
 te_data=datafilles/audioset_2m/cluster_nodes/audioset_eval_cleaned_aug24.json

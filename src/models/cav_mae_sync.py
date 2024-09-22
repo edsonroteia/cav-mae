@@ -68,7 +68,7 @@ class CAVMAE(nn.Module):
     def __init__(self, img_size=224, audio_length=1024, patch_size=16, in_chans=3,
                  embed_dim=768, modality_specific_depth=11, num_heads=12,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, num_register_tokens=4,
-                 mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=False):
+                 mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=False, cls_token=False):
         super().__init__()
         print('A CAV-MAE Model')
         print('Use norm_pix_loss: ', norm_pix_loss)
@@ -128,6 +128,11 @@ class CAVMAE(nn.Module):
         self.decoder_pred_v = nn.Linear(decoder_embed_dim, patch_size ** 2 * in_chans, bias=True)  # decoder to patch
 
         self.norm_pix_loss = norm_pix_loss
+
+        self.cls_token = cls_token
+        if self.cls_token:
+            self.cls_token_a = nn.Parameter(torch.randn(1, 1, embed_dim))
+            self.cls_token_v = nn.Parameter(torch.randn(1, 1, embed_dim))
 
         self.intermediate_outputs = {}
 
@@ -302,11 +307,20 @@ class CAVMAE(nn.Module):
         # visual branch always use unstructured masking
         v, mask_v, ids_restore_v = self.random_masking_unstructured(v, mask_ratio_v)
 
+        batch_size = a.shape[0]
 
 
-       # Append register tokens
+        # Append cls tokens
+        if self.cls_token:
+            cls_tokens_a = self.cls_token_a.expand(batch_size, -1, -1)
+            cls_tokens_v = self.cls_token_v.expand(batch_size, -1, -1)
+
+            a = torch.cat([cls_tokens_a, a], dim=1)
+            v = torch.cat([cls_tokens_v, v], dim=1)
+
+        # Append register tokens
         if self.num_register_tokens > 0:
-            batch_size = a.shape[0]
+            
             r_a = self.register_tokens[:self.num_register_tokens].unsqueeze(0).expand(batch_size, -1, -1)
             r_v = self.register_tokens[self.num_register_tokens:].unsqueeze(0).expand(batch_size, -1, -1)
             
@@ -321,7 +335,7 @@ class CAVMAE(nn.Module):
             v = blk(v)
 
         if self.num_register_tokens > 0:
-            # Remove register tokens
+            # Remove register tokens, keeping the cls token, if present
             a = a[:, :-self.num_register_tokens, :]
             v = v[:, :-self.num_register_tokens, :]
 
@@ -334,11 +348,19 @@ class CAVMAE(nn.Module):
 
         for blk in self.blocks_u:
             ca = blk(a, 'a')
-        ca = self.norm_a(ca)
-
         for blk in self.blocks_u:
             cv = blk(v, 'v')
-        cv = self.norm_v(cv)
+        
+        if self.cls_token:
+            # Extract cls tokens after shared blocks
+            cls_a = x[:, :a.size(1), :]  # Assuming cls_token_a is first in 'a'
+            cls_v = x[:, a.size(1):, :]  # Assuming cls_token_v is first in 'v'
+
+            ca = self.norm_a(cls_a)
+            cv = self.norm_v(cls_v)
+        else:
+            ca = self.norm_a(ca)
+            cv = self.norm_v(cv)
 
         return x, mask_a, ids_restore_a, mask_v, ids_restore_v, ca, cv
 
@@ -472,7 +494,10 @@ class CAVMAE(nn.Module):
 
         # Contrastive loss calculation
         if contrast_loss_weight != 0:
-            loss_c, c_acc = self.forward_contrastive(latent_c_a.mean(dim=1), latent_c_v.mean(dim=1), mode=mode)
+            if not self.cls_token:
+                loss_c, c_acc = self.forward_contrastive(latent_c_a.mean(dim=1), latent_c_v.mean(dim=1), mode=mode)
+            else:
+                loss_c, c_acc = self.forward_contrastive(latent_c_a, latent_c_v, mode=mode)
             loss_c = contrast_loss_weight * loss_c
         else:
             loss_c, c_acc = torch.tensor(0.0, device=audio.device), torch.tensor(0.0, device=audio.device)

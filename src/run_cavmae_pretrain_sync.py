@@ -82,6 +82,7 @@ parser.add_argument("--mask_mode", type=str, default='unstructured', help="maski
 parser.add_argument('--wandb_name', type=str, default=None, help="wandb name")
 parser.add_argument("--num_samples", type=int, default=None, help="Number of samples to use (default: use all samples)")
 parser.add_argument("--n_regster_tokens", type=int, default=4, help="Number of register tokens")
+parser.add_argument("--cls_token", type=ast.literal_eval, default=True, help="Whether to use cls token")
 
 
 args = parser.parse_args()
