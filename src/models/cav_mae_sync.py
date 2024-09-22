@@ -305,12 +305,13 @@ class CAVMAE(nn.Module):
 
 
        # Append register tokens
-        batch_size = a.shape[0]
-        r_a = self.register_tokens[:self.num_register_tokens].unsqueeze(0).expand(batch_size, -1, -1)
-        r_v = self.register_tokens[self.num_register_tokens:].unsqueeze(0).expand(batch_size, -1, -1)
-        
-        a = torch.cat([a, r_a], dim=1)
-        v = torch.cat([v, r_v], dim=1)
+        if self.num_register_tokens > 0:
+            batch_size = a.shape[0]
+            r_a = self.register_tokens[:self.num_register_tokens].unsqueeze(0).expand(batch_size, -1, -1)
+            r_v = self.register_tokens[self.num_register_tokens:].unsqueeze(0).expand(batch_size, -1, -1)
+            
+            a = torch.cat([a, r_a], dim=1)
+            v = torch.cat([v, r_v], dim=1)
 
         # audio and visual stream, independent blocks
         for blk in self.blocks_a:
@@ -319,9 +320,10 @@ class CAVMAE(nn.Module):
         for blk in self.blocks_v:
             v = blk(v)
 
-        # Remove register tokens
-        a = a[:, :-self.num_register_tokens, :]
-        v = v[:, :-self.num_register_tokens, :]
+        if self.num_register_tokens > 0:
+            # Remove register tokens
+            a = a[:, :-self.num_register_tokens, :]
+            v = v[:, :-self.num_register_tokens, :]
 
         x = torch.cat((a, v), dim=1)
 
@@ -510,12 +512,13 @@ class CAVMAE(nn.Module):
         v = v + self.modality_v
 		
 		# Append register tokens
-        batch_size = a.shape[0]
-        r_a = self.register_tokens[:self.num_register_tokens].unsqueeze(0).expand(batch_size, -1, -1)
-        r_v = self.register_tokens[self.num_register_tokens:].unsqueeze(0).expand(batch_size, -1, -1)
-        
-        a = torch.cat([a, r_a], dim=1)
-        v = torch.cat([v, r_v], dim=1)
+        if self.num_register_tokens > 0:
+            batch_size = a.shape[0]
+            r_a = self.register_tokens[:self.num_register_tokens].unsqueeze(0).expand(batch_size, -1, -1)
+            r_v = self.register_tokens[self.num_register_tokens:].unsqueeze(0).expand(batch_size, -1, -1)
+            
+            a = torch.cat([a, r_a], dim=1)
+            v = torch.cat([v, r_v], dim=1)
 
         # audio and visual stream, independent blocks
         for blk in self.blocks_a:
@@ -524,9 +527,10 @@ class CAVMAE(nn.Module):
         for blk in self.blocks_v:
             v = blk(v)
 
-        # Remove register tokens
-        a = a[:, :-self.num_register_tokens, :]
-        v = v[:, :-self.num_register_tokens, :]
+        if self.num_register_tokens > 0:
+            # Remove register tokens
+            a = a[:, :-self.num_register_tokens, :]
+            v = v[:, :-self.num_register_tokens, :]
         
         # use modality specific normalization,
         for blk in self.blocks_u:

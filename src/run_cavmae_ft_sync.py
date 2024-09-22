@@ -96,6 +96,7 @@ parser.add_argument('--skip_frame_agg', help='if do frame agg', type=ast.literal
 parser.add_argument("--num_samples", type=int, default=None, help="Number of samples to use (default: use all samples)")
 parser.add_argument("--wandb_name", type=str, default=None)
 parser.add_argument("--aggregate", type=str, default="None")
+parser.add_argument("--n_regster_tokens", type=int, default=4)
 
 args = parser.parse_args()
 
@@ -158,7 +159,7 @@ if args.data_eval != None:
 
 if args.model == 'cav-mae-ft':
     print('finetune a cav-mae model with 11 modality-specific layers and 1 modality-sharing layers')
-    audio_model = models.CAVMAEFTSync(audio_length=args.target_length, label_dim=args.n_class, modality_specific_depth=11, aggregate=args.aggregate)
+    audio_model = models.CAVMAEFTSync(audio_length=args.target_length, label_dim=args.n_class, modality_specific_depth=11, aggregate=args.aggregate, num_register_tokens=args.n_regster_tokens)
 else:
     raise ValueError('model not supported')
 

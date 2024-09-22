@@ -105,14 +105,14 @@ def get_retrieval_result(audio_model, val_loader, direction='audio', model_type=
     with torch.no_grad():
         # Add tqdm progress bar
         for i, batch in tqdm(enumerate(val_loader), total=len(val_loader), desc="Processing batches"):
-            if model_type == 'sync_pretrain':
+            if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers':
                 a_input, v_input, labels, video_id, frame_indices = batch
             else:
                 (a_input, v_input, labels) = batch
             if i == 0:
                 print("A_shape", a_input.shape)
                 print("V_shape", v_input.shape)
-            if model_type == 'sync_pretrain':
+            if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers':
                 # flatten batch so we process all frames at the same time
                 a_input = a_input.reshape(a_input.shape[0] * a_input.shape[1], a_input.shape[2], a_input.shape[3])
                 v_input = v_input.reshape(v_input.shape[0] * v_input.shape[1], v_input.shape[2], v_input.shape[3], v_input.shape[4])
@@ -129,7 +129,7 @@ def get_retrieval_result(audio_model, val_loader, direction='audio', model_type=
             audio_output = audio_output.to('cpu').detach()
             video_output = video_output.to('cpu').detach()
             
-            if model_type == 'sync_pretrain':
+            if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers':
                 # Group features from the same video together
                 num_frames = audio_output.shape[0] // len(video_id)
                 audio_output = audio_output.view(len(video_id), num_frames, -1)
@@ -141,28 +141,30 @@ def get_retrieval_result(audio_model, val_loader, direction='audio', model_type=
     A_v_feat = torch.cat(A_v_feat)
     if direction == 'audio':
         # audio->visual retrieval
-        sim_mat = get_agg_sim_mat(A_a_feat, A_v_feat, strategy=strategy) if model_type == 'sync_pretrain' else get_sim_mat(A_a_feat, A_v_feat)
+        sim_mat = get_agg_sim_mat(A_a_feat, A_v_feat, strategy=strategy) if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers' else get_sim_mat(A_a_feat, A_v_feat)
     elif direction == 'video':
         # visual->audio retrieval
-        sim_mat = get_agg_sim_mat(A_v_feat, A_a_feat, strategy=strategy) if model_type == 'sync_pretrain' else get_sim_mat(A_v_feat, A_a_feat)
+        sim_mat = get_agg_sim_mat(A_v_feat, A_a_feat, strategy=strategy) if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers' else get_sim_mat(A_v_feat, A_a_feat)
     result = compute_metrics(sim_mat)
     print_computed_metrics(result)
     return result['R1'], result['R5'], result['R10'], result['MR']
 
-def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, model_type='pretrain', batch_size=48, strategy='max'):
+def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, model_type='pretrain' or 'sync_pretrain' or 'sync_pretrain_registers', batch_size=48, strategy='max', num_register_tokens=4):
     print(model)
     print(data)
     frame_use = 5
     # eval setting
     val_audio_conf = audio_conf
     val_audio_conf['frame_use'] = frame_use
-    if model_type == 'sync_pretrain':
+    if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers':
         val_loader = torch.utils.data.DataLoader(dataloader_sync.AudiosetDataset(data, label_csv=label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True, collate_fn=train_collate_fn)
     else:
         val_loader = torch.utils.data.DataLoader(dataloader.AudiosetDataset(data, label_csv=label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
     # cav-mae only been ssl pretrained
-    if model_type == 'sync_pretrain':
-        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11)
+    if model_type == 'sync_pretrain_registers':
+        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens)
+    elif model_type == 'sync_pretrain':
+        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=0)
     elif model_type == 'pretrain':
         audio_model = models.CAVMAE(modality_specific_depth=11)
     # cav-mae only been ssl pretrained + supervisedly finetuned
@@ -182,7 +184,7 @@ if __name__ == "__main__":
     
     parser.add_argument('--dataset', type=str, choices=['audioset', 'vggsound'], 
                         help='Dataset to use for retrieval')
-    parser.add_argument('--model_type', type=str, choices=['sync_pretrain', 'pretrain', 'finetune'], 
+    parser.add_argument('--model_type', type=str, choices=['sync_pretrain', 'sync_pretrain_registers', 'pretrain', 'finetune'], 
                         help='Type of model to use')
     parser.add_argument('--strategy', type=str, 
                         help='Strategy for aggregation')
@@ -223,9 +225,9 @@ if __name__ == "__main__":
         # 'model_1794_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.5-p1.0-tpFalse-mr-unstructured-0.75-20240915_010633/models/audio_model.21.pth',
         # 'model_1794_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr5e-4-epoch25-bs512-normTrue-c0.5-p1.0-tpFalse-mr-unstructured-0.75-20240915_010633/models/best_audio_model.pth',
         # 'model_1890_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/best_audio_model.pth',
-        # 'model_1890_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/audio_model.25.pth',   
-        'model_1921_24': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240920_204943/models/audio_model.24.pth',
-        #'model_1921_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240920_204943/models/best_audio_model.pth',
+        'model_1890_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/audio_model.25.pth',   
+        # 'model_1921_24': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240920_204943/models/audio_model.24.pth',
+        # 'model_1921_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240920_204943/models/best_audio_model.pth',
     }
     if len(model_names) == 0:
         print("Model names dictionary is empty. Searching for models in /scratch/ssml/araujo/exp/")
@@ -245,7 +247,7 @@ if __name__ == "__main__":
         
         print(f"Found {len(model_names)} models to evaluate.")
 
-    if model_type == 'sync_pretrain':
+    if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers':
         target_length = 96
     else:
         target_length = 1024
