@@ -130,6 +130,7 @@ class CAVMAE(nn.Module):
 
         self.norm_pix_loss = norm_pix_loss
 
+        self.global_local_losses = global_local_losses
         self.cls_token = cls_token
         if self.cls_token:
             print("Using CLS Token")
