@@ -83,6 +83,7 @@ parser.add_argument('--wandb_name', type=str, default=None, help="wandb name")
 parser.add_argument("--num_samples", type=int, default=None, help="Number of samples to use (default: use all samples)")
 parser.add_argument("--n_regster_tokens", type=int, default=4, help="Number of register tokens")
 parser.add_argument("--cls_token", type=ast.literal_eval, default=True, help="Whether to use cls token")
+parser.add_argument("--global_local_losses", type=ast.literal_eval, default=True, help="Whether to use global and local losses")
 
 
 args = parser.parse_args()
@@ -149,7 +150,8 @@ if args.data_eval != None:
 if args.model == 'cav-mae':
     print('pretrain a cav-mae model with 11 modality-specific layers and 1 modality-sharing layers')
     # audio_model = models.CAVMAE(audio_length=args.target_length, norm_pix_loss=args.norm_pix_loss, modality_specific_depth=11, tr_pos=args.tr_pos)
-    audio_model = models.CAVMAESync(audio_length=args.target_length, norm_pix_loss=args.norm_pix_loss, modality_specific_depth=11, tr_pos=args.tr_pos, num_register_tokens=args.n_regster_tokens, cls_token=args.cls_token)
+    audio_model = models.CAVMAESync(audio_length=args.target_length, norm_pix_loss=args.norm_pix_loss, modality_specific_depth=11, tr_pos=args.tr_pos, 
+                                    num_register_tokens=args.n_regster_tokens, cls_token=args.cls_token, global_local_losses=args.global_local_losses)
 else:
     raise ValueError('model not supported')
 
