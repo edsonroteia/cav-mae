@@ -15,7 +15,7 @@ export TORCH_HOME=../../pretrained_models
 model=cav-mae
 masking_ratio=0.75
 mask_mode=unstructured # or time, or freq, or tf
-contrast_loss_weight=0.01
+contrast_loss_weight=0.1
 mae_loss_weight=1.0
 tr_pos=False
 norm_pix_loss=True
@@ -26,7 +26,7 @@ pretrain_path=${cur_dir}/IN-initial.pth
 
 bal=None
 lr=2e-4
-epoch=25
+epoch=50
 lrscheduler_start=10
 lrscheduler_decay=0.5
 lrscheduler_step=5
@@ -35,9 +35,10 @@ dataset_std=4.4849
 target_length=96
 noise=True
 mixup=0.0
-batch_size=256
+batch_size=512
 lr_adapt=False
-
+lr_scheduler=cosine
+n_regster_tokens=4
 dataset=audioset
 tr_data=datafilles/audioset_2m/cluster_nodes/audioset_2m_cleaned_aug24.json
 te_data=datafilles/audioset_2m/cluster_nodes/audioset_eval_cleaned_aug24.json
@@ -61,5 +62,5 @@ CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_pretrain_sync.py --model ${
 --pretrain_path ${pretrain_path} \
 --mae_loss_weight ${mae_loss_weight} --contrast_loss_weight ${contrast_loss_weight} \
 --tr_pos ${tr_pos} --masking_ratio ${masking_ratio} --mask_mode ${mask_mode} \
+--lr_scheduler ${lr_scheduler} --n_regster_tokens ${n_regster_tokens}
 # --wandb-name sync_pt_as2m_$(hostname)_lr${lr}_epoch${epoch}
-
