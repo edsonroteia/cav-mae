@@ -511,8 +511,8 @@ class CAVMAE(nn.Module):
         recon_v = torch.einsum('nchw->nhwc', recon_v)
 
         if self.cls_token:
-            cls_a = latent_c_a[:, 0, :]
-            cls_v = latent_c_v[:, 0, :]
+            cls_a = latent_c_a
+            cls_v = latent_c_v
         else:
             cls_a = latent_c_a.mean(dim=1)
             cls_v = latent_c_v.mean(dim=1)
