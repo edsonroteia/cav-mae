@@ -354,8 +354,8 @@ class CAVMAE(nn.Module):
         
         if self.cls_token:
             # Extract cls tokens after shared blocks
-            cls_a = x[:, :a.size(1), :]  # Assuming cls_token_a is first in 'a'
-            cls_v = x[:, a.size(1):, :]  # Assuming cls_token_v is first in 'v'
+            cls_a = x[:, 0, :].squeeze()  # This gets the audio CLS token (assuming it's the first token)
+            cls_v = x[:, a.size(1), :].squeeze()  # This gets the visual CLS token (assuming it's the first token after audio tokens)
 
             ca = self.norm_a(cls_a)
             cv = self.norm_v(cls_v)
