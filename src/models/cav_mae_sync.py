@@ -510,7 +510,14 @@ class CAVMAE(nn.Module):
         recon_v = self.unpatchify(pred_v, 3, 14, 14, 16)
         recon_v = torch.einsum('nchw->nhwc', recon_v)
 
-        return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc, recon_a, recon_v, latent_c_v.mean(dim=1), latent_c_a.mean(dim=1)
+        if self.cls_token:
+            cls_a = latent_c_a[:, 0, :]
+            cls_v = latent_c_v[:, 0, :]
+        else:
+            cls_a = latent_c_a.mean(dim=1)
+            cls_v = latent_c_v.mean(dim=1)
+
+        return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc, recon_a, recon_v, cls_a, cls_v
 
     # used only for inpainting, ignore if inpainting is not of interest
     def forward_inpaint(self, audio, imgs, mask_ratio_a=0.75, mask_ratio_v=0.75, mask_mode='unstructured'):
