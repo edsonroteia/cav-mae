@@ -86,16 +86,15 @@ class CAVMAE(nn.Module):
         self.patch_embed_a.num_patches = int(audio_length * 128 / 256)
         print('Number of Audio Patches: {:d}, Visual Patches: {:d}'.format(self.patch_embed_a.num_patches, self.patch_embed_v.num_patches))
 
-        self.num_register_tokens = num_register_tokens
-        print('Number of Registers: {:d}'.format(self.num_register_tokens))
-
         self.modality_a = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.modality_v = nn.Parameter(torch.zeros(1, 1, embed_dim))
 
         self.pos_embed_a = nn.Parameter(torch.zeros(1, self.patch_embed_a.num_patches, embed_dim), requires_grad=tr_pos)  # fixed sin-cos embedding
         self.pos_embed_v = nn.Parameter(torch.zeros(1, self.patch_embed_v.num_patches, embed_dim), requires_grad=tr_pos)  # fixed sin-cos embedding
 
-        self.register_tokens = nn.Parameter(torch.randn(num_register_tokens * 2, embed_dim))
+        self.num_register_tokens = num_register_tokens
+        print('Number of Registers: {:d}'.format(self.num_register_tokens))
+        self.register_tokens = nn.Parameter(torch.randn(self.num_register_tokens * 2, embed_dim))
 
         # audio-branch
         self.blocks_a = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
@@ -626,6 +625,10 @@ class CAVMAEFT(nn.Module):
         self.blocks_v = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
         self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(12 - modality_specific_depth)])
 
+        self.num_register_tokens = num_register_tokens
+        print('Number of Registers: {:d}'.format(self.num_register_tokens))
+        self.register_tokens = nn.Parameter(torch.randn(self.num_register_tokens * 2, embed_dim))
+
         self.norm_a = norm_layer(embed_dim)
         self.norm_v = norm_layer(embed_dim)
         self.norm = norm_layer(embed_dim)
@@ -704,11 +707,25 @@ class CAVMAEFT(nn.Module):
             v = v + self.pos_embed_v
             v = v + self.modality_v
 
+            # Append register tokens
+            if self.num_register_tokens > 0:
+                batch_size = a.shape[0]
+                r_a = self.register_tokens[:self.num_register_tokens].unsqueeze(0).expand(batch_size, -1, -1)
+                r_v = self.register_tokens[self.num_register_tokens:].unsqueeze(0).expand(batch_size, -1, -1)
+                
+                a = torch.cat([a, r_a], dim=1)
+                v = torch.cat([v, r_v], dim=1)
+
             for blk in self.blocks_a:
                 a = blk(a)
 
             for blk in self.blocks_v:
                 v = blk(v)
+
+            if self.num_register_tokens > 0:
+                # Remove register tokens
+                a = a[:, :-self.num_register_tokens, :]
+                v = v[:, :-self.num_register_tokens, :]
 
             x = torch.cat((a, v), dim=1)
 
