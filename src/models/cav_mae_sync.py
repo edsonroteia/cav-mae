@@ -514,7 +514,7 @@ class CAVMAE(nn.Module):
                 if self.global_local_losses:
                     global_loss_c, global_c_acc = self.forward_contrastive(cls_a, cls_v, mode=mode)
                     local_loss_c, local_c_acc = self.forward_contrastive(latent_c_a.mean(dim=1), latent_c_v.mean(dim=1), mode=mode)
-                    loss_c = global_loss_c + local_loss_c
+                    loss_c = (global_loss_c + local_loss_c) / 2
                     c_acc = (local_c_acc + global_c_acc) / 2
                 else:
                     loss_c, c_acc = self.forward_contrastive(latent_c_a, latent_c_v, mode=mode)
@@ -531,7 +531,7 @@ class CAVMAE(nn.Module):
 
         if self.cls_token:
             if self.global_local_losses:
-                return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc, recon_a, recon_v, latent_c_a.mean(dim=1), latent_c_v.mean(dim=1), cls_a, cls_v
+                return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc, recon_a, recon_v, latent_c_a.mean(dim=1), latent_c_v.mean(dim=1), cls_a, cls_v, global_loss_c, local_loss_c
             else:
                 cls_a = latent_c_a
                 cls_v = latent_c_v

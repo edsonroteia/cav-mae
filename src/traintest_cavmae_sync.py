@@ -98,6 +98,7 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
 
     batch_time, per_sample_time, data_time, per_sample_data_time, per_sample_dnn_time = AverageMeter(), AverageMeter(), AverageMeter(), AverageMeter(), AverageMeter()
     loss_av_meter, loss_a_meter, loss_v_meter, loss_c_meter = AverageMeter(), AverageMeter(), AverageMeter(), AverageMeter()
+    loss_global_meter, loss_local_meter = AverageMeter(), AverageMeter()
     progress = []
 
     best_epoch, best_loss = 0, np.inf
@@ -178,7 +179,7 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
 
             with autocast():
                 if args.global_local_losses:
-                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc, _, _, latent_c_a, latent_c_v, cls_a, cls_v = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
+                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc, _, _, latent_c_a, latent_c_v, cls_a, cls_v, global_loss_c, local_loss_c = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
                 else:
                     loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, _, recon_a, recon_v, latent_c_a, latent_c_v = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
                     
@@ -199,6 +200,9 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
             loss_a_meter.update(loss_mae_a.item(), B)
             loss_v_meter.update(loss_mae_v.item(), B)
             loss_c_meter.update(loss_c.item(), B)
+            if args.global_local_losses:
+                loss_global_meter.update(global_loss_c.item(), B)
+                loss_local_meter.update(local_loss_c.item(), B)
             batch_time.update(time.time() - end_time)
             per_sample_time.update((time.time() - end_time)/a_input.shape[0])
             per_sample_dnn_time.update((time.time() - dnn_start_time)/a_input.shape[0])
@@ -208,6 +212,9 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
             run["train/mae_loss_audio"].append(loss_a_meter.val, step=global_step)
             run["train/mae_loss_visual"].append(loss_v_meter.val, step=global_step)
             run["train/contrastive_loss"].append(loss_c_meter.val, step=global_step)
+            if args.global_local_losses:
+                run["train/global_contrastive_loss"].append(loss_global_meter.val, step=global_step)
+                run["train/local_contrastive_loss"].append(loss_local_meter.val, step=global_step)
             run["train/contrastive_accuracy"].append(c_acc, step=global_step)
             run["train/learning_rate"].append(optimizer.param_groups[0]['lr'], step=global_step)
 
@@ -239,12 +246,15 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
 
         pbar.close()
         print('start validation')
-        eval_loss_av, eval_loss_mae, eval_loss_mae_a, eval_loss_mae_v, eval_loss_c, eval_accuracies = validate(audio_model, test_loader, args, run, global_step)
+        eval_loss_av, eval_loss_mae, eval_loss_mae_a, eval_loss_mae_v, eval_loss_c, eval_loss_global, eval_loss_local, eval_accuracies = validate(audio_model, test_loader, args, run, global_step)
 
         print("Eval Audio MAE Loss: {:.6f}".format(eval_loss_mae_a))
         print("Eval Visual MAE Loss: {:.6f}".format(eval_loss_mae_v))
         print("Eval Total MAE Loss: {:.6f}".format(eval_loss_mae))
         print("Eval Contrastive Loss: {:.6f}".format(eval_loss_c))
+        if args.global_local_losses:
+            print("Eval Global Contrastive Loss: {:.6f}".format(eval_loss_global))
+            print("Eval Local Contrastive Loss: {:.6f}".format(eval_loss_local))
         print("Eval Total Loss: {:.6f}".format(eval_loss_av))
         # for k, v in eval_accuracies.items():
         #     print(f"Eval Contrastive Accuracy ({k}): {v:.6f}")
@@ -252,6 +262,9 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
         print("Train Audio MAE Loss: {:.6f}".format(loss_a_meter.avg))
         print("Train Visual MAE Loss: {:.6f}".format(loss_v_meter.avg))
         print("Train Contrastive Loss: {:.6f}".format(loss_c_meter.avg))
+        if args.global_local_losses:
+            print("Train Global Contrastive Loss: {:.6f}".format(loss_global_meter.avg))
+            print("Train Local Contrastive Loss: {:.6f}".format(loss_local_meter.avg))
         print("Train Total Loss: {:.6f}".format(loss_av_meter.avg))
 
         # Log validation metrics to Neptune
@@ -259,11 +272,17 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
         run["eval/mae_loss_audio"].append(eval_loss_mae_a, step=global_step)
         run["eval/mae_loss_visual"].append(eval_loss_mae_v, step=global_step)
         run["eval/contrastive_loss"].append(eval_loss_c, step=global_step)
+        if args.global_local_losses:
+            run["eval/global_contrastive_loss"].append(eval_loss_global, step=global_step)
+            run["eval/local_contrastive_loss"].append(eval_loss_local, step=global_step)
         # for k, v in eval_accuracies.items():
         #     run[f"eval/contrastive_accuracy_{k}"].append(v, step=global_step)
         run["train/epoch_mae_loss_audio"].append(loss_a_meter.avg, step=global_step)
         run["train/epoch_mae_loss_visual"].append(loss_v_meter.avg, step=global_step)
         run["train/epoch_contrastive_loss"].append(loss_c_meter.avg, step=global_step)
+        if args.global_local_losses:
+            run["train/epoch_global_contrastive_loss"].append(loss_global_meter.avg, step=global_step)
+            run["train/epoch_local_contrastive_loss"].append(loss_local_meter.avg, step=global_step)
         run["train/epoch_total_loss"].append(loss_av_meter.avg, step=global_step)
         run["epoch"].append(epoch, step=global_step)
 
@@ -321,6 +340,9 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
         loss_a_meter.reset()
         loss_v_meter.reset()
         loss_c_meter.reset()
+        if args.global_local_losses:
+            loss_global_meter.reset()
+            loss_local_meter.reset()
 
 def optimal_path_score(similarity_matrix):
     n, m = similarity_matrix.shape
@@ -479,6 +501,7 @@ def validate(audio_model, val_loader, args, run, global_step):
 
     end = time.time()
     A_loss, A_loss_mae, A_loss_mae_a, A_loss_mae_v, A_loss_c = [], [], [], [], []
+    A_loss_global, A_loss_local = [], []
     A_accuracies = {
         'whole_avg': [], 'whole_max': [],
         'diag_avg': [], 'diag_max': [],
@@ -503,7 +526,7 @@ def validate(audio_model, val_loader, args, run, global_step):
             
             with autocast():
                 if args.global_local_losses:
-                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, _, recon_a, recon_v, latent_c_a, latent_c_v, cls_a, cls_v = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
+                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, _, recon_a, recon_v, latent_c_a, latent_c_v, cls_a, cls_v, global_loss_c, local_loss_c = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
                 else:
                     loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, _, recon_a, recon_v, latent_c_a, latent_c_v = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
                 
@@ -518,12 +541,18 @@ def validate(audio_model, val_loader, args, run, global_step):
                 loss_mae_a = loss_mae_a.mean()
                 loss_mae_v = loss_mae_v.mean()
                 loss_c = loss_c.mean()
+                if args.global_local_losses:
+                    loss_global = global_loss_c.mean()
+                    loss_local = local_loss_c.mean()
             
             A_loss.append(loss.to('cpu').detach())
             A_loss_mae.append(loss_mae.to('cpu').detach())
             A_loss_mae_a.append(loss_mae_a.to('cpu').detach())
             A_loss_mae_v.append(loss_mae_v.to('cpu').detach())
             A_loss_c.append(loss_c.to('cpu').detach())
+            if args.global_local_losses:
+                A_loss_global.append(global_loss_c.to('cpu').detach())
+                A_loss_local.append(local_loss_c.to('cpu').detach())
             # for k, v in accuracies.items():
                 # A_accuracies[k].append(v)
             
@@ -543,6 +572,9 @@ def validate(audio_model, val_loader, args, run, global_step):
         loss_mae_a = np.mean(A_loss_mae_a)
         loss_mae_v = np.mean(A_loss_mae_v)
         loss_c = np.mean(A_loss_c)
+        if args.global_local_losses:
+            loss_global = np.mean(A_loss_global)
+            loss_local = np.mean(A_loss_local)
         # accuracies = {k: np.mean(v) for k, v in A_accuracies.items()}
 
     print(f"Validation Results - Loss: {loss:.4f}, MAE Loss: {loss_mae:.4f}, "
@@ -551,4 +583,7 @@ def validate(audio_model, val_loader, args, run, global_step):
     # for k, v in accuracies.items():
         # print(f"Accuracy ({k}): {v:.4f}")
 
-    return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, accuracies
+    if args.global_local_losses:
+        return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, loss_global, loss_local, accuracies
+    else:
+        return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, accuracies
