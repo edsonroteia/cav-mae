@@ -38,14 +38,17 @@ def log_plot_to_neptune(run, plot_name, fig, step):
     run[f"visualizations/{plot_name}"].log(neptune.types.File.as_image(image), step=step)
     plt.close(fig)
 
-def visualize_and_log(a_input, v_input, audio_model, step, run):
+def visualize_and_log(a_input, v_input, audio_model, step, run, args):
     print("Logging reconstruction examples to Neptune...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     a_input, v_input = a_input.to(device), v_input.to(device)
         
     # Get reconstructions
     with torch.no_grad():
-        _, _, _, _, _, mask_a, mask_v, _, recon_a, recon_v, _, _ = audio_model(a_input, v_input)
+        if args.global_local_losses:
+            _, _, _, _, _, mask_a, mask_v, _, recon_a, recon_v, _, _, _, _ = audio_model(a_input, v_input)
+        else:
+            _, _, _, _, _, mask_a, mask_v, _, recon_a, recon_v, _, _ = audio_model(a_input, v_input)
     
     # Select first sample and first frame of the batch for visualization
     a_input_np = a_input[0].cpu().numpy()
@@ -241,7 +244,7 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
                 if np.isnan(loss_av_meter.avg):
                     print("training diverged...")
                     return
-                visualize_and_log(a_input, v_input, audio_model, global_step, run)
+                visualize_and_log(a_input, v_input, audio_model, global_step, run, args)
 
             end_time = time.time()
             global_step += 1
