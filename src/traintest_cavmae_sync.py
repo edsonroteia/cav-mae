@@ -46,7 +46,7 @@ def visualize_and_log(a_input, v_input, audio_model, step, run, args):
     # Get reconstructions
     with torch.no_grad():
         if args.global_local_losses:
-            _, _, _, _, _, mask_a, mask_v, _, recon_a, recon_v, _, _, _, _ = audio_model(a_input, v_input)
+            _, _, _, _, _, mask_a, mask_v, _, recon_a, recon_v, _, _, _, _, _, _ = audio_model(a_input, v_input)
         else:
             _, _, _, _, _, mask_a, mask_v, _, recon_a, recon_v, _, _ = audio_model(a_input, v_input)
     
