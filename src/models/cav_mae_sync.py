@@ -130,12 +130,13 @@ class CAVMAE(nn.Module):
 
         self.norm_pix_loss = norm_pix_loss
 
-        self.global_local_losses = global_local_losses
         self.cls_token = cls_token
         if self.cls_token:
             print("Using CLS Token")
             self.cls_token_a = nn.Parameter(torch.randn(1, 1, embed_dim))
             self.cls_token_v = nn.Parameter(torch.randn(1, 1, embed_dim))
+        
+        self.global_local_losses = global_local_losses
         if self.global_local_losses:
             print("Using Global and Local Losses")
 
@@ -359,12 +360,15 @@ class CAVMAE(nn.Module):
             cv = blk(v, 'v')
         
         if self.cls_token:
-            # Extract cls tokens after shared blocks
-            cls_a = ca[:, 0, :].squeeze()  # This gets the audio CLS token from ca
-            cls_v = cv[:, 0, :].squeeze()  # This gets the visual CLS token from cv
+            # split the local patch tokens from the cls tokens
+            #cls tokens
+            cls_a = self.norm_a(ca[:, 0, :].squeeze())  # This gets the audio CLS token from ca
+            cls_v = self.norm_v(cv[:, 0, :].squeeze())  # This gets the visual CLS token from cv
+            # local patch tokens
+            ca = self.norm_a(ca[:, 1:, :])
+            cv = self.norm_v(cv[:, 1:, :])
 
-            ca = self.norm_a(cls_a)
-            cv = self.norm_v(cls_v)
+            return x, mask_a, ids_restore_a, mask_v, ids_restore_v, ca, cv, cls_a, cls_v
         else:
             ca = self.norm_a(ca)
             cv = self.norm_v(cv)
@@ -488,7 +492,10 @@ class CAVMAE(nn.Module):
         return loss
 
     def forward(self, audio, imgs, mask_ratio_a=0.75, mask_ratio_v=0.75, mae_loss_weight=1., contrast_loss_weight=0.01, mask_mode='unstructured', mode='train'):
-        latent, mask_a, ids_restore_a, mask_v, ids_restore_v, latent_c_a, latent_c_v = self.forward_encoder(audio, imgs, mask_ratio_a, mask_ratio_v, mask_mode=mask_mode)
+        if self.global_local_losses:    
+            latent, mask_a, ids_restore_a, mask_v, ids_restore_v, latent_c_a, latent_c_v, cls_a, cls_v = self.forward_encoder(audio, imgs, mask_ratio_a, mask_ratio_v, mask_mode=mask_mode)
+        else:
+            latent, mask_a, ids_restore_a, mask_v, ids_restore_v, latent_c_a, latent_c_v = self.forward_encoder(audio, imgs, mask_ratio_a, mask_ratio_v, mask_mode=mask_mode)
         
         # MAE loss calculation (remains the same for both train and eval)
         if mae_loss_weight != 0:
@@ -504,7 +511,13 @@ class CAVMAE(nn.Module):
             if not self.cls_token:
                 loss_c, c_acc = self.forward_contrastive(latent_c_a.mean(dim=1), latent_c_v.mean(dim=1), mode=mode)
             else:
-                loss_c, c_acc = self.forward_contrastive(latent_c_a, latent_c_v, mode=mode)
+                if self.global_local_losses:
+                    global_loss_c, global_c_acc = self.forward_contrastive(cls_a, cls_v, mode=mode)
+                    local_loss_c, local_c_acc = self.forward_contrastive(latent_c_a.mean(dim=1), latent_c_v.mean(dim=1), mode=mode)
+                    loss_c = global_loss_c + local_loss_c
+                    c_acc = (local_c_acc + global_c_acc) / 2
+                else:
+                    loss_c, c_acc = self.forward_contrastive(latent_c_a, latent_c_v, mode=mode)
             loss_c = contrast_loss_weight * loss_c
         else:
             loss_c, c_acc = torch.tensor(0.0, device=audio.device), torch.tensor(0.0, device=audio.device)
@@ -517,8 +530,11 @@ class CAVMAE(nn.Module):
         recon_v = torch.einsum('nchw->nhwc', recon_v)
 
         if self.cls_token:
-            cls_a = latent_c_a
-            cls_v = latent_c_v
+            if self.global_local_losses:
+                return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc, recon_a, recon_v, latent_c_a.mean(dim=1), latent_c_v.mean(dim=1), cls_a, cls_v
+            else:
+                cls_a = latent_c_a
+                cls_v = latent_c_v
         else:
             cls_a = latent_c_a.mean(dim=1)
             cls_v = latent_c_v.mean(dim=1)
@@ -584,7 +600,7 @@ class CAVMAE(nn.Module):
 # the finetuned CAV-MAE model
 class CAVMAEFT(nn.Module):
     def __init__(self, label_dim, img_size=224, audio_length=1024, patch_size=16, in_chans=3,
-                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True, aggregate='None'):
+                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True, aggregate='None', num_register_tokens=0):
         super().__init__()
         timm.models.vision_transformer.Block = Block
         print('Use norm_pix_loss: ', norm_pix_loss)
