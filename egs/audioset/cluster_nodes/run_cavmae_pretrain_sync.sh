@@ -42,6 +42,7 @@ n_regster_tokens=4
 
 cls_token=True
 
+global_local_losses=True
 dataset=audioset
 tr_data=datafilles/audioset_2m/cluster_nodes/audioset_2m_cleaned_aug24.json
 te_data=datafilles/audioset_2m/cluster_nodes/audioset_eval_cleaned_aug24.json
@@ -66,4 +67,5 @@ CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_pretrain_sync.py --model ${
 --mae_loss_weight ${mae_loss_weight} --contrast_loss_weight ${contrast_loss_weight} \
 --tr_pos ${tr_pos} --masking_ratio ${masking_ratio} --mask_mode ${mask_mode} \
 --lr_scheduler ${lr_scheduler} --n_regster_tokens ${n_regster_tokens} --cls_token ${cls_token}
+--global_local_losses ${global_local_losses}
 # --wandb-name sync_pt_as2m_$(hostname)_lr${lr}_epoch${epoch}
