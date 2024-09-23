@@ -187,6 +187,8 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
                     # accuracies = calculate_contrastive_accuracy(latent_c_a.float(), latent_c_v.float(), video_ids, run=run, mode='eval', global_step=global_step)
                 
                 loss, loss_mae, loss_mae_a, loss_mae_v, loss_c = loss.mean(), loss_mae.mean(), loss_mae_a.mean(), loss_mae_v.mean(), loss_c.mean()
+                if args.global_local_losses:
+                    loss_global, loss_local = global_loss_c.mean(), local_loss_c.mean()
 
             optimizer.zero_grad()
             scaler.scale(loss).backward()
