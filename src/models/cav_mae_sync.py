@@ -798,7 +798,7 @@ class CAVMAEFT(nn.Module):
                 a = a.view(batch_size, 10, -1, a.shape[-1])
                 
                 # Average across patches
-                x = x.mean(dim=2)
+                a = a.mean(dim=2)
                 
                 # Add CLS token
                 cls_tokens = self.cls_token.expand(batch_size, -1, -1)
