@@ -791,8 +791,27 @@ class CAVMAEFT(nn.Module):
             for blk in self.blocks_u:
                 a = blk(a)
             a = self.norm(a)
-
-            if self.aggregate != "None":
+            
+            if self.aggregate == "self_attention_cls":
+                # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
+                batch_size = a.shape[0] // 10  # Assuming 10 frames per video
+                a = a.view(batch_size, 10, -1, a.shape[-1])
+                
+                # Average across patches
+                x = x.mean(dim=2)
+                
+                # Add CLS token
+                cls_tokens = self.cls_token.expand(batch_size, -1, -1)
+                a = torch.cat((cls_tokens, a), dim=1)
+                
+                # Apply classifier layers
+                for block in self.classifier_layers:
+                    a = block(a)
+                
+                a = self.classifier_norm(a)
+                a = self.classifier_head(a[:, 0])  # Use CLS token for classification
+                return a
+            if self.aggregate == "self_attention_cls":
                 # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
                 batch_size = a.shape[0] // 10  # Assuming 10 frames per video
                 a = a.view(batch_size, 10, -1, a.shape[-1])
@@ -803,10 +822,10 @@ class CAVMAEFT(nn.Module):
                 # Concatenate frames
                 # Expected dimension: (batch_size, 10 * embed_dim)
                 x = a.view(batch_size, -1)
+                x = self.mlp_head(x)
             else:
                 x = a.mean(dim=1)
-
-            x = self.mlp_head(x)
+                x = self.mlp_head(x)
             return x
 
         # finetune with only image (and inference with only image when the model is finetuned with only image)
@@ -822,7 +841,27 @@ class CAVMAEFT(nn.Module):
                 v = blk(v)
             v = self.norm(v)
 
-            if self.aggregate != "None":
+            if self.aggregate == "self_attention_cls":
+                # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
+                batch_size = v.shape[0] // 10  # Assuming 10 frames per video
+                v = v.view(batch_size, 10, -1, v.shape[-1])
+
+                # Average across patches
+                v = v.mean(dim=2)
+                
+                # Add CLS token
+                cls_tokens = self.cls_token.expand(batch_size, -1, -1)
+                v = torch.cat((cls_tokens, v), dim=1)
+                
+                # Apply classifier layers
+                for block in self.classifier_layers:
+                    v = block(v)
+                
+                v = self.classifier_norm(v)
+                v = self.classifier_head(v[:, 0])  # Use CLS token for classification
+                return v
+
+            if self.aggregate == "self_attention_cls":
                 # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
                 batch_size = v.shape[0] // 10  # Assuming 10 frames per video
                 v = v.view(batch_size, 10, -1, v.shape[-1])
@@ -833,10 +872,10 @@ class CAVMAEFT(nn.Module):
                 # Concatenate frames
                 # Expected dimension: (batch_size, 10 * embed_dim)
                 x = v.view(batch_size, -1)
+                x = self.mlp_head(x)
             else:
                 x = v.mean(dim=1)
-
-            x = self.mlp_head(x)
+                x = self.mlp_head(x)
             return x
 
         # used in case that the model is finetuned with both modality, but in inference only audio is given
