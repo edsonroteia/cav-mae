@@ -97,6 +97,7 @@ parser.add_argument("--num_samples", type=int, default=None, help="Number of sam
 parser.add_argument("--wandb_name", type=str, default=None)
 parser.add_argument("--aggregate", type=str, default="None")
 parser.add_argument("--n_register_tokens", type=int, default=4)
+parser.add_argument("--augmentation", type=ast.literal_eval, default=True)
 
 args = parser.parse_args()
 
@@ -110,9 +111,9 @@ else:
 
 audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': args.freqm, 'timem': args.timem, 'mixup': args.mixup,
               'dataset': args.dataset, 'mode':mode, 'mean':args.dataset_mean, 'std':args.dataset_std,
-              'noise':args.noise, 'label_smooth': args.label_smooth, 'im_res': im_res, 'num_samples': args.num_samples}
+              'noise':args.noise, 'label_smooth': args.label_smooth, 'im_res': im_res, 'num_samples': args.num_samples, 'augmentation': args.augmentation}
 val_audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': args.dataset,
-                  'mode':mode, 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': im_res, 'num_samples': args.num_samples}
+                  'mode':mode, 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': im_res, 'num_samples': args.num_samples, 'augmentation': False}
 
 def get_loader(args, audio_conf, val_audio_conf, train_csv, val_csv):
     print('Now process ' + args.dataset)

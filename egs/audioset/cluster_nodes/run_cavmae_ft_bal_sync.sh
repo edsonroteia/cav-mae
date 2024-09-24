@@ -26,8 +26,11 @@ head_lr=100 # newly initialized ft layers uses 10 times larger than the base lr
 
 bal=None
 lr=${1:-2e-4}  # Use the first argument as lr, default to 1e-4 if not provided
-batch_size=${2:-144}  # Use the second argument as batch_size, default to 24 if not provided
+batch_size=${2:-48}  # Use the second argument as batch_size, default to 24 if not provided
 ftmode=${3:-multimodal}
+cuda_devices=${4:-0,1,2,3,4,5,6,7}
+aggregate=${5:-self_attention_cls}
+num_workers=${6:-48}
 epoch=25
 lrscheduler_start=5
 lrscheduler_decay=0.5
@@ -54,7 +57,7 @@ label_csv=datafilles/audioset_20k/cluster_nodes/class_labels_indices.csv
 exp_dir=./exp/testmae02-${dataset}-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-a5-$(date +%Y%m%d_%H%M%S)
 mkdir -p $exp_dir
 
-CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model} --dataset ${dataset} \
+CUDA_VISIBLE_DEVICES=${cuda_devices} CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model} --dataset ${dataset} \
 --data-train ${tr_data} --data-val ${te_data} --exp-dir $exp_dir \
 --label-csv ${label_csv} --n_class 527 \
 --lr $lr --n-epochs ${epoch} --batch-size $batch_size --save_model True \
@@ -66,4 +69,4 @@ CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model}
 --wa ${wa} --wa_start ${wa_start} --wa_end ${wa_end} --lr_adapt ${lr_adapt} \
 --pretrain_path ${pretrain_path} --ftmode ${ftmode} \
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
---num-workers 48 --aggregate self_attention_cls --lr_scheduler ${lr_scheduler}
+--num-workers ${num_workers} --aggregate ${aggregate} --lr_scheduler ${lr_scheduler}

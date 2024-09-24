@@ -131,14 +131,27 @@ class AudiosetDataset(Dataset):
         # by default, all models use 224*224, other resolutions are not tested
         self.im_res = self.audio_conf.get('im_res', 224)
         print('now using {:d} * {:d} image input'.format(self.im_res, self.im_res))
-        self.preprocess = T.Compose([
-            T.Resize(self.im_res, interpolation=PIL.Image.BICUBIC),
-            T.CenterCrop(self.im_res),
-            T.ToTensor(),
-            T.Normalize(
-                mean=[0.4850, 0.4560, 0.4060],
-                std=[0.2290, 0.2240, 0.2250]
-            )])
+
+        
+        self.augmentation = self.audio_conf.get('augmentation', False)
+        if self.augmentation:
+            self.preprocess = T.Compose([
+                T.RandomResizedCrop(self.im_res, scale=(0.08, 1.0), ratio=(0.9, 1.1)),
+                T.RandomHorizontalFlip(p=0.5),
+                T.ToTensor(),
+                T.Normalize(
+                    mean=[0.4850, 0.4560, 0.4060],
+                    std=[0.2290, 0.2240, 0.2250]
+                )])
+        else:
+            self.preprocess = T.Compose([
+                T.Resize(self.im_res, interpolation=PIL.Image.BICUBIC),
+                T.CenterCrop(self.im_res),
+                T.ToTensor(),
+                T.Normalize(
+                    mean=[0.4850, 0.4560, 0.4060],
+                    std=[0.2290, 0.2240, 0.2250]
+                )])
 
     # change python list to numpy array to avoid memory leak.
     def pro_data(self, data_json):
