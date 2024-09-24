@@ -156,7 +156,8 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
 
     print("current #steps=%s, #epochs=%s" % (global_step, epoch))
     print("start training...")
-    result = np.zeros([args.n_epochs, 17])  # 8 original metrics + 8 new accuracy metrics
+    # result = np.zeros([args.n_epochs, 17])  # 8 original metrics + 8 new accuracy metrics
+    result = np.zeros([args.n_epochs, 8])  # 8 original metrics   
     audio_model.train()
     while epoch < args.n_epochs + 1:
         begin_time = time.time()
@@ -305,9 +306,10 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
         # ] + list(eval_accuracies.values()) + [optimizer.param_groups[0]['lr']]
         header = ['train_loss_audio', 'train_loss_visual', 'train_loss_contrastive', 'train_loss_total',
           'eval_loss_mae_audio', 'eval_loss_mae_visual', 'eval_loss_contrastive', 'eval_loss_total',
-          'acc_whole_avg', 'acc_whole_max', 'acc_diag_avg', 'acc_diag_max',
-          'acc_optimal_avg', 'acc_optimal_max', 'acc_hungarian_avg', 'acc_hungarian_max',
-          'learning_rate']
+        ]
+        #   'acc_whole_avg', 'acc_whole_max', 'acc_diag_avg', 'acc_diag_max',
+        #   'acc_optimal_avg', 'acc_optimal_max', 'acc_hungarian_avg', 'acc_hungarian_max',
+        #   'learning_rate']
         np.savetxt(exp_dir + '/result.csv', result, delimiter=',', header=','.join(header), comments='')
         print('validation finished')
 
