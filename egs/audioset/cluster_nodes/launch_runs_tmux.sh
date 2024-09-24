@@ -24,18 +24,25 @@ num_workers=8
 
 # Start running commands in each pane
 pane=0
+last_command=""
+
 for lr in "${lrs[@]}"; do
   for ftmode in "${ftmodes[@]}"; do
     if [[ $pane -lt 7 ]]; then
       # Assign one job per GPU
       tmux send-keys -t $pane "dev_init && $cmd_prefix $lr $batch_size $ftmode ${cuda_devices[$pane]} None $num_workers" C-m
     else
-      # For the last pane, run two jobs on the same GPU (using CUDA device 7)
-      tmux send-keys -t $pane "dev_init && $cmd_prefix $lr $batch_size $ftmode ${cuda_devices[7]} None $num_workers; $cmd_prefix $lr $batch_size multimodal ${cuda_devices[7]} self_attention_cls $num_workers" C-m
+      # Store the remaining command for the last GPU
+      last_command="$cmd_prefix $lr $batch_size $ftmode ${cuda_devices[7]} None $num_workers"
     fi
     ((pane++))
   done
 done
+
+# For the last pane (pane 7), run two jobs on the same GPU (using CUDA device 7)
+if [[ -n "$last_command" ]]; then
+  tmux send-keys -t 7 "dev_init && $last_command; $cmd_prefix 1e-4 $batch_size multimodal ${cuda_devices[7]} None $num_workers" C-m
+fi
 
 # Attach to the tmux session (optional)
 tmux select-pane -t 0  # Move back to the first pane
