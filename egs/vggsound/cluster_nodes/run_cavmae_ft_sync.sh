@@ -20,13 +20,16 @@ model=cav-mae-ft
 pretrain_dir=/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_021700/models/
 pretrain_path=${pretrain_dir}/best_audio_model.pth
 
-freeze_base=False
-head_lr=10 # newly initialized ft layers uses 10 times larger than the base lr
+freeze_base=True
+head_lr=1 # newly initialized ft layers uses 10 times larger than the base lr
 
 bal=bal
 lr=${1:-1e-4}  # Use the first argument as lr, default to 1e-4 if not provided
 batch_size=${2:-48}  # Use the second argument as batch_size, default to 24 if not provided
 ftmode=${3:-multimodal}
+cuda_devices=${4:-0,1,2,3,4,5,6,7}
+aggregate=${5:-self_attention_cls}
+num_workers=${6:-48}
 epoch=10
 lrscheduler_start=2
 lrscheduler_decay=0.5
@@ -65,4 +68,4 @@ CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model}
 --wa ${wa} --wa_start ${wa_start} --wa_end ${wa_end} --lr_adapt ${lr_adapt} \
 --pretrain_path ${pretrain_path} --ftmode ${ftmode} \
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
---num-workers 32 --aggregate self_attention_cls --lr_scheduler ${lr_scheduler}
+--num-workers ${num_workers} --aggregate ${aggregate} --lr_scheduler ${lr_scheduler}
