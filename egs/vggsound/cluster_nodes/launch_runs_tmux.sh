@@ -16,7 +16,7 @@ ftmodes=(multimodal audioonly videoonly)
 cuda_devices=(0 1 2 3 4 5 6 7)  # Each run uses one GPU
 
 # Command to run in each pane
-cmd_prefix="egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh"
+cmd_prefix="bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh"
 
 # Arguments that remain constant across all runs
 batch_size=48
