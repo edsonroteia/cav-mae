@@ -21,8 +21,13 @@ pretrain_dir=/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch
 pretrain_path=${pretrain_dir}/audio_model.25.pth
 # pretrain_path=${pretrain_dir}/best_audio_model.pth
 
-freeze_base=False
-head_lr=100 # newly initialized ft layers uses 10 times larger than the base lr
+freeze_base=${7:-True}
+# if freeze_base is True, then head_lr is 1, else 100
+if [ "$freeze_base" = True ]; then
+    head_lr=1 # newly initialized ft layers uses 10 times larger than the base lr
+else
+    head_lr=100
+fi
 
 bal=None
 lr=${1:-2e-4}  # Use the first argument as lr, default to 1e-4 if not provided
