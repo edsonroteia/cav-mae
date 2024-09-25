@@ -565,6 +565,8 @@ class CAVMAE(nn.Module):
         v = v + self.pos_embed_v
         v = v + self.modality_v
 		
+batch_size = a.shape[0]
+
         # Append cls tokens
         if self.cls_token:
             cls_tokens_a = self.cls_token_a.expand(batch_size, -1, -1)
@@ -575,7 +577,7 @@ class CAVMAE(nn.Module):
 
         # Append register tokens
         if self.num_register_tokens > 0:
-            batch_size = a.shape[0]
+            
             r_a = self.register_tokens[:self.num_register_tokens].unsqueeze(0).expand(batch_size, -1, -1)
             r_v = self.register_tokens[self.num_register_tokens:].unsqueeze(0).expand(batch_size, -1, -1)
             
