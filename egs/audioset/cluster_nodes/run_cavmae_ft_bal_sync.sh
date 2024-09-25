@@ -38,6 +38,7 @@ aggregate=${5:-self_attention_cls}
 num_workers=${6:-48}
 num_samples=${8:-9999999}
 epoch=${9:-25}
+neptune_tag=${10:-finetuning}
 lrscheduler_start=5
 lrscheduler_decay=0.5
 lrscheduler_step=1
@@ -54,6 +55,7 @@ timem=192
 mixup=0.5
 label_smooth=0.1
 lr_scheduler=cosine
+
 
 dataset=audioset
 tr_data=datafilles/audioset_20k/cluster_nodes/audioset_20k_cleaned.json
@@ -76,4 +78,4 @@ CUDA_VISIBLE_DEVICES=${cuda_devices} CUDA_CACHE_DISABLE=1 python -W ignore src/r
 --pretrain_path ${pretrain_path} --ftmode ${ftmode} \
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
 --num-workers ${num_workers} --aggregate ${aggregate} --lr_scheduler ${lr_scheduler} \
---num_samples ${num_samples}
+--num_samples ${num_samples} --neptune_tag ${neptune_tag}

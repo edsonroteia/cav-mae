@@ -373,7 +373,7 @@ def train(audio_model, train_loader, test_loader, args, run):
         loss_meter.reset()
         per_sample_dnn_time.reset()
 
-    run.stop()
+
 
 def validate(audio_model, val_loader, args, output_pred=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

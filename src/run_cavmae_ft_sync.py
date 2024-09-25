@@ -32,11 +32,7 @@ from PIL import Image
 
 # finetune cav-mae model
 
-run = neptune.init_run(
-    project="junioroteia/CAV-MAE",
-    api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJmNGE4NDA2NS1hYmE2LTQ3YWYtODllMC02ODk4NGNlODY0MDUifQ==",
-    tags=["finetuning"],
-)  # your credentials
+
 
 print("I am process %s, running on %s: starting (%s)" % (os.getpid(), os.uname()[1], time.asctime()))
 
@@ -99,7 +95,20 @@ parser.add_argument("--aggregate", type=str, default="None")
 parser.add_argument("--n_register_tokens", type=int, default=4)
 parser.add_argument("--augmentation", type=ast.literal_eval, default=True)
 
+parser.add_argument("--neptune_tag", type=str, default="finetuning")
 args = parser.parse_args()
+
+run = neptune.init_run(
+    project="junioroteia/CAV-MAE",
+    api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJmNGE4NDA2NS1hYmE2LTQ3YWYtODllMC02ODk4NGNlODY0MDUifQ==",
+    tags=["finetuning", args.neptune_tag],
+)  # your credentials
+
+# Add these variables after initializing the Neptune run
+run["best_val_mAP"] = 0
+run["best_val_ACC"] = 0
+run["last_val_mAP"] = 0
+run["last_val_ACC"] = 0
 
 # all exp in this work is based on 224 * 224 image
 im_res = 224
@@ -238,9 +247,11 @@ for wa_start in range(args.wa_start, args.n_epochs, 5):
             if args.metrics == 'mAP':
                 cur_res = np.mean([stat['AP'] for stat in stats])
                 print('mAP is {:.4f}'.format(cur_res))
+                run[f"wa_mAP/start_{wa_start}_interval_{wa_interval}"] = cur_res
             elif args.metrics == 'acc':
                 cur_res = stats[0]['acc']
                 print('acc is {:.4f}'.format(cur_res))
+                run[f"wa_ACC/start_{wa_start}_interval_{wa_interval}"] = cur_res
         else:
             # Validate the model and get outputs
             stats, _, audio_output, target = validate(audio_model, val_loader, args, output_pred=True)
@@ -258,9 +269,11 @@ for wa_start in range(args.wa_start, args.n_epochs, 5):
             if args.metrics == 'mAP':
                 cur_res = np.mean([stat['AP'] for stat in stats])
                 print('final mAP is {:.4f}'.format(cur_res))
+                run[f"wa_mAP/start_{wa_start}_interval_{wa_interval}"] = cur_res
             elif args.metrics == 'acc':
                 cur_res = stats[0]['acc']
                 print('final acc is {:.4f}'.format(cur_res))
+                run[f"wa_ACC/start_{wa_start}_interval_{wa_interval}"] = cur_res
 
         # Save the results with the corresponding wa configuration
         results.append((f"wa_start: {wa_start}, wa_interval: {wa_interval}", cur_res))
@@ -278,4 +291,10 @@ table_data = {
     "Final Result": [result for _, result in results]
 }
 run["results/summary"].upload(neptune.types.File.as_html(pd.DataFrame(table_data)))
-            
+
+# Log the best performing weight averaging configuration
+best_wa_result = max(results, key=lambda x: x[1])
+run["best_wa_config"] = best_wa_result[0]
+run["best_wa_result"] = best_wa_result[1]
+
+run.stop()

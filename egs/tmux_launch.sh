@@ -14,19 +14,31 @@ tmux select-layout tiled
 lrs=(1e-2 1e-3 1e-4)
 ftmodes=(multimodal audioonly videoonly)
 cuda_devices=(0 1 2 3 4 5 6 7)  # Each run uses one GPU
+# Parse command line arguments
 aggregate=${1:-self_attention_cls}
 freeze_base=${2:-True}
 debug=${3:-False}
+
+# Set default values for num_samples and num_epochs
+num_samples=9999999
+num_epochs=25
+
+# Override defaults if debug mode is enabled
 if [ "$debug" = True ]; then
   num_samples=48
   num_epochs=1
-else
-  num_samples=9999999
-  num_epochs=25
 fi
+
+# Print the parsed arguments for verification
+echo "Aggregate: $aggregate"
+echo "Freeze base: $freeze_base"
+echo "Debug mode: $debug"
+echo "Number of samples: $num_samples"
+echo "Number of epochs: $num_epochs"
 # Command to run in each pane
 cmd_prefix="bash egs/audioset/cluster_nodes/run_cavmae_ft_bal_sync.sh"
 
+neptune_tag1=aggr_${aggregate}_freeze_${freeze_base}
 # Arguments that remain constant across all runs
 batch_size=48
 num_workers=8
@@ -40,10 +52,10 @@ for lr in "${lrs[@]}"; do
   for ftmode in "${ftmodes[@]}"; do
     if [[ $pane -lt 7 ]]; then
       # Assign one job per GPU
-      tmux send-keys -t $pane "dev_init && $cmd_prefix $lr $batch_size $ftmode ${cuda_devices[$pane]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[$pane]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
+      tmux send-keys -t $pane "dev_init && $cmd_prefix $lr $batch_size $ftmode ${cuda_devices[$pane]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[$pane]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
     else
       # Store the remaining command for the last GPU
-      last_command="$cmd_prefix $lr $batch_size $ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base $num_samples; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples'"
+      last_command="$cmd_prefix $lr $batch_size $ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'"
     fi
     ((pane++))
   done
@@ -55,7 +67,7 @@ if [[ -n "$last_command" ]]; then
   last_lr=${lrs[-1]}           # Last element of the lrs array
   last_ftmode=${ftmodes[-1]}   # Last element of the ftmodes array
 
-  tmux send-keys -t 7 "dev_init && $last_command; $cmd_prefix $last_lr $batch_size $last_ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base $num_samples; echo 'Run completed with parameters: lr=$last_lr, batch_size=$batch_size, ftmode=$last_ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples'" C-m
+  tmux send-keys -t 7 "dev_init && $last_command; $cmd_prefix $last_lr $batch_size $last_ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1; echo 'Run completed with parameters: lr=$last_lr, batch_size=$batch_size, ftmode=$last_ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
 fi
 
 # Add the 9th pane with the brocm-smi.sh command
