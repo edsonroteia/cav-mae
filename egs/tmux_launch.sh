@@ -52,7 +52,7 @@ if [[ -n "$last_command" ]]; then
 fi
 
 # Add the 9th pane with the brocm-smi.sh command
-tmux send-keys -t 8 "bash ~/brocm-smi.sh" C-m
+tmux send-keys -t 8 "watch -n 1 bash ~/brocm-smi.sh" C-m
 
 # Attach to the tmux session (optional)
 tmux select-pane -t 0  # Move back to the first pane
