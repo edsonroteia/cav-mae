@@ -107,7 +107,7 @@ def print_report(results):
 
 def main():
     parser = argparse.ArgumentParser(description="Clean JSON files by removing entries with missing WAV files.")
-    parser.add_argument("folder", help="Path to the folder containing JSON files")
+    parser.add_argument("folders", nargs='+', help="Paths to folders containing JSON files")
     parser.add_argument("-v", "--verbose", action="store_true", help="Increase output verbosity")
     args = parser.parse_args()
 
@@ -116,18 +116,20 @@ def main():
     else:
         logging.getLogger().setLevel(logging.INFO)
 
-    folder_path = Path(args.folder)
+    all_results = []
+    for folder in args.folders:
+        folder_path = Path(folder)
+        if not folder_path.is_dir():
+            logging.error(f"Error: '{folder_path}' is not a valid directory.")
+            continue
 
-    if not folder_path.is_dir():
-        logging.error(f"Error: '{folder_path}' is not a valid directory.")
-        sys.exit(1)
-
-    results = process_json_files(folder_path)
+        results = process_json_files(folder_path)
+        all_results.extend(results)
     
-    if not results:
-        logging.warning("No JSON files were processed. Check if the folder contains JSON files.")
+    if not all_results:
+        logging.warning("No JSON files were processed. Check if the folders contain JSON files.")
     else:
-        print_report(results)
+        print_report(all_results)
 
 if __name__ == "__main__":
     main()
