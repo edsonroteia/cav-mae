@@ -565,7 +565,7 @@ class CAVMAE(nn.Module):
         v = v + self.pos_embed_v
         v = v + self.modality_v
 		
-batch_size = a.shape[0]
+        batch_size = a.shape[0]
 
         # Append cls tokens
         if self.cls_token:
