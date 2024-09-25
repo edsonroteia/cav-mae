@@ -16,7 +16,14 @@ ftmodes=(multimodal audioonly videoonly)
 cuda_devices=(0 1 2 3 4 5 6 7)  # Each run uses one GPU
 aggregate=${1:-self_attention_cls}
 freeze_base=${2:-True}
-num_samples=${3:-9999999}
+debug=${3:-False}
+if [ "$debug" = True ]; then
+  num_samples=48
+  num_epochs=1
+else
+  num_samples=9999999
+  num_epochs=25
+fi
 # Command to run in each pane
 cmd_prefix="bash egs/audioset/cluster_nodes/run_cavmae_ft_bal_sync.sh"
 
@@ -33,7 +40,7 @@ for lr in "${lrs[@]}"; do
   for ftmode in "${ftmodes[@]}"; do
     if [[ $pane -lt 7 ]]; then
       # Assign one job per GPU
-      tmux send-keys -t $pane "dev_init && $cmd_prefix $lr $batch_size $ftmode ${cuda_devices[$pane]} ${aggregate} $num_workers $freeze_base $num_samples; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[$pane]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples'" C-m
+      tmux send-keys -t $pane "dev_init && $cmd_prefix $lr $batch_size $ftmode ${cuda_devices[$pane]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[$pane]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
     else
       # Store the remaining command for the last GPU
       last_command="$cmd_prefix $lr $batch_size $ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base $num_samples; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples'"
