@@ -180,7 +180,7 @@ def train(audio_model, train_loader, test_loader, args, run):
             min_lr=args.lr * 0.1,
             max_lr=args.lr
         )
-        print('Using cosine annealing learning rate scheduler over {:d} epochs with minimum lr of {}}'.format(args.n_epochs, args.lr * 0.1))
+        print('Using cosine annealing learning rate scheduler over {:d} epochs with minimum lr of {:d}'.format(args.n_epochs, args.lr * 0.1))
     else:
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(args.n_epochs*0.5), int(args.n_epochs*0.75)], gamma=0.1)
         print('Using step learning rate scheduler with milestones at 50% and 75% of training, decay rate of 0.1')
