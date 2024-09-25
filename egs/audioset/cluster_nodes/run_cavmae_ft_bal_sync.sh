@@ -36,6 +36,7 @@ ftmode=${3:-multimodal}
 cuda_devices=${4:-0,1,2,3,4,5,6,7}
 aggregate=${5:-self_attention_cls}
 num_workers=${6:-48}
+num_samples=${8:-9999999}
 epoch=25
 lrscheduler_start=5
 lrscheduler_decay=0.5
@@ -74,4 +75,5 @@ CUDA_VISIBLE_DEVICES=${cuda_devices} CUDA_CACHE_DISABLE=1 python -W ignore src/r
 --wa ${wa} --wa_start ${wa_start} --wa_end ${wa_end} --lr_adapt ${lr_adapt} \
 --pretrain_path ${pretrain_path} --ftmode ${ftmode} \
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
---num-workers ${num_workers} --aggregate ${aggregate} --lr_scheduler ${lr_scheduler}
+--num-workers ${num_workers} --aggregate ${aggregate} --lr_scheduler ${lr_scheduler} \
+--num_samples ${num_samples}
