@@ -3,12 +3,12 @@
 # Create a new tmux window named 'job_run'
 tmux new-window -n 'job_run'
 
-# Split the window into 8 panes
-tmux select-layout tiled  # Ensures panes are tiled (you can adjust layout as per your preference)
-for i in {1..7}; do
+# Split the window into 9 panes
+tmux select-layout tiled
+for i in {1..8}; do
   tmux split-window -h
 done
-tmux select-layout tiled  # Make sure panes are arranged correctly
+tmux select-layout tiled
 
 # Declare arrays for the parameter variations
 lrs=(1e-2 1e-3 1e-4)
@@ -50,6 +50,9 @@ if [[ -n "$last_command" ]]; then
 
   tmux send-keys -t 7 "dev_init && $last_command; $cmd_prefix $last_lr $batch_size $last_ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base; echo 'Run completed with parameters: lr=$last_lr, batch_size=$batch_size, ftmode=$last_ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base'" C-m
 fi
+
+# Add the 9th pane with the brocm-smi.sh command
+tmux send-keys -t 8 "bash ~/brocm-smi.sh" C-m
 
 # Attach to the tmux session (optional)
 tmux select-pane -t 0  # Move back to the first pane
