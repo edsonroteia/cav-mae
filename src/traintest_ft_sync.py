@@ -124,13 +124,25 @@ def train(audio_model, train_loader, test_loader, args, run):
 
     # possible mlp layer name list, mlp layers are newly initialized layers in the finetuning stage (i.e., not pretrained) and should use a larger lr during finetuning
     mlp_list = ['mlp_head.0.weight', 'mlp_head.0.bias', 'mlp_head.1.weight', 'mlp_head.1.bias',
-                'mlp_head2.0.weight', 'mlp_head2.0.bias', 'mlp_head2.1.weight', 'mlp_head2.1.bias',
-                'mlp_head_a.0.weight', 'mlp_head_a.0.bias', 'mlp_head_a.1.weight', 'mlp_head_a.1.bias',
-                'mlp_head_v.0.weight', 'mlp_head_v.0.bias', 'mlp_head_v.1.weight', 'mlp_head_v.1.bias',
-                'mlp_head_concat.0.weight', 'mlp_head_concat.0.bias', 'mlp_head_concat.1.weight', 'mlp_head_concat.1.bias']
-    mlp_params = list(filter(lambda kv: kv[0] in mlp_list, audio_model.module.named_parameters()))
-    base_params = list(filter(lambda kv: kv[0] not in mlp_list, audio_model.module.named_parameters()))
-    mlp_params = [i[1] for i in mlp_params]
+                'mlp_head.3.weight', 'mlp_head.3.bias', 'mlp_head.5.weight', 'mlp_head.5.bias',
+                'mlp_head.7.weight', 'mlp_head.7.bias']
+    concat_mlp_list = ['mlp_head.0.weight', 'mlp_head.0.bias', 'mlp_head.1.weight', 'mlp_head.1.bias',
+                       'mlp_head.3.weight', 'mlp_head.3.bias', 'mlp_head.5.weight', 'mlp_head.5.bias',
+                       'mlp_head.7.weight', 'mlp_head.7.bias']
+    transformer_cls_list = ['cls_token', 'classifier_layers.0.weight', 'classifier_layers.0.bias',
+                            'classifier_layers.1.weight', 'classifier_layers.1.bias',
+                            'classifier_norm.weight', 'classifier_norm.bias',
+                            'classifier_head.weight', 'classifier_head.bias']
+
+    if args.aggregate == 'concat_mlp':
+        cls_params = list(filter(lambda kv: kv[0] in concat_mlp_list, audio_model.module.named_parameters()))
+    elif args.aggregate == 'self_attention_cls':
+        cls_params = list(filter(lambda kv: kv[0] in transformer_cls_list, audio_model.module.named_parameters()))
+    else:
+        cls_params = list(filter(lambda kv: kv[0] in mlp_list, audio_model.module.named_parameters()))
+
+    base_params = list(filter(lambda kv: kv[0] not in (mlp_list + concat_mlp_list + transformer_cls_list), audio_model.module.named_parameters()))
+    cls_params = [i[1] for i in cls_params]
     base_params = [i[1] for i in base_params]
 
     # if freeze the pretrained parameters and only train the newly initialized model (linear probing)
@@ -144,13 +156,13 @@ def train(audio_model, train_loader, test_loader, args, run):
     print('Total trainable parameter number is : {:.3f} million'.format(sum(p.numel() for p in trainables) / 1e6))
 
     print('The newly initialized mlp layer uses {:.3f} x larger lr'.format(args.head_lr))
-    optimizer = torch.optim.Adam([{'params': base_params, 'lr': args.lr}, {'params': mlp_params, 'lr': args.lr * args.head_lr}], weight_decay=5e-7, betas=(0.95, 0.999))
+    optimizer = torch.optim.Adam([{'params': base_params, 'lr': args.lr}, {'params': cls_params, 'lr': args.lr * args.head_lr}], weight_decay=5e-7, betas=(0.95, 0.999))
     base_lr = optimizer.param_groups[0]['lr']
     mlp_lr = optimizer.param_groups[1]['lr']
     lr_list = [args.lr, mlp_lr]
     print('base lr, mlp lr : ', base_lr, mlp_lr)
 
-    print('Total newly initialized MLP parameter number is : {:.3f} million'.format(sum(p.numel() for p in mlp_params) / 1e6))
+    print('Total newly initialized MLP parameter number is : {:.3f} million'.format(sum(p.numel() for p in cls_params) / 1e6))
     print('Total pretrained backbone parameter number is : {:.3f} million'.format(sum(p.numel() for p in base_params) / 1e6))
 
     # Configure learning rate scheduler
@@ -168,7 +180,7 @@ def train(audio_model, train_loader, test_loader, args, run):
             min_lr=args.lr * 0.1,
             max_lr=args.lr
         )
-        print('Using cosine annealing learning rate scheduler over {:d} epochs with minimum lr of 1e-6'.format(args.n_epochs))
+        print('Using cosine annealing learning rate scheduler over {:d} epochs with minimum lr of {}}'.format(args.n_epochs, args.lr * 0.1))
     else:
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[int(args.n_epochs*0.5), int(args.n_epochs*0.75)], gamma=0.1)
         print('Using step learning rate scheduler with milestones at 50% and 75% of training, decay rate of 0.1')
