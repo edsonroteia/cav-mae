@@ -10,7 +10,7 @@
 import argparse
 import os
 import models
-import dataloader as dataloader
+import dataloader_loc as dataloader
 import torch
 import numpy as np
 from torch.cuda.amp import autocast
@@ -59,6 +59,8 @@ def unnormalize(img, mean, std):
     return img.clamp(0, 1)  # Clamp to make sure image range is between 0 and 1
 
 # direction: 'audio' means audio->visual retrieval, 'video' means visual->audio retrieval
+import os  # Add this import at the top of the file if it's not already there
+
 def get_localization_result(audio_model, val_loader):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if not isinstance(audio_model, nn.DataParallel):
@@ -68,6 +70,10 @@ def get_localization_result(audio_model, val_loader):
 
     A_a_feat, A_v_feat = [], []
     ious = []
+
+    # Create the directory if it doesn't exist
+    os.makedirs("85_imgs", exist_ok=True)
+
     with torch.no_grad():
         for i, (a_input, v_input, labels, bboxes) in enumerate(tqdm(val_loader)):
             audio_input, video_input = a_input.to(device), v_input.to(device)
@@ -179,12 +185,12 @@ def eval_localization(model, data, audio_conf, label_csv, num_class, model_type=
     return iou
 
 # use cav-mae scale 108 (batch size) model that has only been pretrained
-model = '/home/edson/code/cav-mae/pretrained_model/85.pth'
+model = '/local/1314365/code/cav-mae/cav-mae-scale++.pth'
 res = []
 
 # for vggsound
-data = '/data1/edson/datasets/VGGSS/sample_data.json'
-label_csv = '/data1/edson/datasets/VGGSS/class_labels_indices_vgg.csv'
+data = 'datafilles/vggsound/cluster_nodes/vgs_test_localization.json'
+label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
 dataset = 'vggsound'
 audio_conf = {'num_mel_bins': 128, 'target_length': 1024, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
                 'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5}
