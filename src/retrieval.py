@@ -94,7 +94,7 @@ def print_computed_metrics(metrics):
     print('R@1: {:.4f} - R@5: {:.4f} - R@10: {:.4f} - Median R: {}'.format(r1, r5, r10, mr))
 
 # direction: 'audio' means audio->visual retrieval, 'video' means visual->audio retrieval
-def get_retrieval_result(audio_model, val_loader, direction='audio', model_type='pretrain', strategy='max', cls_token=False):
+def get_retrieval_result(audio_model, val_loader, direction='audio', model_type='pretrain', strategy='max', cls_token=False, local_matching=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if not isinstance(audio_model, nn.DataParallel):
         audio_model = nn.DataParallel(audio_model)
@@ -105,26 +105,31 @@ def get_retrieval_result(audio_model, val_loader, direction='audio', model_type=
     with torch.no_grad():
         # Add tqdm progress bar
         for i, batch in tqdm(enumerate(val_loader), total=len(val_loader), desc="Processing batches"):
-            if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers':
+            if 'sync' in model_type:
                 a_input, v_input, labels, video_id, frame_indices = batch
             else:
                 (a_input, v_input, labels) = batch
             if i == 0:
                 print("A_shape", a_input.shape)
                 print("V_shape", v_input.shape)
-            if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers':
+            if 'sync' in model_type:
                 # flatten batch so we process all frames at the same time
                 a_input = a_input.reshape(a_input.shape[0] * a_input.shape[1], a_input.shape[2], a_input.shape[3])
                 v_input = v_input.reshape(v_input.shape[0] * v_input.shape[1], v_input.shape[2], v_input.shape[3], v_input.shape[4])
 
             audio_input, video_input = a_input.to(device), v_input.to(device)
             with autocast():
-                audio_output, video_output = audio_model.module.forward_feat(audio_input, video_input)
                 if cls_token:
-                    audio_output = audio_output[:, 0]
-                    video_output = video_output[:, 0]
+                    tokens_audio_output, tokens_video_output, cls_audio_output, cls_video_output = audio_model.module.forward_feat(audio_input, video_input)
+                    if local_matching:
+                        audio_output = torch.mean(tokens_audio_output, dim=1)
+                        video_output = torch.mean(tokens_video_output, dim=1)
+                    else:
+                        audio_output = cls_audio_output
+                        video_output = cls_video_output
                 else:
                     # mean pool all patches
+                    audio_output, video_output = audio_model.module.forward_feat(audio_input, video_input)
                     audio_output = torch.mean(audio_output, dim=1)
                     video_output = torch.mean(video_output, dim=1)
                 # normalization
@@ -133,7 +138,7 @@ def get_retrieval_result(audio_model, val_loader, direction='audio', model_type=
             audio_output = audio_output.to('cpu').detach()
             video_output = video_output.to('cpu').detach()
             
-            if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers':
+            if 'sync' in model_type:
                 # Group features from the same video together
                 num_frames = audio_output.shape[0] // len(video_id)
                 audio_output = audio_output.view(len(video_id), num_frames, -1)
@@ -145,28 +150,33 @@ def get_retrieval_result(audio_model, val_loader, direction='audio', model_type=
     A_v_feat = torch.cat(A_v_feat)
     if direction == 'audio':
         # audio->visual retrieval
-        sim_mat = get_agg_sim_mat(A_a_feat, A_v_feat, strategy=strategy) if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers' else get_sim_mat(A_a_feat, A_v_feat)
+        sim_mat = get_agg_sim_mat(A_a_feat, A_v_feat, strategy=strategy) if 'sync' in model_type else get_sim_mat(A_a_feat, A_v_feat)
     elif direction == 'video':
         # visual->audio retrieval
-        sim_mat = get_agg_sim_mat(A_v_feat, A_a_feat, strategy=strategy) if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers' else get_sim_mat(A_v_feat, A_a_feat)
+        sim_mat = get_agg_sim_mat(A_v_feat, A_a_feat, strategy=strategy) if 'sync' in model_type else get_sim_mat(A_v_feat, A_a_feat)
     result = compute_metrics(sim_mat)
     print_computed_metrics(result)
     return result['R1'], result['R5'], result['R10'], result['MR']
 
-def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, model_type='pretrain' or 'sync_pretrain' or 'sync_pretrain_registers', batch_size=48, strategy='max', num_register_tokens=4, cls_token=False):
+def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, model_type='pretrain', batch_size=48, strategy='max', num_register_tokens=4, cls_token=False, local_matching=False):
     print(model)
     print(data)
     frame_use = 5
     # eval setting
     val_audio_conf = audio_conf
     val_audio_conf['frame_use'] = frame_use
-    if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers':
+    if 'sync' in model_type:
         val_loader = torch.utils.data.DataLoader(dataloader_sync.AudiosetDataset(data, label_csv=label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True, collate_fn=train_collate_fn)
     else:
         val_loader = torch.utils.data.DataLoader(dataloader.AudiosetDataset(data, label_csv=label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
     # cav-mae only been ssl pretrained
+
     if model_type == 'sync_pretrain_registers':
         audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens)
+    elif model_type == 'sync_pretrain_registers_cls':
+        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens, cls_token=True)
+    elif model_type == 'sync_pretrain_registers_cls_global_local':
+        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens, cls_token=True, global_local_losses=True)
     elif model_type == 'sync_pretrain':
         audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=0)
     elif model_type == 'pretrain':
@@ -180,7 +190,7 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     msg = audio_model.load_state_dict(sdA, strict=False)
     print(msg)
     audio_model.eval()
-    r1, r5, r10, mr = get_retrieval_result(audio_model, val_loader, direction, model_type, strategy, cls_token)
+    r1, r5, r10, mr = get_retrieval_result(audio_model, val_loader, direction, model_type, strategy, cls_token, local_matching)
     return r1 * 100, r5 * 100, r10 * 100, mr
 
 if __name__ == "__main__": 
@@ -243,9 +253,17 @@ if __name__ == "__main__":
         # 'model_1919_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.05-p1.0-tpFalse-mr-unstructured-0.75-20240920_201244/models/best_audio_model.pth',
         # 'model_1920_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr4e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240920_201543/models/audio_model.25.pth',
         # 'model_1920_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr4e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240920_201543/models/best_audio_model.pth',
-        'model_1983_25': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240922_222603/models/audio_model.25.pth',
-        'model_1983_best': '/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240922_222603/models/best_audio_model.pth',
+        # 'model_1919_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.05-p1.0-tpFalse-mr-unstructured-0.75-20240920_201244/models/audio_model.25.pth', 'sync_pretrain_registers'),
+        # 'model_1970_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240922_181136/models/audio_model.25.pth', 'sync_pretrain_registers'),
+        # 'model_1983_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240922_222603/models/audio_model.25.pth', 'sync_pretrain_registers_cls'),
+        # 'model_1984_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.05-p1.0-tpFalse-mr-unstructured-0.75-20240922_222719/models/audio_model.25.pth', 'sync_pretrain_registers_cls'),
+        # 'model_2145_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240925_112229/models/audio_model.25.pth', 'sync_pretrain_registers_cls_global_local'),
+        # 'model_2145_25_local': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240925_112229/models/audio_model.25.pth', 'sync_pretrain_registers_cls_global_local'),
+        # 'model_2145_25_both': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240925_112229/models/audio_model.25.pth', 'sync_pretrain_registers_cls_global_local'),
+        # 'cav_mae++': ('/local/1314365/code/cav-mae/cav-mae-scale++.pth', 'pretrain'),
+        'cav_mae+': ('/local/1314365/code/cav-mae/cav-mae-scale+.pth', 'pretrain'),
         }
+    
     if len(model_names) == 0:
         print("Model names dictionary is empty. Searching for models in /scratch/ssml/araujo/exp/")
         base_dir = '/scratch/ssml/araujo/exp/'
@@ -264,10 +282,7 @@ if __name__ == "__main__":
         
         print(f"Found {len(model_names)} models to evaluate.")
 
-    if model_type == 'sync_pretrain' or model_type == 'sync_pretrain_registers':
-        target_length = 96
-    else:
-        target_length = 1024
+
 
     res = []
 
@@ -283,12 +298,25 @@ if __name__ == "__main__":
         print(f"Unsupported dataset: {dataset}")
         exit(1)
 
-    for model_name, model_path in tqdm(model_names.items(), desc=f"Processing models for {dataset}"):
-        for direction in tqdm(directions, desc="Evaluating directions", leave=False):
-            for num_samples in tqdm(nums_samples, desc="Testing sample sizes", leave=False):    
+    for num_samples in tqdm(nums_samples, desc="Testing sample sizes"):
+        for model_name, (model_path, model_type) in tqdm(model_names.items(), desc=f"Processing models for {dataset}", leave=False):
+            if 'sync' in model_type:
+                target_length = 96
+            else:
+                target_length = 1024
+
+            if 'cls' in model_type:
+                cls_token = True
+            else:
+                cls_token = False
+            
+            for direction in tqdm(directions, desc="Evaluating directions", leave=False):
                 audio_conf = {'num_mel_bins': 128, 'target_length': target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
                             'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5, 'num_samples': num_samples}
-                r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, strategy=strategy, num_register_tokens=num_register_tokens, cls_token=cls_token)
+                if 'local' in model_name:
+                    r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, strategy=strategy, num_register_tokens=8 if '1970' in model_name else 4, cls_token=cls_token, local_matching=True)
+                else:
+                    r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, strategy=strategy, num_register_tokens=8 if '1970' in model_name else 4, cls_token=cls_token, local_matching=False)
                 res.append([model_name, dataset, direction, num_samples, r1, r5, r10, mr])
                 res_sorted = sorted(res, key=lambda x: x[-1])  # Sort by MR
                 print("\nCurrent Results Table:")
