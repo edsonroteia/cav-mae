@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# if help is called, print the usage with the default values
+if [ "$1" = "-h" ]; then
+  echo "Usage: $0 [aggregate] [freeze_base] [debug] [model_name] [cls_token]"
+  echo "Default values: aggregate=self_attention_cls, freeze_base=True, debug=False, model_name=model_2145, cls_token=False"
+  exit 0
+fi
+
 # Create a new tmux window named 'job_run'
 tmux new-window -n 'job_run'
 
@@ -51,7 +58,7 @@ get_model_path() {
 
 # Get the pretrain_path
 pretrain_path=$(get_model_path "$model_name")
-
+cls_token=${5:-False}
 if [ -z "$pretrain_path" ]; then
     echo "Error: Model $model_name not found in models.csv"
     exit 1
@@ -74,10 +81,10 @@ for lr in "${lrs[@]}"; do
   for ftmode in "${ftmodes[@]}"; do
     if [[ $pane -lt 7 ]]; then
       # Assign one job per GPU
-      tmux send-keys -t $pane "dev_init && $cmd_prefix $lr $batch_size $ftmode ${cuda_devices[$pane]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[$pane]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
+      tmux send-keys -t $pane "dev_init && $cmd_prefix $lr $batch_size $ftmode ${cuda_devices[$pane]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path $cls_token; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[$pane]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
     else
       # Store the remaining command for the last GPU
-      last_command="$cmd_prefix $lr $batch_size $ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'"
+      last_command="$cmd_prefix $lr $batch_size $ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path $cls_token; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'"
     fi
     ((pane++))
   done
@@ -89,7 +96,7 @@ if [[ -n "$last_command" ]]; then
   last_lr=${lrs[-1]}           # Last element of the lrs array
   last_ftmode=${ftmodes[-1]}   # Last element of the ftmodes array
 
-  tmux send-keys -t 7 "dev_init && $last_command; $cmd_prefix $last_lr $batch_size $last_ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1; echo 'Run completed with parameters: lr=$last_lr, batch_size=$batch_size, ftmode=$last_ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
+  tmux send-keys -t 7 "dev_init && $last_command; $cmd_prefix $last_lr $batch_size $last_ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path $cls_token; echo 'Run completed with parameters: lr=$last_lr, batch_size=$batch_size, ftmode=$last_ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
 fi
 
 # Add the 9th pane with the brocm-smi.sh command

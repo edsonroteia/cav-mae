@@ -57,7 +57,7 @@ timem=192
 mixup=0.5
 label_smooth=0.1
 lr_scheduler=cosine
-
+cls_token=${12:-False}
 
 dataset=audioset
 tr_data=datafilles/audioset_20k/cluster_nodes/audioset_20k_cleaned.json
@@ -80,4 +80,4 @@ CUDA_VISIBLE_DEVICES=${cuda_devices} CUDA_CACHE_DISABLE=1 python -W ignore src/r
 --pretrain_path ${pretrain_path} --ftmode ${ftmode} \
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
 --num-workers ${num_workers} --aggregate ${aggregate} --lr_scheduler ${lr_scheduler} \
---num_samples ${num_samples} --neptune_tag ${neptune_tag}
+--num_samples ${num_samples} --neptune_tag ${neptune_tag} --cls_token ${cls_token}

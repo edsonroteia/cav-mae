@@ -96,6 +96,7 @@ parser.add_argument("--n_register_tokens", type=int, default=4)
 parser.add_argument("--augmentation", type=ast.literal_eval, default=True)
 
 parser.add_argument("--neptune_tag", type=str, default="finetuning")
+parser.add_argument("--cls_token", type=ast.literal_eval, default=True)
 args = parser.parse_args()
 
 run = neptune.init_run(
@@ -169,7 +170,7 @@ if args.data_eval != None:
 
 if args.model == 'cav-mae-ft':
     print('finetune a cav-mae model with 11 modality-specific layers and 1 modality-sharing layers')
-    audio_model = models.CAVMAEFTSync(audio_length=args.target_length, label_dim=args.n_class, modality_specific_depth=11, aggregate=args.aggregate, num_register_tokens=args.n_register_tokens)
+    audio_model = models.CAVMAEFTSync(audio_length=args.target_length, label_dim=args.n_class, modality_specific_depth=11, aggregate=args.aggregate, num_register_tokens=args.n_register_tokens, cls_token=args.cls_token)
 else:
     raise ValueError('model not supported')
 
