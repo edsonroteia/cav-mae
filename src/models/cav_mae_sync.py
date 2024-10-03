@@ -173,6 +173,10 @@ class CAVMAE(nn.Module):
         w = self.patch_embed_v.proj.weight.data
         torch.nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
 
+        if self.cls_token:
+            torch.nn.init.normal_(self.cls_token_a, std=.02)
+            torch.nn.init.normal_(self.cls_token_v, std=.02)
+
         # timm's trunc_normal_(std=.02) is effectively normal_(std=0.02) as cutoff is too big (2.)
         torch.nn.init.normal_(self.modality_a, std=.02)
         torch.nn.init.normal_(self.modality_v, std=.02)
@@ -596,20 +600,31 @@ class CAVMAE(nn.Module):
             a = a[:, :-self.num_register_tokens, :]
             v = v[:, :-self.num_register_tokens, :]
         
-        # use modality specific normalization,
         for blk in self.blocks_u:
-            a = blk(a, 'a')
-        a = self.norm_a(a)
+            ca = blk(a, 'a')
+        for blk in self.blocks_u:
+            cv = blk(v, 'v')
+        
+        if self.cls_token:
+            # split the local patch tokens from the cls tokens
+            #cls tokens
+            cls_a = self.norm_a(ca[:, 0, :].squeeze())  # This gets the audio CLS token from ca
+            cls_v = self.norm_v(cv[:, 0, :].squeeze())  # This gets the visual CLS token from cv
+            # local patch tokens
+            ca = self.norm_a(ca[:, 1:, :])
+            cv = self.norm_v(cv[:, 1:, :])
 
-        for blk in self.blocks_u:
-            v = blk(v, 'v')
-        v = self.norm_v(v)
-        return a, v
+            return ca, cv, cls_a, cls_v
+        else:
+            ca = self.norm_a(ca)
+            cv = self.norm_v(cv)
+
+        return ca, cv
 
 # the finetuned CAV-MAE model
 class CAVMAEFT(nn.Module):
     def __init__(self, label_dim, img_size=224, audio_length=1024, patch_size=16, in_chans=3,
-                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True, aggregate='None', num_register_tokens=0):
+                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True, aggregate='None', num_register_tokens=0, cls_token=False):
         super().__init__()
         timm.models.vision_transformer.Block = Block
         print('Use norm_pix_loss: ', norm_pix_loss)
@@ -643,6 +658,12 @@ class CAVMAEFT(nn.Module):
         self.norm_v = norm_layer(embed_dim)
         self.norm = norm_layer(embed_dim)
 
+        self.cls_token = cls_token
+        if self.cls_token:
+            print("Using CLS Token")
+            self.cls_token_a = nn.Parameter(torch.randn(1, 1, embed_dim))
+            self.cls_token_v = nn.Parameter(torch.randn(1, 1, embed_dim))
+
         if self.aggregate == "concat_mlp":
             self.mlp_head = nn.Sequential(
                 nn.LayerNorm(embed_dim * 10),
@@ -655,7 +676,7 @@ class CAVMAEFT(nn.Module):
                 nn.Linear(embed_dim, label_dim)
             )
         elif self.aggregate == "self_attention_cls":
-            self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
+            self.cls_cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
             self.classifier_layers = nn.ModuleList([
                 Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer)
                 for _ in range(2)  # You can adjust the number of layers as needed
@@ -689,6 +710,10 @@ class CAVMAEFT(nn.Module):
         w = self.patch_embed_v.proj.weight.data
         torch.nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
 
+        if self.cls_token:
+            torch.nn.init.normal_(self.cls_token_a, std=.02)
+            torch.nn.init.normal_(self.cls_token_v, std=.02)
+
         torch.nn.init.normal_(self.modality_a, std=.02)
         torch.nn.init.normal_(self.modality_v, std=.02)
 
@@ -717,6 +742,14 @@ class CAVMAEFT(nn.Module):
             v = v + self.pos_embed_v
             v = v + self.modality_v
 
+            #Append CLS tokens
+            if self.cls_token:
+                cls_tokens_a = self.cls_token_a.expand(batch_size, -1, -1)
+                cls_tokens_v = self.cls_token_v.expand(batch_size, -1, -1)
+
+                a = torch.cat([cls_tokens_a, a], dim=1)
+                v = torch.cat([cls_tokens_v, v], dim=1)
+
             # Append register tokens
             if self.num_register_tokens > 0:
                 batch_size = a.shape[0]
@@ -737,7 +770,11 @@ class CAVMAEFT(nn.Module):
                 a = a[:, :-self.num_register_tokens, :]
                 v = v[:, :-self.num_register_tokens, :]
 
-            x = torch.cat((a, v), dim=1)
+            num_a_tokens = a.shape[1]  # Includes CLS_A
+            num_v_tokens = v.shape[1]  # Includes CLS_V
+
+            # Concatenate audio and visual tokens without cls tokens
+            x = torch.cat((a, v), dim=1) 
 
             for blk in self.blocks_u:
                 x = blk(x)
@@ -750,9 +787,15 @@ class CAVMAEFT(nn.Module):
                 
                 # Average across patches
                 x = x.mean(dim=2)
-                
+                # if backbone had a cls_token, initialize the ft cls token with the average of the cls tokens from each modality
+                # if self.cls_token:
+                #     cls_tokens_a = x[:, 0, :].mean(dim=1)
+                #     cls_tokens_v = x[:, len(),:].mean(dim=1)
+                #     cls_tokens = torch.cat((cls_tokens_a, cls_tokens_v), dim=1)
+                #     cls_tokens = cls_tokens.unsqueeze(1)
+                #     x = torch.cat((cls_tokens, x), dim=2)
                 # Add CLS token
-                cls_tokens = self.cls_token.expand(batch_size, -1, -1)
+                cls_tokens = self.cls_cls_token.expand(batch_size, -1, -1)
                 x = torch.cat((cls_tokens, x), dim=1)
                 
                 # Apply classifier layers
@@ -803,7 +846,7 @@ class CAVMAEFT(nn.Module):
                 a = a.mean(dim=2)
                 
                 # Add CLS token
-                cls_tokens = self.cls_token.expand(batch_size, -1, -1)
+                cls_tokens = self.cls_cls_token.expand(batch_size, -1, -1)
                 a = torch.cat((cls_tokens, a), dim=1)
                 
                 # Apply classifier layers
@@ -852,7 +895,7 @@ class CAVMAEFT(nn.Module):
                 v = v.mean(dim=2)
                 
                 # Add CLS token
-                cls_tokens = self.cls_token.expand(batch_size, -1, -1)
+                cls_tokens = self.cls_cls_token.expand(batch_size, -1, -1)
                 v = torch.cat((cls_tokens, v), dim=1)
                 
                 # Apply classifier layers
