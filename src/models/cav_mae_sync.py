@@ -742,6 +742,8 @@ class CAVMAEFT(nn.Module):
             v = v + self.pos_embed_v
             v = v + self.modality_v
 
+            batch_size = a.shape[0]
+
             #Append CLS tokens
             if self.cls_token:
                 cls_tokens_a = self.cls_token_a.expand(batch_size, -1, -1)

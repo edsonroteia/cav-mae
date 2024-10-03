@@ -10,17 +10,17 @@ fi
 # Create a new tmux window named 'job_run'
 tmux new-window -n 'job_run'
 
-# Split the window into 9 panes
+# Split the window into 7 panes
 tmux select-layout tiled
-for i in {1..8}; do
+for i in {1..6}; do
   tmux split-window -h
 done
 tmux select-layout tiled
 
 # Declare arrays for the parameter variations
-lrs=(1e-2 1e-3 1e-4)
+lrs=(1e-3 1e-4)
 ftmodes=(multimodal audioonly videoonly)
-cuda_devices=(0 1 2 3 4 5 6 7)  # Each run uses one GPU
+cuda_devices=('0,1' 2 3 '4,5' 6 7)  # Each run uses one GPU
 # Parse command line arguments
 aggregate=${1:-self_attention_cls}
 freeze_base=${2:-True}
@@ -74,33 +74,31 @@ num_workers=8
 
 # Start running commands in each pane
 pane=0
-last_command=""
 
 # Loop through learning rates and feature modes
 for lr in "${lrs[@]}"; do
   for ftmode in "${ftmodes[@]}"; do
-    if [[ $pane -lt 7 ]]; then
-      # Assign one job per GPU
-      tmux send-keys -t $pane "dev_init && $cmd_prefix $lr $batch_size $ftmode ${cuda_devices[$pane]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path $cls_token; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[$pane]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
-    else
-      # Store the remaining command for the last GPU
-      last_command="$cmd_prefix $lr $batch_size $ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path $cls_token; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'"
-    fi
+    # Assign GPU based on pane number
+    case $pane in
+      0) cuda_device=${cuda_devices[0]} ;; # 0,1
+      1) cuda_device=${cuda_devices[1]} ;; # 2
+      2) cuda_device=${cuda_devices[2]} ;; # 3
+      3) cuda_device=${cuda_devices[3]} ;; # 4,5
+      4) cuda_device=${cuda_devices[4]} ;; # 6
+      5) cuda_device=${cuda_devices[5]} ;; # 7
+    esac
+    
+    # Print the process information
+    echo "Launching process: lr=$lr, ftmode=$ftmode on GPU(s) $cuda_device"
+    
+    tmux send-keys -t $pane "echo 'Launching process: lr=$lr, ftmode=$ftmode on GPU(s) $cuda_device' && dev_init && $cmd_prefix $lr $batch_size $ftmode $cuda_device ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path $cls_token; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=$cuda_device, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
+    
     ((pane++))
   done
 done
 
-# For the last pane (pane 7), run two jobs on the same GPU (using CUDA device 7)
-if [[ -n "$last_command" ]]; then
-  # Dynamically use the last elements from the arrays
-  last_lr=${lrs[-1]}           # Last element of the lrs array
-  last_ftmode=${ftmodes[-1]}   # Last element of the ftmodes array
-
-  tmux send-keys -t 7 "dev_init && $last_command; $cmd_prefix $last_lr $batch_size $last_ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path $cls_token; echo 'Run completed with parameters: lr=$last_lr, batch_size=$batch_size, ftmode=$last_ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
-fi
-
-# Add the 9th pane with the brocm-smi.sh command
-tmux send-keys -t 8 "watch -n 1 bash ~/brocm-smi.sh" C-m
+# Add the 7th pane with the brocm-smi.sh command
+tmux send-keys -t 6 "watch -n 1 bash ~/brocm-smi.sh" C-m
 
 # Attach to the tmux session (optional)
 tmux select-pane -t 0  # Move back to the first pane
