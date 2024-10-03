@@ -17,8 +17,10 @@ model=cav-mae-ft
 
 # you can replace with any checkpoint you want, but by default, we use cav-mae-scale++
 # pretrain_dir=/local/$SLURM_JOB_ID/models/
-pretrain_dir=/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/
-pretrain_path=${pretrain_dir}/audio_model.25.pth
+# pretrain_dir=/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/
+#receive pretrain_dir as argument
+pretrain_path=${11:-/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/audio_model.25.pth}
+# pretrain_path=${pretrain_dir}/audio_model.25.pth
 # pretrain_path=${pretrain_dir}/best_audio_model.pth
 
 freeze_base=${7:-True}

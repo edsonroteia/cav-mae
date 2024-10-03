@@ -39,6 +39,28 @@ echo "Number of epochs: $num_epochs"
 cmd_prefix="bash egs/audioset/cluster_nodes/run_cavmae_ft_bal_sync.sh"
 
 neptune_tag1=aggr_${aggregate}_freeze_${freeze_base}
+# get pretrain_path from models.csv
+# Read the model name from command line argument
+model_name=${4:-model_2145}  # Default to model_2145 if not provided
+
+# Function to get the path for a given model name
+get_model_path() {
+    local model=$1
+    awk -F ',' -v model="$model" '$1 == model {print $2}' models.csv
+}
+
+# Get the pretrain_path
+pretrain_path=$(get_model_path "$model_name")
+
+if [ -z "$pretrain_path" ]; then
+    echo "Error: Model $model_name not found in models.csv"
+    exit 1
+fi
+
+echo "Using model name: $model_name"
+echo "Using pretrain_path: $pretrain_path"
+
+
 # Arguments that remain constant across all runs
 batch_size=48
 num_workers=8
@@ -52,10 +74,10 @@ for lr in "${lrs[@]}"; do
   for ftmode in "${ftmodes[@]}"; do
     if [[ $pane -lt 7 ]]; then
       # Assign one job per GPU
-      tmux send-keys -t $pane "dev_init && $cmd_prefix $lr $batch_size $ftmode ${cuda_devices[$pane]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[$pane]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
+      tmux send-keys -t $pane "dev_init && $cmd_prefix $lr $batch_size $ftmode ${cuda_devices[$pane]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[$pane]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
     else
       # Store the remaining command for the last GPU
-      last_command="$cmd_prefix $lr $batch_size $ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'"
+      last_command="$cmd_prefix $lr $batch_size $ftmode ${cuda_devices[7]} ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=${cuda_devices[7]}, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'"
     fi
     ((pane++))
   done
