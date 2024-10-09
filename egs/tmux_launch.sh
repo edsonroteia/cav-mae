@@ -56,6 +56,11 @@ get_model_path() {
     awk -F ',' -v model="$model" '$1 == model {print $2}' models.csv
 }
 
+get_num_register_tokens() {
+    local model=$1
+    awk -F ',' -v model="$model" '$1 == model {print $3}' models.csv
+}
+
 # Get the pretrain_path
 pretrain_path=$(get_model_path "$model_name")
 cls_token=${5:-False}
@@ -63,10 +68,12 @@ if [ -z "$pretrain_path" ]; then
     echo "Error: Model $model_name not found in models.csv"
     exit 1
 fi
+# Get the number of register tokens
+num_register_tokens=$(get_num_register_tokens "$model_name")
 
 echo "Using model name: $model_name"
 echo "Using pretrain_path: $pretrain_path"
-
+echo "Using num_register_tokens: $num_register_tokens"
 
 # Arguments that remain constant across all runs
 batch_size=48
@@ -91,7 +98,7 @@ for lr in "${lrs[@]}"; do
     # Print the process information
     echo "Launching process: lr=$lr, ftmode=$ftmode on GPU(s) $cuda_device"
     
-    tmux send-keys -t $pane "echo 'Launching process: lr=$lr, ftmode=$ftmode on GPU(s) $cuda_device' && dev_init && $cmd_prefix $lr $batch_size $ftmode $cuda_device ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path $cls_token; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=$cuda_device, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs'" C-m
+    tmux send-keys -t $pane "echo 'Launching process: lr=$lr, ftmode=$ftmode on GPU(s) $cuda_device' && dev_init && $cmd_prefix $lr $batch_size $ftmode $cuda_device ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path $cls_token $num_register_tokens; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=$cuda_device, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs, num_register_tokens=$num_register_tokens'" C-m
     
     ((pane++))
   done
