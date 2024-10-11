@@ -252,7 +252,10 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
 
         pbar.close()
         print('start validation')
-        eval_loss_av, eval_loss_mae, eval_loss_mae_a, eval_loss_mae_v, eval_loss_c, eval_loss_global, eval_loss_local, eval_accuracies = validate(audio_model, test_loader, args, run, global_step)
+        if args.global_local_losses:
+            eval_loss_av, eval_loss_mae, eval_loss_mae_a, eval_loss_mae_v, eval_loss_c, eval_loss_global, eval_loss_local, eval_accuracies = validate(audio_model, test_loader, args, run, global_step)
+        else:
+            eval_loss_av, eval_loss_mae, eval_loss_mae_a, eval_loss_mae_v, eval_loss_c, eval_accuracies = validate(audio_model, test_loader, args, run, global_step)
 
         print("Eval Audio MAE Loss: {:.6f}".format(eval_loss_mae_a))
         print("Eval Visual MAE Loss: {:.6f}".format(eval_loss_mae_v))
