@@ -32,18 +32,31 @@ lrscheduler_decay=0.5
 lrscheduler_step=5
 dataset_mean=-5.081
 dataset_std=4.4849
-target_length=96
 noise=True
 mixup=0.0
 batch_size=512
 lr_adapt=False
 lr_scheduler=cosine
-n_regster_tokens=4
 
-cls_token=True
+# print manual arguments if any or if help is requested
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    echo "Usage: $0 [target_length] [n_regster_tokens] [cls_token] [global_local_losses]"
+    exit 0
+fi
+if [ $# -gt 0 ]; then
+    echo "Manual arguments:"
+    echo "target_length: $1"
+echo "n_regster_tokens: $2"
+    echo "cls_token: $3"
+    echo "global_local_losses: $4"
+fi
 
+# receive target_length, n_regster_tokens, cls_token, global_local_losses as arguments
+target_length=${1:-96}
+n_regster_tokens=${2:-0}
+cls_token=${3:-False}
+global_local_losses=${4:-False}
 
-global_local_losses=True
 dataset=audioset
 tr_data=datafilles/audioset_2m/cluster_nodes/audioset_2m_cleaned_aug24.json
 te_data=datafilles/audioset_2m/cluster_nodes/audioset_eval_cleaned_aug24.json
