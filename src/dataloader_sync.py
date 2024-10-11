@@ -301,12 +301,12 @@ class AudiosetDataset(Dataset):
                 
                 try:
                     fbank = self._wav2fbank(datum['wav'])
-                    fbank = fbank[frame_idx*96:(frame_idx+1)*96, :]
+                    fbank = fbank[frame_idx*self.target_length:(frame_idx+1)*self.target_length, :]
                     if not self.skip_norm:
                         fbank = (fbank - self.norm_mean) / (self.norm_std)
                 except Exception as e:
                     print(f"Error processing audio for video {datum['video_id']}: {str(e)}")
-                    fbank = torch.zeros(96, 128)
+                    fbank = torch.zeros(self.target_length, 128)
                 
                 try:
                     image = self.get_image(frame_path)
@@ -337,7 +337,7 @@ class AudiosetDataset(Dataset):
             
             try:
                 fbank = self._wav2fbank(datum['wav'])
-                fbank = fbank[frame_idx*96:(frame_idx+1)*96, :]
+                fbank = fbank[frame_idx*self.target_length:(frame_idx+1)*self.target_length, :]
                 image = self.get_image(frame_path)
                 
                 if not self.skip_norm:
@@ -354,7 +354,7 @@ class AudiosetDataset(Dataset):
             
             except Exception as e:
                 # Return dummy data in case of error
-                return torch.zeros((96, 128)), torch.zeros((3, 224, 224)), torch.zeros(self.label_num), datum['video_id'], frame_idx
+                return torch.zeros((self.target_length, 128)), torch.zeros((3, 224, 224)), torch.zeros(self.label_num), datum['video_id'], frame_idx
 
 
 
