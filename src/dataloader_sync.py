@@ -301,7 +301,12 @@ class AudiosetDataset(Dataset):
                 
                 try:
                     fbank = self._wav2fbank(datum['wav'])
-                    fbank = fbank[frame_idx*self.target_length:(frame_idx+1)*self.target_length, :]
+                    # The original fbank is 1024 frames, we need to cut it to the target length based on the fact that we gave 10 frames
+                    # First, we need to see the correspondence between frame index and fbank index
+                    # Then, we need to cut the fbank to the target length
+                    # Finally, we need to take only the first 10 frames
+                    fbank_index = frame_idx * (fbank.shape[0] // self.total_frame)
+                    fbank = fbank[fbank_index:fbank_index+self.target_length, :]
                     if not self.skip_norm:
                         fbank = (fbank - self.norm_mean) / (self.norm_std)
                 except Exception as e:
@@ -337,7 +342,8 @@ class AudiosetDataset(Dataset):
             
             try:
                 fbank = self._wav2fbank(datum['wav'])
-                fbank = fbank[frame_idx*self.target_length:(frame_idx+1)*self.target_length, :]
+                fbank_index = frame_idx * (fbank.shape[0] // self.total_frame)
+                fbank = fbank[fbank_index:fbank_index+self.target_length, :]
                 image = self.get_image(frame_path)
                 
                 if not self.skip_norm:
