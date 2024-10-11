@@ -10,6 +10,12 @@
 
 # run cav-mae pretraining, use smaller lr and batch size, fits smaller GPUs (4*12GB GPUs)
 
+# print manual arguments if any or if help is requested
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    echo "Usage: $0 [target_length] [n_regster_tokens] [cls_token] [global_local_losses]"
+    exit 0
+fi
+
 export TORCH_HOME=../../pretrained_models
 
 model=cav-mae
@@ -38,11 +44,7 @@ batch_size=512
 lr_adapt=False
 lr_scheduler=cosine
 
-# print manual arguments if any or if help is requested
-if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    echo "Usage: $0 [target_length] [n_regster_tokens] [cls_token] [global_local_losses]"
-    exit 0
-fi
+
 if [ $# -gt 0 ]; then
     echo "Manual arguments:"
     echo "target_length: $1"
