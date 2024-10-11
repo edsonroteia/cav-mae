@@ -76,7 +76,7 @@ parser.add_argument("--masking_ratio", type=float, default=0.75, help="masking r
 parser.add_argument("--mask_mode", type=str, default='unstructured', help="masking ratio", choices=['unstructured', 'time', 'freq', 'tf'])
 
 parser.add_argument('--wandb_name', type=str, default=None, help="wandb name")
-
+parser.add_argument('--lr_scheduler', type=str, default='step', help="lr scheduler", choices=['cosine', 'step'])
 
 args = parser.parse_args()
 

@@ -109,6 +109,7 @@ class AudiosetDataset(Dataset):
         self.noise = self.audio_conf.get('noise', False)
         if self.noise == True:
             print('now use noise augmentation')
+            # fbank = fbank + torch.rand(fbank.shape[0], fbank.shape[1]) * np.random.rand() / 10
         else:
             print('not use noise augmentation')
 

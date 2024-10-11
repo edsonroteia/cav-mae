@@ -22,6 +22,7 @@ import neptune
 import wandb
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from cosine_scheduler import CosineWarmupScheduler
 
 def visualize_and_log(a_input, v_input, audio_model, step):
     print("Logging examples to wandb...")
@@ -104,6 +105,17 @@ def train(audio_model, train_loader, train_dataset, test_loader, args):
     if args.lr_adapt == True:
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=args.lr_patience, verbose=True)
         print('Override to use adaptive learning rate scheduler.')
+    elif args.lr_scheduler == 'cosine':
+        max_iter = args.n_epochs * len(train_loader)
+        print("Max Iterations {} = epochs {} * iter_per_epoch{}".format(max_iter, args.n_epochs, len(train_loader)))
+        scheduler = scheduler = CosineWarmupScheduler(
+            optimizer,
+            warmup_epochs=max_iter * 0.1,
+            max_epochs=max_iter,
+            min_lr=args.lr * 0.1,
+            max_lr=args.lr
+        )
+        print('Using cosine annealing learning rate scheduler over {:d} epochs with minimum lr of 1e-6'.format(args.n_epochs))
     else:
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, list(range(args.lrscheduler_start, 1000, args.lrscheduler_step)),gamma=args.lrscheduler_decay)
         print('The learning rate scheduler starts at {:d} epoch with decay rate of {:.3f} every {:d} epoches'.format(args.lrscheduler_start, args.lrscheduler_decay, args.lrscheduler_step))

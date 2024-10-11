@@ -94,7 +94,8 @@ class CAVMAE(nn.Module):
 
         self.num_register_tokens = num_register_tokens
         print('Number of Registers: {:d}'.format(self.num_register_tokens))
-        self.register_tokens = nn.Parameter(torch.randn(self.num_register_tokens * 2, embed_dim))
+        if self.num_register_tokens > 0:
+            self.register_tokens = nn.Parameter(torch.randn(self.num_register_tokens * 2, embed_dim))
 
         # audio-branch
         self.blocks_a = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
@@ -652,7 +653,8 @@ class CAVMAEFT(nn.Module):
 
         self.num_register_tokens = num_register_tokens
         print('Number of Registers: {:d}'.format(self.num_register_tokens))
-        self.register_tokens = nn.Parameter(torch.randn(self.num_register_tokens * 2, embed_dim))
+        if self.num_register_tokens > 0:
+            self.register_tokens = nn.Parameter(torch.randn(self.num_register_tokens * 2, embed_dim))
 
         self.norm_a = norm_layer(embed_dim)
         self.norm_v = norm_layer(embed_dim)
