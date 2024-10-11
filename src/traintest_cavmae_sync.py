@@ -185,7 +185,7 @@ def train(audio_model, train_loader, train_dataset, test_loader, args, run):
                 if args.global_local_losses:
                     loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc, _, _, latent_c_a, latent_c_v, cls_a, cls_v, global_loss_c, local_loss_c = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
                 else:
-                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, _, recon_a, recon_v, latent_c_a, latent_c_v = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
+                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, c_acc, recon_a, recon_v, latent_c_a, latent_c_v = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
                     
                     # Calculate our own contrastive accuracies for validation
                     # accuracies = calculate_contrastive_accuracy(latent_c_a.float(), latent_c_v.float(), video_ids, run=run, mode='eval', global_step=global_step)
