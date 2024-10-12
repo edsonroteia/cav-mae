@@ -530,7 +530,7 @@ class CAVMAE(nn.Module):
 
         loss = loss_mae + loss_c
 
-        recon_a = self.unpatchify(pred_a, 1, 8, 6, 16)
+        recon_a = self.unpatchify(pred_a, 1, 8, int(self.target_length/16), 16)
         recon_a = torch.einsum('nchw->nhwc', recon_a)
         recon_v = self.unpatchify(pred_v, 3, 14, 14, 16)
         recon_v = torch.einsum('nchw->nhwc', recon_v)
