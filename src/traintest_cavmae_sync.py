@@ -503,95 +503,66 @@ def calculate_contrastive_accuracy(audio_rep, video_rep, video_ids, frame_indice
 
 def validate(audio_model, val_loader, args, run, global_step):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    batch_time = AverageMeter()
     if not isinstance(audio_model, nn.DataParallel):
         audio_model = nn.DataParallel(audio_model)
     audio_model = audio_model.to(device)
     audio_model.eval()
 
-    end = time.time()
-    A_loss, A_loss_mae, A_loss_mae_a, A_loss_mae_v, A_loss_c = [], [], [], [], []
-    A_loss_global, A_loss_local = [], []
-    A_accuracies = {
-        'whole_avg': [], 'whole_max': [],
-        'diag_avg': [], 'diag_max': [],
-        'optimal_avg': [], 'optimal_max': [],
-        'hungarian_avg': [], 'hungarian_max': []
-    }
+    loss_sum = 0
+    loss_mae_sum = 0
+    loss_mae_a_sum = 0
+    loss_mae_v_sum = 0
+    loss_c_sum = 0
+    if args.global_local_losses:
+        loss_global_sum = 0
+        loss_local_sum = 0
+    
+    num_samples = 0
 
     with torch.no_grad():
         pbar = tqdm(val_loader, desc='Validation', leave=True)
-        accuracies ={}
         for i, batch in enumerate(pbar):
             if batch is None:
                 continue
-            (a_input, v_input, labels, video_ids, frame_indices) = batch
-            # print(f"Batch {i}: a_input shape: {a_input.shape}, v_input shape: {v_input.shape}")
-            # print(f"Number of video_ids: {len(video_ids)}")
-            # print(f"Number of unique video_ids: {len(set(video_ids))}")
-            # print(f"Frame indices shape: {frame_indices.shape}")
+            (a_input, v_input, _, _, _) = batch
             
             a_input = a_input.to(device)
             v_input = v_input.to(device)
             
             with autocast():
                 if args.global_local_losses:
-                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, _, recon_a, recon_v, latent_c_a, latent_c_v, cls_a, cls_v, global_loss_c, local_loss_c = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
+                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, _, _, _, _, _, _, _, _, _, global_loss_c, local_loss_c = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
                 else:
-                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, mask_a, mask_v, _, recon_a, recon_v, latent_c_a, latent_c_v = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
-                
-                # print(f"latent_c_a shape: {latent_c_a.shape}, latent_c_v shape: {latent_c_v.shape}")
-                
-                # Calculate our own contrastive accuracies for validation
-                # accuracies_local = calculate_contrastive_accuracy(latent_c_a.float(), latent_c_v.float(), video_ids, run=run, mode='eval', global_step=global_step)
-                # accuracies_global = calculate_contrastive_accuracy(cls_a.float(), cls_v.float(), video_ids, run=run, mode='eval', global_step=global_step)
+                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, _, _, _, _, _, _, _ = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
 
-                loss = loss.mean()
-                loss_mae = loss_mae.mean()
-                loss_mae_a = loss_mae_a.mean()
-                loss_mae_v = loss_mae_v.mean()
-                loss_c = loss_c.mean()
-                if args.global_local_losses:
-                    loss_global = global_loss_c.mean()
-                    loss_local = local_loss_c.mean()
-            
-            A_loss.append(loss.to('cpu').detach())
-            A_loss_mae.append(loss_mae.to('cpu').detach())
-            A_loss_mae_a.append(loss_mae_a.to('cpu').detach())
-            A_loss_mae_v.append(loss_mae_v.to('cpu').detach())
-            A_loss_c.append(loss_c.to('cpu').detach())
+            batch_size = a_input.size(0)
+            num_samples += batch_size
+
+            loss_sum += loss.sum().item()
+            loss_mae_sum += loss_mae.sum().item()
+            loss_mae_a_sum += loss_mae_a.sum().item()
+            loss_mae_v_sum += loss_mae_v.sum().item()
+            loss_c_sum += loss_c.sum().item()
             if args.global_local_losses:
-                A_loss_global.append(global_loss_c.to('cpu').detach())
-                A_loss_local.append(local_loss_c.to('cpu').detach())
-            # for k, v in accuracies.items():
-                # A_accuracies[k].append(v)
-            
-            batch_time.update(time.time() - end)
-            end = time.time()
-
-            # if i % 10 == 0:  # Print every 10 batches
-            #     print(f'Validation Batch: [{i}/{len(val_loader)}]\t'
-            #           f'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-            #           f'Loss {loss.item():.4f}')
-                # for k, v in accuracies.items():
-                #     print(f'{k}: {v:.4f}')
+                loss_global_sum += global_loss_c.sum().item()
+                loss_local_sum += local_loss_c.sum().item()
 
         pbar.close()
-        loss = np.mean(A_loss)
-        loss_mae = np.mean(A_loss_mae)
-        loss_mae_a = np.mean(A_loss_mae_a)
-        loss_mae_v = np.mean(A_loss_mae_v)
-        loss_c = np.mean(A_loss_c)
-        if args.global_local_losses:
-            loss_global = np.mean(A_loss_global)
-            loss_local = np.mean(A_loss_local)
-        # accuracies = {k: np.mean(v) for k, v in A_accuracies.items()}
+
+    loss = loss_sum / num_samples
+    loss_mae = loss_mae_sum / num_samples
+    loss_mae_a = loss_mae_a_sum / num_samples
+    loss_mae_v = loss_mae_v_sum / num_samples
+    loss_c = loss_c_sum / num_samples
+    if args.global_local_losses:
+        loss_global = loss_global_sum / num_samples
+        loss_local = loss_local_sum / num_samples
 
     print(f"Validation Results - Loss: {loss:.4f}, MAE Loss: {loss_mae:.4f}, "
           f"MAE Loss Audio: {loss_mae_a:.4f}, MAE Loss Visual: {loss_mae_v:.4f}, "
           f"Contrastive Loss: {loss_c:.4f}")
-    # for k, v in accuracies.items():
-        # print(f"Accuracy ({k}): {v:.4f}")
+
+    accuracies = {}  # Placeholder for compatibility with the original return structure
 
     if args.global_local_losses:
         return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, loss_global, loss_local, accuracies
