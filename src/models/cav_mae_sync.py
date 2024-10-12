@@ -498,7 +498,7 @@ class CAVMAE(nn.Module):
         return loss
 
     def forward(self, audio, imgs, mask_ratio_a=0.75, mask_ratio_v=0.75, mae_loss_weight=1., contrast_loss_weight=0.01, mask_mode='unstructured', mode='train'):
-        if self.global_local_losses:    
+        if self.cls_token:    
             latent, mask_a, ids_restore_a, mask_v, ids_restore_v, latent_c_a, latent_c_v, cls_a, cls_v = self.forward_encoder(audio, imgs, mask_ratio_a, mask_ratio_v, mask_mode=mask_mode)
         else:
             latent, mask_a, ids_restore_a, mask_v, ids_restore_v, latent_c_a, latent_c_v = self.forward_encoder(audio, imgs, mask_ratio_a, mask_ratio_v, mask_mode=mask_mode)
