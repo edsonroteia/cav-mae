@@ -523,7 +523,7 @@ class CAVMAE(nn.Module):
                     loss_c = (global_loss_c + local_loss_c) / 2
                     c_acc = (local_c_acc + global_c_acc) / 2
                 else:
-                    loss_c, c_acc = self.forward_contrastive(latent_c_a, latent_c_v, mode=mode)
+                    loss_c, c_acc = self.forward_contrastive(cls_a, cls_v, mode=mode)
             loss_c = contrast_loss_weight * loss_c
         else:
             loss_c, c_acc = torch.tensor(0.0, device=audio.device), torch.tensor(0.0, device=audio.device)
