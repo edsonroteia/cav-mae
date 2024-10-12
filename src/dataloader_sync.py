@@ -312,43 +312,76 @@ class AudiosetDataset(Dataset):
         
         datum = self.decode_data(self.data[index])
         
-        if self.mode == 'eval':
-            fbanks = []
-            images = []
-            frame_indices = []
+        # if self.mode == 'eval':
+        #     fbanks = []
+        #     images = []
+        #     frame_indices = []
             
-            for frame_idx in range(self.total_frame):
-                frame_path = f"{datum['video_path']}/frame_{frame_idx}/{datum['video_id']}.jpg"
+        #     for frame_idx in range(self.total_frame):
+        #         frame_path = f"{datum['video_path']}/frame_{frame_idx}/{datum['video_id']}.jpg"
                 
-                try:
-                    fbank = self._wav2fbank(datum['wav'])
-                    # Use the mapping function to get the spectrogram segment
-                    start, end = self.map_frame_to_spectrogram(
-                        frame_index=frame_idx,
-                        num_frames=self.total_frame,
-                        spectrogram_length=fbank.shape[0],
-                        target_length=self.target_length
-                    )
-                    fbank = fbank[start:end, :]
+        #         try:
+        #             fbank = self._wav2fbank(datum['wav'])
+        #             # Use the mapping function to get the spectrogram segment
+        #             start, end = self.map_frame_to_spectrogram(
+        #                 frame_index=frame_idx,
+        #                 num_frames=self.total_frame,
+        #                 spectrogram_length=fbank.shape[0],
+        #                 target_length=self.target_length
+        #             )
+        #             fbank = fbank[start:end, :]
                     
-                    if not self.skip_norm:
-                        fbank = (fbank - self.norm_mean) / self.norm_std
-                except Exception as e:
-                    print(f"Error processing audio for video {datum['video_id']}: {str(e)}")
-                    fbank = torch.zeros(self.target_length, 128)
+        #             if not self.skip_norm:
+        #                 fbank = (fbank - self.norm_mean) / self.norm_std
+        #         except Exception as e:
+        #             print(f"Error processing audio for video {datum['video_id']}: {str(e)}")
+        #             fbank = torch.zeros(self.target_length, 128)
                 
-                try:
-                    image = self.get_image(frame_path)
-                except Exception as e:
-                    print(f"Error processing frame {frame_idx} for video {datum['video_id']}: {str(e)}")
-                    image = torch.zeros(3,224,224)
+        #         try:
+        #             image = self.get_image(frame_path)
+        #         except Exception as e:
+        #             print(f"Error processing frame {frame_idx} for video {datum['video_id']}: {str(e)}")
+        #             image = torch.zeros(3,224,224)
                     
-                fbanks.append(fbank)
-                images.append(image)
-                frame_indices.append(frame_idx)
+        #         fbanks.append(fbank)
+        #         images.append(image)
+        #         frame_indices.append(frame_idx)
             
-            if not fbanks:
-                raise RuntimeError(f"No valid frames found for video {datum['video_id']}")
+        #     if not fbanks:
+        #         raise RuntimeError(f"No valid frames found for video {datum['video_id']}")
+            
+        #     label_indices = np.zeros(self.label_num) + (self.label_smooth / self.label_num)
+        #     for label_str in datum['labels'].split(','):
+        #         label_indices[int(self.index_dict[label_str])] = 1.0 - self.label_smooth
+        #     label_indices = torch.FloatTensor(label_indices)
+            
+        #     self.debug_counter += 1
+
+        #     return torch.stack(fbanks), torch.stack(images), label_indices, datum['video_id'], torch.tensor(frame_indices)
+        
+        # else:  # Training mode
+        if self.mode == 'train':
+            # Select a random frame
+            frame_idx = random.randint(0, self.total_frame - 1)
+        else:
+            frame_idx = int((self.total_frame) / 2)
+            
+        frame_path = f"{datum['video_path']}/frame_{frame_idx}/{datum['video_id']}.jpg"
+            
+        try:
+            fbank = self._wav2fbank(datum['wav'])
+            # Use the mapping function to get the spectrogram segment
+            start, end = self.map_frame_to_spectrogram(
+                frame_index=frame_idx,
+                num_frames=self.total_frame,
+                spectrogram_length=fbank.shape[0],
+                target_length=self.target_length
+            )
+            fbank = fbank[start:end, :]
+            image = self.get_image(frame_path)
+            
+            if not self.skip_norm:
+                fbank = (fbank - self.norm_mean) / self.norm_std
             
             label_indices = np.zeros(self.label_num) + (self.label_smooth / self.label_num)
             for label_str in datum['labels'].split(','):
@@ -357,40 +390,10 @@ class AudiosetDataset(Dataset):
             
             self.debug_counter += 1
 
-            return torch.stack(fbanks), torch.stack(images), label_indices, datum['video_id'], torch.tensor(frame_indices)
-        
-        else:  # Training mode
-            # Select a random frame
-            frame_idx = random.randint(0, self.total_frame - 1)
-            frame_path = f"{datum['video_path']}/frame_{frame_idx}/{datum['video_id']}.jpg"
-            
-            try:
-                fbank = self._wav2fbank(datum['wav'])
-                # Use the mapping function to get the spectrogram segment
-                start, end = self.map_frame_to_spectrogram(
-                    frame_index=frame_idx,
-                    num_frames=self.total_frame,
-                    spectrogram_length=fbank.shape[0],
-                    target_length=self.target_length
-                )
-                fbank = fbank[start:end, :]
-                image = self.get_image(frame_path)
-                
-                if not self.skip_norm:
-                    fbank = (fbank - self.norm_mean) / self.norm_std
-                
-                label_indices = np.zeros(self.label_num) + (self.label_smooth / self.label_num)
-                for label_str in datum['labels'].split(','):
-                    label_indices[int(self.index_dict[label_str])] = 1.0 - self.label_smooth
-                label_indices = torch.FloatTensor(label_indices)
-                
-                self.debug_counter += 1
-
-                return fbank, image, label_indices, datum['video_id'], frame_idx
-            
-            except Exception as e:
-                # Return dummy data in case of error
-                return torch.zeros((self.target_length, 128)), torch.zeros((3, 224, 224)), torch.zeros(self.label_num), datum['video_id'], frame_idx
+            return fbank, image, label_indices, datum['video_id'], frame_idx
+        except Exception as e:
+            # Return dummy data in case of error
+            return torch.zeros((self.target_length, 128)), torch.zeros((3, 224, 224)), torch.zeros(self.label_num), datum['video_id'], frame_idx
 
 
 
