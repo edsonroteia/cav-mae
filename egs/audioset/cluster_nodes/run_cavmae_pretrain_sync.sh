@@ -12,7 +12,7 @@
 
 # print manual arguments if any or if help is requested
 if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    echo "Usage: $0 [target_length] [n_regster_tokens] [cls_token] [global_local_losses]"
+    echo "Usage: $0 [target_length] [n_regster_tokens] [cls_token] [global_local_losses] [contrast_loss_weight] [debug]"
     exit 0
 fi
 
@@ -21,7 +21,6 @@ export TORCH_HOME=../../pretrained_models
 model=cav-mae
 masking_ratio=0.75
 mask_mode=unstructured # or time, or freq, or tf
-contrast_loss_weight=0.1
 mae_loss_weight=1.0
 tr_pos=False
 norm_pix_loss=True
@@ -48,9 +47,10 @@ lr_scheduler=cosine
 if [ $# -gt 0 ]; then
     echo "Manual arguments:"
     echo "target_length: $1"
-echo "n_regster_tokens: $2"
+    echo "n_regster_tokens: $2"
     echo "cls_token: $3"
     echo "global_local_losses: $4"
+    echo "contrast_loss_weight: $5"
 fi
 
 # receive target_length, n_regster_tokens, cls_token, global_local_losses as arguments
@@ -58,6 +58,15 @@ target_length=${1:-96}
 n_regster_tokens=${2:-0}
 cls_token=${3:-False}
 global_local_losses=${4:-False}
+contrast_loss_weight=${5:-0.1}
+debug=${6:-False}
+if [ "$debug" = True ]; then
+    echo "Debug mode"
+    num_samples=${batch_size}
+else
+    num_samples=None
+fi
+
 
 dataset=audioset
 tr_data=datafilles/audioset_2m/cluster_nodes/audioset_2m_cleaned_aug24.json
@@ -84,5 +93,5 @@ CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_pretrain_sync.py --model ${
 --tr_pos ${tr_pos} --masking_ratio ${masking_ratio} --mask_mode ${mask_mode} \
 --lr_scheduler ${lr_scheduler} --n_regster_tokens ${n_regster_tokens} --cls_token ${cls_token} \
 --global_local_losses ${global_local_losses} \
---num_samples ${batch_size}
+--num_samples ${num_samples}
 # --wandb-name sync_pt_as2m_$(hostname)_lr${lr}_epoch${epoch}

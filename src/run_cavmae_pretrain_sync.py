@@ -24,6 +24,11 @@ import neptune
 import wandb
 from dataloader_sync import eval_collate_fn, train_collate_fn
 
+# Function to parse 'None' as None
+def parse_none(value):
+    if value.lower() == 'none':
+        return None
+    return int(value)
 
 # pretrain cav-mae model
 
@@ -80,7 +85,7 @@ parser.add_argument("--masking_ratio", type=float, default=0.75, help="masking r
 parser.add_argument("--mask_mode", type=str, default='unstructured', help="masking ratio", choices=['unstructured', 'time', 'freq', 'tf'])
 
 parser.add_argument('--wandb_name', type=str, default=None, help="wandb name")
-parser.add_argument("--num_samples", type=int, default=None, help="Number of samples to use (default: use all samples)")
+parser.add_argument("--num_samples", type=parse_none, default=None, help="Number of samples (integer or 'None')")
 parser.add_argument("--n_regster_tokens", type=int, default=4, help="Number of register tokens")
 parser.add_argument("--cls_token", type=ast.literal_eval, default=True, help="Whether to use cls token")
 parser.add_argument("--global_local_losses", type=ast.literal_eval, default=True, help="Whether to use global and local losses")
