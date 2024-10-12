@@ -126,7 +126,7 @@ class AudiosetDataset(Dataset):
         # set the frame to use in the eval mode, default value for training is -1 which means random frame
         self.frame_use = self.audio_conf.get('frame_use', -1)
         # by default, 10 frames are used
-        self.total_frame = self.audio_conf.get('total_frame', 10)
+        self.total_frame = self.audio_conf.get('total_frame', 16)
         print('now use frame {:d} from total {:d} frames'.format(self.frame_use, self.total_frame))
 
         # by default, all models use 224*224, other resolutions are not tested
@@ -239,7 +239,7 @@ class AudiosetDataset(Dataset):
             else:
                 frame_idx = self.frame_use
         else:
-            frame_idx = random.randint(0, 9)
+            frame_idx = random.randint(0, self.total_frame - 1)
 
         while os.path.exists(video_path + '/frame_' + str(frame_idx) + '/' + video_id + '.jpg') == False and frame_idx >= 1:
             print('frame {:s} {:d} does not exist'.format(video_id, frame_idx))
@@ -255,6 +255,27 @@ class AudiosetDataset(Dataset):
             if os.path.exists(frame_path):
                 all_frames.append((frame_path, frame_idx))
         return all_frames
+
+    def map_frame_to_spectrogram(self, frame_index, num_frames, spectrogram_length, target_length):
+        """
+        Maps a frame index to a corresponding segment in the spectrogram.
+        
+        :param frame_index: Index of the frame (0 to num_frames-1)
+        :param num_frames: Total number of frames
+        :param spectrogram_length: Total length of the spectrogram
+        :param target_length: Desired length of each segment
+        :return: Tuple of (start_index, end_index) for the spectrogram segment
+        """
+        frame_position = int(round(frame_index * spectrogram_length / num_frames))
+        
+        start = max(0, frame_position - target_length // 2)
+        end = start + target_length
+        
+        if end > spectrogram_length:
+            end = spectrogram_length
+            start = max(0, end - target_length)
+        
+        return (start, end)
 
     def __getitem__(self, index):
         """
@@ -301,14 +322,17 @@ class AudiosetDataset(Dataset):
                 
                 try:
                     fbank = self._wav2fbank(datum['wav'])
-                    # The original fbank is 1024 frames, we need to cut it to the target length based on the fact that we gave 10 frames
-                    # First, we need to see the correspondence between frame index and fbank index
-                    # Then, we need to cut the fbank to the target length
-                    # Finally, we need to take only the first 10 frames
-                    fbank_index = frame_idx * (fbank.shape[0] // self.total_frame)
-                    fbank = fbank[fbank_index:fbank_index+self.target_length, :]
+                    # Use the mapping function to get the spectrogram segment
+                    start, end = self.map_frame_to_spectrogram(
+                        frame_index=frame_idx,
+                        num_frames=self.total_frame,
+                        spectrogram_length=fbank.shape[0],
+                        target_length=self.target_length
+                    )
+                    fbank = fbank[start:end, :]
+                    
                     if not self.skip_norm:
-                        fbank = (fbank - self.norm_mean) / (self.norm_std)
+                        fbank = (fbank - self.norm_mean) / self.norm_std
                 except Exception as e:
                     print(f"Error processing audio for video {datum['video_id']}: {str(e)}")
                     fbank = torch.zeros(self.target_length, 128)
@@ -342,12 +366,18 @@ class AudiosetDataset(Dataset):
             
             try:
                 fbank = self._wav2fbank(datum['wav'])
-                fbank_index = frame_idx * (fbank.shape[0] // self.total_frame)
-                fbank = fbank[fbank_index:fbank_index+self.target_length, :]
+                # Use the mapping function to get the spectrogram segment
+                start, end = self.map_frame_to_spectrogram(
+                    frame_index=frame_idx,
+                    num_frames=self.total_frame,
+                    spectrogram_length=fbank.shape[0],
+                    target_length=self.target_length
+                )
+                fbank = fbank[start:end, :]
                 image = self.get_image(frame_path)
                 
                 if not self.skip_norm:
-                    fbank = (fbank - self.norm_mean) / (self.norm_std)
+                    fbank = (fbank - self.norm_mean) / self.norm_std
                 
                 label_indices = np.zeros(self.label_num) + (self.label_smooth / self.label_num)
                 for label_str in datum['labels'].split(','):

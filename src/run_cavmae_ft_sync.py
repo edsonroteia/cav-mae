@@ -97,6 +97,7 @@ parser.add_argument("--augmentation", type=ast.literal_eval, default=True)
 
 parser.add_argument("--neptune_tag", type=str, default="finetuning")
 parser.add_argument("--cls_token", type=ast.literal_eval, default=True)
+parser.add_argument("--total_frame", type=int, default=16)
 args = parser.parse_args()
 
 run = neptune.init_run(
@@ -121,9 +122,9 @@ else:
 
 audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': args.freqm, 'timem': args.timem, 'mixup': args.mixup,
               'dataset': args.dataset, 'mode':mode, 'mean':args.dataset_mean, 'std':args.dataset_std,
-              'noise':args.noise, 'label_smooth': args.label_smooth, 'im_res': im_res, 'num_samples': args.num_samples, 'augmentation': args.augmentation}
+              'noise':args.noise, 'label_smooth': args.label_smooth, 'im_res': im_res, 'num_samples': args.num_samples, 'augmentation': args.augmentation, 'total_frame': args.total_frame}
 val_audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': args.dataset,
-                  'mode':mode, 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': im_res, 'num_samples': args.num_samples, 'augmentation': False}
+                  'mode':mode, 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': im_res, 'num_samples': args.num_samples, 'augmentation': False, 'total_frame': args.total_frame}
 
 def get_loader(args, audio_conf, val_audio_conf, train_csv, val_csv):
     print('Now process ' + args.dataset)

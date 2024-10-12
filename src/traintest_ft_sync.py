@@ -222,7 +222,7 @@ def train(audio_model, train_loader, test_loader, args, run):
                 audio_output = audio_model(a_input, v_input, args.ftmode)
                 if args.aggregate != 'None':
                     # Reshape labels to match the new shape of audio_output
-                    labels = labels.view(B//10, 10, -1)[:, 0, :]  # Take the first frame's label for each video
+                    labels = labels.view(B//args.total_frame, args.total_frame, -1)[:, 0, :]  # Take the first frame's label for each video
                 loss = loss_fn(audio_output, labels)
             
             optimizer.zero_grad()
@@ -240,7 +240,7 @@ def train(audio_model, train_loader, test_loader, args, run):
             run["train/learning_rate"].log(optimizer.param_groups[0]["lr"], step=current_step)
 
             if args.aggregate != 'None':
-                B = B // 10  # Adjust B to reflect the number of videos, not frames
+                B = B // args.total_frame  # Adjust B to reflect the number of videos, not frames
             loss_meter.update(loss.item(), B)
             batch_time.update(time.time() - end_time)
             per_sample_time.update((time.time() - end_time)/B)
@@ -401,7 +401,7 @@ def validate(audio_model, val_loader, args, output_pred=False):
             if args.aggregate != 'None':
                 # Reshape labels to match the new shape of audio_output
                 B = a_input.size(0)
-                labels = labels.view(B//10, 10, -1)[:, 0, :]  # Take the first frame's label for each video
+                labels = labels.view(B//args.total_frame, args.total_frame, -1)[:, 0, :]  # Take the first frame's label for each video
             
             loss = args.loss_fn(audio_output, labels)
             

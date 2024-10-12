@@ -69,7 +69,7 @@ class CAVMAE(nn.Module):
                  embed_dim=768, modality_specific_depth=11, num_heads=12,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, num_register_tokens=4,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=False, 
-                 cls_token=False, global_local_losses=False):
+                 cls_token=False, global_local_losses=False, total_frame=16):
         super().__init__()
         print('A CAV-MAE Model')
         print('Use norm_pix_loss: ', norm_pix_loss)
@@ -140,6 +140,8 @@ class CAVMAE(nn.Module):
         if self.global_local_losses:
             print("Using Global and Local Losses")
 
+        self.total_frame = total_frame
+        print('Using {:d} frames'.format(self.total_frame))
 
         self.intermediate_outputs = {}
 
@@ -459,11 +461,11 @@ class CAVMAE(nn.Module):
         else:  # eval mode
             # For eval, we consider any match within the same video as correct
             # This assumes that samples from the same video are grouped together
-            num_frames = total.shape[0] // (total.shape[1] // 10)  # Assuming 10 frames per video
-            video_indices = torch.arange(total.shape[1] // 10, device=total.device).repeat_interleave(10)
+            num_frames = total.shape[0] // (total.shape[1] // self.total_frame)
+            video_indices = torch.arange(total.shape[1] // self.total_frame, device=total.device).repeat_interleave(self.total_frame)
             
             max_similarities, max_indices = torch.max(total, dim=1)
-            correct_matches = (video_indices[max_indices] == torch.arange(total.shape[0] // 10, device=total.device).repeat_interleave(num_frames))
+            correct_matches = (video_indices[max_indices] == torch.arange(total.shape[0] // self.total_frame, device=total.device).repeat_interleave(num_frames))
             
             c_acc = correct_matches.float().mean()
             
@@ -625,7 +627,7 @@ class CAVMAE(nn.Module):
 # the finetuned CAV-MAE model
 class CAVMAEFT(nn.Module):
     def __init__(self, label_dim, img_size=224, audio_length=1024, patch_size=16, in_chans=3,
-                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True, aggregate='None', num_register_tokens=0, cls_token=False):
+                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True, aggregate='None', num_register_tokens=0, cls_token=False, total_frame=16):
         super().__init__()
         timm.models.vision_transformer.Block = Block
         print('Use norm_pix_loss: ', norm_pix_loss)
@@ -666,12 +668,15 @@ class CAVMAEFT(nn.Module):
             self.cls_token_a = nn.Parameter(torch.randn(1, 1, embed_dim))
             self.cls_token_v = nn.Parameter(torch.randn(1, 1, embed_dim))
 
+        self.total_frame = total_frame
+        print('Using {:d} frames'.format(self.total_frame))
+
         if self.aggregate == "concat_mlp":
             self.mlp_head = nn.Sequential(
-                nn.LayerNorm(embed_dim * 10),
-                nn.Linear(embed_dim * 10, embed_dim * 5),
+                nn.LayerNorm(embed_dim * self.total_frame),
+                nn.Linear(embed_dim * self.total_frame, embed_dim * 5),
                 nn.GELU(),
-                nn.Linear(embed_dim * 5, embed_dim * 2),
+                nn.Linear(embed_dim * (self.total_frame // 2), embed_dim * 2),
                 nn.GELU(),
                 nn.Linear(embed_dim * 2, embed_dim),
                 nn.GELU(),
@@ -786,8 +791,8 @@ class CAVMAEFT(nn.Module):
 
             if self.aggregate == "self_attention_cls":
                 # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
-                batch_size = x.shape[0] // 10  # Assuming 10 frames per video
-                x = x.view(batch_size, 10, -1, x.shape[-1])
+                batch_size = x.shape[0] // self.total_frame 
+                x = x.view(batch_size, self.total_frame, -1, x.shape[-1])
                 
                 # Average across patches
                 x = x.mean(dim=2)
@@ -810,14 +815,14 @@ class CAVMAEFT(nn.Module):
                 x = self.classifier_head(x[:, 0])  # Use CLS token for classification
             elif self.aggregate != "None":
                 # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
-                batch_size = x.shape[0] // 10  # Assuming 10 frames per video
-                x = x.view(batch_size, 10, -1, x.shape[-1])
+                batch_size = x.shape[0] // self.total_frame
+                x = x.view(batch_size, self.total_frame, -1, x.shape[-1])
                 
                 # Average across patches
                 x = x.mean(dim=2)
                 
                 # Concatenate frames
-                # Expected dimension: (batch_size, 10 * embed_dim)
+                # Expected dimension: (batch_size, self.total_frame * embed_dim)
                 x = x.view(batch_size, -1)
                 x = self.mlp_head(x)
             else:
@@ -843,8 +848,8 @@ class CAVMAEFT(nn.Module):
             
             if self.aggregate == "self_attention_cls":
                 # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
-                batch_size = a.shape[0] // 10  # Assuming 10 frames per video
-                a = a.view(batch_size, 10, -1, a.shape[-1])
+                batch_size = a.shape[0] // self.total_frame
+                a = a.view(batch_size, self.total_frame, -1, a.shape[-1])
                 
                 # Average across patches
                 a = a.mean(dim=2)
@@ -862,14 +867,14 @@ class CAVMAEFT(nn.Module):
                 return a
             if self.aggregate == "self_attention_cls":
                 # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
-                batch_size = a.shape[0] // 10  # Assuming 10 frames per video
-                a = a.view(batch_size, 10, -1, a.shape[-1])
+                batch_size = a.shape[0] // self.total_frame
+                a = a.view(batch_size, self.total_frame, -1, a.shape[-1])
                 
                 # Average across patches
                 a = a.mean(dim=2)
                 
                 # Concatenate frames
-                # Expected dimension: (batch_size, 10 * embed_dim)
+                # Expected dimension: (batch_size, self.total_frame * embed_dim)
                 x = a.view(batch_size, -1)
                 x = self.mlp_head(x)
             else:
@@ -892,8 +897,8 @@ class CAVMAEFT(nn.Module):
 
             if self.aggregate == "self_attention_cls":
                 # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
-                batch_size = v.shape[0] // 10  # Assuming 10 frames per video
-                v = v.view(batch_size, 10, -1, v.shape[-1])
+                batch_size = v.shape[0] // self.total_frame
+                v = v.view(batch_size, self.total_frame, -1, v.shape[-1])
 
                 # Average across patches
                 v = v.mean(dim=2)
@@ -912,14 +917,14 @@ class CAVMAEFT(nn.Module):
 
             if self.aggregate == "self_attention_cls":
                 # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
-                batch_size = v.shape[0] // 10  # Assuming 10 frames per video
-                v = v.view(batch_size, 10, -1, v.shape[-1])
+                batch_size = v.shape[0] // self.total_frame 
+                v = v.view(batch_size, self.total_frame, -1, v.shape[-1])
                 
                 # Average across patches
                 v = v.mean(dim=2)
                 
                 # Concatenate frames
-                # Expected dimension: (batch_size, 10 * embed_dim)
+                # Expected dimension: (batch_size, self.total_frame * embed_dim)
                 x = v.view(batch_size, -1)
                 x = self.mlp_head(x)
             else:

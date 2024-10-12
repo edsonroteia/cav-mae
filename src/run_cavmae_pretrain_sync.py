@@ -85,14 +85,15 @@ parser.add_argument("--n_regster_tokens", type=int, default=4, help="Number of r
 parser.add_argument("--cls_token", type=ast.literal_eval, default=True, help="Whether to use cls token")
 parser.add_argument("--global_local_losses", type=ast.literal_eval, default=True, help="Whether to use global and local losses")
 parser.add_argument("--augmentation", type=ast.literal_eval, default=False, help="Whether to use data augmentation")
+parser.add_argument("--total_frame", type=int, default=16)
 
 args = parser.parse_args()
 
 im_res = 224
 audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': 0, 'timem': 0, 'mixup': args.mixup, 'dataset': args.dataset, 'mode':'train', 'mean':args.dataset_mean, 'std':args.dataset_std,
-              'noise':args.noise, 'label_smooth': 0, 'im_res': im_res, 'num_samples': args.num_samples, 'augmentation': args.augmentation}
+              'noise':args.noise, 'label_smooth': 0, 'im_res': im_res, 'num_samples': args.num_samples, 'augmentation': args.augmentation, 'total_frame': args.total_frame}
 val_audio_conf = {'num_mel_bins': 128, 'target_length': args.target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': args.dataset,
-                  'mode':'eval', 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': im_res, 'num_samples': args.num_samples, 'augmentation': False}
+                  'mode':'eval', 'mean': args.dataset_mean, 'std': args.dataset_std, 'noise': False, 'im_res': im_res, 'num_samples': args.num_samples, 'augmentation': False, 'total_frame': args.total_frame}
 
 
 # Extract command-line arguments into a dictionary
