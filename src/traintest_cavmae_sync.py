@@ -507,17 +507,16 @@ def validate(audio_model, val_loader, args, run, global_step):
         audio_model = nn.DataParallel(audio_model)
     audio_model = audio_model.to(device)
     audio_model.eval()
-
-    loss_sum = 0
-    loss_mae_sum = 0
-    loss_mae_a_sum = 0
-    loss_mae_v_sum = 0
-    loss_c_sum = 0
-    if args.global_local_losses:
-        loss_global_sum = 0
-        loss_local_sum = 0
     
-    num_samples = 0
+    # Initialize running sums and counts instead of lists to save memory
+    sum_loss = 0.0
+    sum_loss_mae = 0.0
+    sum_loss_mae_a = 0.0
+    sum_loss_mae_v = 0.0
+    sum_loss_c = 0.0
+    sum_loss_global = 0.0
+    sum_loss_local = 0.0
+    count = 0
 
     with torch.no_grad():
         pbar = tqdm(val_loader, desc='Validation', leave=True)
@@ -525,46 +524,63 @@ def validate(audio_model, val_loader, args, run, global_step):
             if batch is None:
                 continue
             (a_input, v_input, _, _, _) = batch
-            
-            a_input = a_input.to(device)
-            v_input = v_input.to(device)
+
+            a_input = a_input.to(device, non_blocking=True)
+            v_input = v_input.to(device, non_blocking=True)
             
             with autocast():
                 if args.global_local_losses:
-                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, _, _, _, _, _, _, _, _, _, global_loss_c, local_loss_c = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
+                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, _, _, _, _, _, _, _, _, _, global_loss_c, local_loss_c = audio_model(
+                        a_input, v_input, args.masking_ratio, args.masking_ratio,
+                        mae_loss_weight=args.mae_loss_weight,
+                        contrast_loss_weight=args.contrast_loss_weight,
+                        mask_mode=args.mask_mode
+                    )
                 else:
-                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, _, _, _, _, _, _, _ = audio_model(a_input, v_input, args.masking_ratio, args.masking_ratio, mae_loss_weight=args.mae_loss_weight, contrast_loss_weight=args.contrast_loss_weight, mask_mode=args.mask_mode)
+                    loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, _, _, _, _, _, _, _ = audio_model(
+                        a_input, v_input, args.masking_ratio, args.masking_ratio,
+                        mae_loss_weight=args.mae_loss_weight,
+                        contrast_loss_weight=args.contrast_loss_weight,
+                        mask_mode=args.mask_mode
+                    )
 
-            batch_size = a_input.size(0)
-            num_samples += batch_size
-
-            loss_sum += loss.sum().item()
-            loss_mae_sum += loss_mae.sum().item()
-            loss_mae_a_sum += loss_mae_a.sum().item()
-            loss_mae_v_sum += loss_mae_v.sum().item()
-            loss_c_sum += loss_c.sum().item()
+                loss = loss.mean()
+                loss_mae = loss_mae.mean()
+                loss_mae_a = loss_mae_a.mean()
+                loss_mae_v = loss_mae_v.mean()
+                loss_c = loss_c.mean()
+                if args.global_local_losses:
+                    loss_global = global_loss_c.mean()
+                    loss_local = local_loss_c.mean()
+            
+            # Accumulate the losses
+            sum_loss += loss.item()
+            sum_loss_mae += loss_mae.item()
+            sum_loss_mae_a += loss_mae_a.item()
+            sum_loss_mae_v += loss_mae_v.item()
+            sum_loss_c += loss_c.item()
             if args.global_local_losses:
-                loss_global_sum += global_loss_c.sum().item()
-                loss_local_sum += local_loss_c.sum().item()
+                sum_loss_global += loss_global.item()
+                sum_loss_local += loss_local.item()
+            count += 1
 
         pbar.close()
-
-    loss = loss_sum / num_samples
-    loss_mae = loss_mae_sum / num_samples
-    loss_mae_a = loss_mae_a_sum / num_samples
-    loss_mae_v = loss_mae_v_sum / num_samples
-    loss_c = loss_c_sum / num_samples
-    if args.global_local_losses:
-        loss_global = loss_global_sum / num_samples
-        loss_local = loss_local_sum / num_samples
+        
+        # Compute the averages
+        loss = sum_loss / count
+        loss_mae = sum_loss_mae / count
+        loss_mae_a = sum_loss_mae_a / count
+        loss_mae_v = sum_loss_mae_v / count
+        loss_c = sum_loss_c / count
+        if args.global_local_losses:
+            loss_global = sum_loss_global / count
+            loss_local = sum_loss_local / count
 
     print(f"Validation Results - Loss: {loss:.4f}, MAE Loss: {loss_mae:.4f}, "
           f"MAE Loss Audio: {loss_mae_a:.4f}, MAE Loss Visual: {loss_mae_v:.4f}, "
           f"Contrastive Loss: {loss_c:.4f}")
 
-    accuracies = {}  # Placeholder for compatibility with the original return structure
-
     if args.global_local_losses:
-        return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, loss_global, loss_local, accuracies
+        return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, loss_global, loss_local, {}
     else:
-        return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, accuracies
+        return loss, loss_mae, loss_mae_a, loss_mae_v, loss_c, {}
