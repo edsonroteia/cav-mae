@@ -83,7 +83,8 @@ class CAVMAE(nn.Module):
         self.patch_embed_a = PatchEmbed(img_size, patch_size, 1, embed_dim)
         self.patch_embed_v = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
 
-        self.patch_embed_a.num_patches = int(audio_length * 128 / 256)
+        self.audio_length = audio_length
+        self.patch_embed_a.num_patches = int((self.audio_length / 16) * (128 / 16))
         print('Number of Audio Patches: {:d}, Visual Patches: {:d}'.format(self.patch_embed_a.num_patches, self.patch_embed_v.num_patches))
 
         self.modality_a = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -530,7 +531,7 @@ class CAVMAE(nn.Module):
 
         loss = loss_mae + loss_c
 
-        recon_a = self.unpatchify(pred_a, 1, 8, int(self.target_length/16), 16)
+        recon_a = self.unpatchify(pred_a, 1, 8, int(self.audio_length/16), 16)
         recon_a = torch.einsum('nchw->nhwc', recon_a)
         recon_v = self.unpatchify(pred_v, 3, 14, 14, 16)
         recon_v = torch.einsum('nchw->nhwc', recon_v)
