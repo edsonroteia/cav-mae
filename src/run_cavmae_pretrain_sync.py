@@ -144,13 +144,13 @@ else:
 val_loader = torch.utils.data.DataLoader(
     dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
     batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True,
-    collate_fn=eval_collate_fn)
+    collate_fn=train_collate_fn)
 
 if args.data_eval != None:
     eval_loader = torch.utils.data.DataLoader(
         dataloader.AudiosetDataset(args.data_eval, label_csv=args.label_csv, audio_conf=val_audio_conf),
         batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True,
-        collate_fn=eval_collate_fn)
+        collate_fn=train_collate_fn)
 
 
 if args.model == 'cav-mae':
