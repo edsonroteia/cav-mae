@@ -198,36 +198,24 @@ if __name__ == "__main__":
     
     parser.add_argument('--dataset', type=str, choices=['audioset', 'vggsound'], 
                         help='Dataset to use for retrieval')
-    parser.add_argument('--model_type', type=str, choices=['sync_pretrain', 'sync_pretrain_registers', 'pretrain', 'finetune'], 
-                        help='Type of model to use')
     parser.add_argument('--strategy', type=str, 
                         help='Strategy for aggregation')
     parser.add_argument('--directions', type=str, nargs='+', 
                         help='Directions for evaluation')
     parser.add_argument('--nums_samples', type=int, nargs='+', 
                         help='Number of samples to test')
-    parser.add_argument('--cls_token', type=bool, default=False, 
-                        help='Whether to use cls token')
-    parser.add_argument('--num_register_tokens', type=int, default=4, 
-                        help='Number of register tokens')
     args = parser.parse_args()
 
     # Print out the parsed arguments
     print(f"Dataset: {args.dataset}")
-    print(f"Model Type: {args.model_type}")
     print(f"Strategy: {args.strategy}")
     print(f"Directions: {args.directions}")
     print(f"Number of Samples: {args.nums_samples}")
-    print(f"Number of Register Tokens: {args.num_register_tokens}")
-    print(f"CLS Token: {args.cls_token}")
 
     dataset = args.dataset
-    model_type = args.model_type
     strategy = args.strategy
     directions = args.directions
     nums_samples = args.nums_samples
-    num_register_tokens = args.num_register_tokens
-    cls_token = args.cls_token
 
     # Hardcoded values for model paths (you may want to add these as command-line arguments in the future)
     model_names = {
@@ -261,7 +249,8 @@ if __name__ == "__main__":
         # 'model_2145_25_local': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240925_112229/models/audio_model.25.pth', 'sync_pretrain_registers_cls_global_local'),
         # 'model_2145_25_both': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240925_112229/models/audio_model.25.pth', 'sync_pretrain_registers_cls_global_local'),
         # 'cav_mae++': ('/local/1314365/code/cav-mae/cav-mae-scale++.pth', 'pretrain'),
-        'cav_mae+': ('/local/1314365/code/cav-mae/cav-mae-scale+.pth', 'pretrain'),
+        # 'cav_mae+': ('/local/1314365/code/cav-mae/cav-mae-scale+.pth', 'pretrain'),
+        'model_2618_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_183505/models/audio_model.25.pth', 'sync_pretrain')
         }
     
     if len(model_names) == 0:
@@ -312,7 +301,7 @@ if __name__ == "__main__":
             
             for direction in tqdm(directions, desc="Evaluating directions", leave=False):
                 audio_conf = {'num_mel_bins': 128, 'target_length': target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
-                            'mode': 'eval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5, 'num_samples': num_samples}
+                            'mode': 'retrieval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5, 'num_samples': num_samples}
                 if 'local' in model_name:
                     r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, strategy=strategy, num_register_tokens=8 if '1970' in model_name else 4, cls_token=cls_token, local_matching=True)
                 else:
