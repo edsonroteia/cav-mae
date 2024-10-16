@@ -59,6 +59,7 @@ label_smooth=0.1
 lr_scheduler=cosine
 cls_token=${12:-False}
 n_register_tokens=${13:-4}
+total_frame=${14:-16}
 
 dataset=audioset
 tr_data=datafilles/audioset_20k/cluster_nodes/audioset_20k_cleaned.json
@@ -82,4 +83,4 @@ CUDA_VISIBLE_DEVICES=${cuda_devices} CUDA_CACHE_DISABLE=1 python -W ignore src/r
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
 --num-workers ${num_workers} --aggregate ${aggregate} --lr_scheduler ${lr_scheduler} \
 --num_samples ${num_samples} --neptune_tag ${neptune_tag} --cls_token ${cls_token} \
---n_register_tokens ${n_register_tokens}
+--n_register_tokens ${n_register_tokens} --total_frame ${total_frame}
