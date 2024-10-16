@@ -172,13 +172,13 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
     # cav-mae only been ssl pretrained
 
     if model_type == 'sync_pretrain_registers':
-        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens)
+        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens, total_frame=audio_conf['total_frame'])
     elif model_type == 'sync_pretrain_registers_cls':
-        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens, cls_token=True)
+        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens, cls_token=True, total_frame=audio_conf['total_frame'])
     elif model_type == 'sync_pretrain_registers_cls_global_local':
-        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens, cls_token=True, global_local_losses=True)
+        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens, cls_token=True, global_local_losses=True, total_frame=audio_conf['total_frame'])
     elif model_type == 'sync_pretrain':
-        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=0)
+        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=0, total_frame=audio_conf['total_frame'])
     elif model_type == 'pretrain':
         audio_model = models.CAVMAE(modality_specific_depth=11)
     # cav-mae only been ssl pretrained + supervisedly finetuned
@@ -250,7 +250,9 @@ if __name__ == "__main__":
         # 'model_2145_25_both': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240925_112229/models/audio_model.25.pth', 'sync_pretrain_registers_cls_global_local'),
         # 'cav_mae++': ('/local/1314365/code/cav-mae/cav-mae-scale++.pth', 'pretrain'),
         # 'cav_mae+': ('/local/1314365/code/cav-mae/cav-mae-scale+.pth', 'pretrain'),
-        'model_2618_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_183505/models/audio_model.25.pth', 'sync_pretrain')
+        # 'model_2618_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_183505/models/audio_model.25.pth', 'sync_pretrain'),
+        'model_2625_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_184319/models/audio_model.25.pth', 'sync_pretrain'),
+        'model_2626_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_184455/models/audio_model.25.pth', 'sync_pretrain'),
         }
     
     if len(model_names) == 0:
@@ -290,7 +292,12 @@ if __name__ == "__main__":
     for num_samples in tqdm(nums_samples, desc="Testing sample sizes"):
         for model_name, (model_path, model_type) in tqdm(model_names.items(), desc=f"Processing models for {dataset}", leave=False):
             if 'sync' in model_type:
-                target_length = 96
+                if '2625' in model_name:
+                    target_length = 192
+                elif '2626' in model_name:
+                    target_length = 512
+                else:
+                    target_length = 96
             else:
                 target_length = 1024
 
@@ -301,7 +308,7 @@ if __name__ == "__main__":
             
             for direction in tqdm(directions, desc="Evaluating directions", leave=False):
                 audio_conf = {'num_mel_bins': 128, 'target_length': target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
-                            'mode': 'retrieval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5, 'num_samples': num_samples}
+                            'mode': 'retrieval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5, 'num_samples': num_samples, 'total_frame': 16}
                 if 'local' in model_name:
                     r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, strategy=strategy, num_register_tokens=8 if '1970' in model_name else 4, cls_token=cls_token, local_matching=True)
                 else:
