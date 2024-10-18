@@ -251,8 +251,12 @@ if __name__ == "__main__":
         # 'cav_mae++': ('/local/1314365/code/cav-mae/cav-mae-scale++.pth', 'pretrain'),
         # 'cav_mae+': ('/local/1314365/code/cav-mae/cav-mae-scale+.pth', 'pretrain'),
         # 'model_2618_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_183505/models/audio_model.25.pth', 'sync_pretrain'),
-        'model_2625_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_184319/models/audio_model.25.pth', 'sync_pretrain'),
-        'model_2626_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_184455/models/audio_model.25.pth', 'sync_pretrain'),
+        # 'model_2625_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_184319/models/audio_model.25.pth', 'sync_pretrain'),
+        # 'model_2626_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_184455/models/audio_model.25.pth', 'sync_pretrain'),
+        'model_2675_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.01-p1.0-tpFalse-mr-unstructured-0.75-20241017_184725/models/audio_model.25.pth', 'sync_pretrain'),
+        'model_2676_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.01-p1.0-tpFalse-mr-unstructured-0.75-20241017_184808/models/audio_model.25.pth', 'sync_pretrain_registers_cls'),
+        'model_2631_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.5-p1.0-tpFalse-mr-unstructured-0.75-20241013_000350/models/audio_model.25.pth', 'sync_pretrain'),
+        'model_2633_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241013_000816/models/audio_model.25.pth', 'sync_pretrain'),
         }
     
     if len(model_names) == 0:
@@ -276,46 +280,46 @@ if __name__ == "__main__":
 
 
     res = []
+    for dataset in ['audioset', 'vggsound']:
+        if dataset == "audioset":
+            data = 'datafilles/audioset_20k/cluster_nodes/audioset_eval_5_per_class_for_retrieval_cleaned.json'
+            label_csv = 'datafilles/audioset_20k/cluster_nodes/class_labels_indices.csv'
+            num_class = 527
+        elif dataset == "vggsound":
+            data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
+            label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
+            num_class = 309
+        else:
+            print(f"Unsupported dataset: {dataset}")
+            exit(1)
 
-    if dataset == "audioset":
-        data = 'datafilles/audioset_20k/cluster_nodes/audioset_eval_5_per_class_for_retrieval_cleaned.json'
-        label_csv = 'datafilles/audioset_20k/cluster_nodes/class_labels_indices.csv'
-        num_class = 527
-    elif dataset == "vggsound":
-        data = 'datafilles/vggsound/cluster_nodes/vgg_test_5_per_class_for_retrieval_cleaned.json'
-        label_csv = 'datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv'
-        num_class = 309
-    else:
-        print(f"Unsupported dataset: {dataset}")
-        exit(1)
-
-    for num_samples in tqdm(nums_samples, desc="Testing sample sizes"):
-        for model_name, (model_path, model_type) in tqdm(model_names.items(), desc=f"Processing models for {dataset}", leave=False):
-            if 'sync' in model_type:
-                if '2625' in model_name:
-                    target_length = 192
-                elif '2626' in model_name:
-                    target_length = 512
+        for num_samples in tqdm(nums_samples, desc="Testing sample sizes"):
+            for model_name, (model_path, model_type) in tqdm(model_names.items(), desc=f"Processing models for {dataset}", leave=False):
+                if 'sync' in model_type:
+                    if '2s' in model_name:
+                        target_length = 192
+                    elif '5s' in model_name:
+                        target_length = 512
+                    else:
+                        target_length = 96
                 else:
-                    target_length = 96
-            else:
-                target_length = 1024
+                    target_length = 1024
 
-            if 'cls' in model_type:
-                cls_token = True
-            else:
-                cls_token = False
-            
-            for direction in tqdm(directions, desc="Evaluating directions", leave=False):
-                audio_conf = {'num_mel_bins': 128, 'target_length': target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
-                            'mode': 'retrieval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5, 'num_samples': num_samples, 'total_frame': 16}
-                if 'local' in model_name:
-                    r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, strategy=strategy, num_register_tokens=8 if '1970' in model_name else 4, cls_token=cls_token, local_matching=True)
+                if 'cls' in model_type:
+                    cls_token = True
                 else:
-                    r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, strategy=strategy, num_register_tokens=8 if '1970' in model_name else 4, cls_token=cls_token, local_matching=False)
-                res.append([model_name, dataset, direction, num_samples, r1, r5, r10, mr])
-                res_sorted = sorted(res, key=lambda x: x[-1])  # Sort by MR
-                print("\nCurrent Results Table:")
-                print(tabulate(res_sorted, headers=["Model", "Dataset", "Direction", "Num Samples", "R@1", "R@5", "R@10", "MR"]))
+                    cls_token = False
+                
+                for direction in tqdm(directions, desc="Evaluating directions", leave=False):
+                    audio_conf = {'num_mel_bins': 128, 'target_length': target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
+                                'mode': 'retrieval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5, 'num_samples': num_samples, 'total_frame': 16}
+                    if 'local' in model_name:
+                        r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, strategy=strategy, num_register_tokens=8 if '1970' in model_name else 4, cls_token=cls_token, local_matching=True)
+                    else:
+                        r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=100, strategy=strategy, num_register_tokens=8 if '1970' in model_name else 4, cls_token=cls_token, local_matching=False)
+                    res.append([model_name, dataset, direction, num_samples, r1, r5, r10, mr])
+                    res_sorted = sorted(res, key=lambda x: x[-1])  # Sort by MR
+                    print("\nCurrent Results Table:")
+                    print(tabulate(res_sorted, headers=["Model", "Dataset", "Direction", "Num Samples", "R@1", "R@5", "R@10", "MR"]))
 
     np.savetxt('./retrieval_result.csv', res, delimiter=',', fmt='%s')
