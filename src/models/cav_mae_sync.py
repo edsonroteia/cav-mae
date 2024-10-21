@@ -103,7 +103,9 @@ class CAVMAE(nn.Module):
         # visual-branch
         self.blocks_v = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
         # unified branch
-        self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(12-modality_specific_depth+2)])
+        # self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(12-modality_specific_depth+2)])
+        self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(12-modality_specific_depth)])
+
 
         # independent normalization layer for audio, visual, and audio-visual
         self.norm_a, self.norm_v, self.norm = norm_layer(embed_dim), norm_layer(embed_dim), norm_layer(embed_dim)
@@ -177,10 +179,10 @@ class CAVMAE(nn.Module):
         w = self.patch_embed_v.proj.weight.data
         torch.nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
 
-        for block in self.blocks_u:
-            torch.nn.init.normal_(block.norm1.weight, std=.02)
-            torch.nn.init.normal_(block.norm1_a.weight, std=.02)
-            torch.nn.init.normal_(block.norm1_v.weight, std=.02)
+        # for block in self.blocks_u:
+        #     torch.nn.init.normal_(block.norm1.weight, std=.02)
+        #     torch.nn.init.normal_(block.norm1_a.weight, std=.02)
+        #     torch.nn.init.normal_(block.norm1_v.weight, std=.02)
 
         if self.cls_token:
             torch.nn.init.normal_(self.cls_token_a, std=.02)
