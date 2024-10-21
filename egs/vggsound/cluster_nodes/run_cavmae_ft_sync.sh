@@ -17,11 +17,17 @@ model=cav-mae-ft
 
 # you can replace with any checkpoint you want, but by default, we use cav-mae-scale++
 # pretrain_dir=/local/$SLURM_JOB_ID/models/
-pretrain_dir=/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_021700/models/
-pretrain_path=${pretrain_dir}/best_audio_model.pth
+# pretrain_dir=/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_021700/models/
+# pretrain_path=${pretrain_dir}/best_audio_model.pth
+pretrain_path=${11:-/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_183505/models/audio_model.25.pth}
 
-freeze_base=True
-head_lr=1 # newly initialized ft layers uses 10 times larger than the base lr
+freeze_base=${7:-True}
+# if freeze_base is True, then head_lr is 1, else 100
+if [ "$freeze_base" = True ]; then
+    head_lr=1 # newly initialized ft layers uses 10 times larger than the base lr
+else
+    head_lr=100
+fi
 
 bal=bal
 lr=${1:-1e-4}  # Use the first argument as lr, default to 1e-4 if not provided
@@ -30,7 +36,9 @@ ftmode=${3:-multimodal}
 cuda_devices=${4:-0,1,2,3,4,5,6,7}
 aggregate=${5:-self_attention_cls}
 num_workers=${6:-48}
-epoch=20
+num_samples=${8:-9999999}
+epoch=${9:-25}
+neptune_tag=${10:-finetuning}
 lrscheduler_start=2
 lrscheduler_decay=0.5
 lrscheduler_step=1
@@ -47,6 +55,9 @@ timem=192
 mixup=0.5
 label_smooth=0.1
 lr_scheduler=cosine
+cls_token=${12:-False}
+n_register_tokens=${13:-4}
+total_frame=${14:-16}
 
 dataset=vggsound
 tr_data=datafilles/vggsound/cluster_nodes/vgg_train_cleaned.json
@@ -68,4 +79,6 @@ CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model}
 --wa ${wa} --wa_start ${wa_start} --wa_end ${wa_end} --lr_adapt ${lr_adapt} \
 --pretrain_path ${pretrain_path} --ftmode ${ftmode} \
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
---num-workers ${num_workers} --aggregate ${aggregate} --lr_scheduler ${lr_scheduler}
+--num-workers ${num_workers} --aggregate ${aggregate} --lr_scheduler ${lr_scheduler} \
+--num_samples ${num_samples} --neptune_tag ${neptune_tag} --cls_token ${cls_token} \
+--n_register_tokens ${n_register_tokens} --total_frame ${total_frame}
