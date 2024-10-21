@@ -116,7 +116,7 @@ run["last_val_ACC"] = 0
 im_res = 224
 
 if args.aggregate != "None":
-    mode = 'eval'
+    mode = 'retrieval'
 else:
     mode = 'train'
 

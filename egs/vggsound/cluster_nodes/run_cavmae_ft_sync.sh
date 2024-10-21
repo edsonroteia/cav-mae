@@ -26,7 +26,7 @@ freeze_base=${7:-True}
 if [ "$freeze_base" = True ]; then
     head_lr=1 # newly initialized ft layers uses 10 times larger than the base lr
 else
-    head_lr=100
+    head_lr=10
 fi
 
 bal=bal
