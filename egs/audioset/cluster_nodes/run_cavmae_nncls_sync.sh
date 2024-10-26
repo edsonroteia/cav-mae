@@ -29,7 +29,7 @@ if [ "$freeze_base" = True ]; then
 else
     head_lr=100
 fi
-num_samples=${8:-9999999}
+num_samples=${8:-999999}
 epoch=${9:-25}
 neptune_tag=${10:-finetuning}
 lrscheduler_start=5
@@ -51,7 +51,7 @@ lr_scheduler=cosine
 pretrain_path=${11:-/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/audio_model.25.pth}
 cls_token=${12:-False}
 n_register_tokens=${13:-4}
-total_frame=${14:-16}
+total_frame=${14:-10}
 
 #Print all arguments that expect to be passed in
 echo "Arguments:"
@@ -79,7 +79,7 @@ label_csv=datafilles/audioset_20k/cluster_nodes/class_labels_indices.csv
 exp_dir=./exp/testmae02-${dataset}-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-a5-$(date +%Y%m%d_%H%M%S)
 mkdir -p $exp_dir
 
-CUDA_VISIBLE_DEVICES=${cuda_devices} CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model} --dataset ${dataset} \
+CUDA_VISIBLE_DEVICES=${cuda_devices} CUDA_CACHE_DISABLE=1 python -W ignore src/run_knn_classification_sync.py --model ${model} --dataset ${dataset} \
 --data-train ${tr_data} --data-val ${te_data} --exp-dir $exp_dir \
 --label-csv ${label_csv} --n_class 527 \
 --lr $lr --n-epochs ${epoch} --batch-size $batch_size --save_model True \

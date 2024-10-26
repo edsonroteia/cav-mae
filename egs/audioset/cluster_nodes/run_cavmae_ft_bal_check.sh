@@ -14,16 +14,17 @@
 export TORCH_HOME=../../pretrained_models
 
 model=cav-mae-ft
-ftmode=multimodal
 
 # # you can replace with any checkpoint you want, but by default, we use cav-mae-scale++
 # cur_dir=$(pwd)
 # wget -nc https://www.dropbox.com/s/l5t5geufdy3qvnv/audio_model.21.pth?dl=1 -O cav-mae-scale++.pth
 # pretrain_path=cav-mae-scale++.pth
+pretrain_path=/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241017_184335/models/audio_model.25.pth
 
-cur_dir=$(pwd)
-wget -nc https://www.dropbox.com/s/9nlz523a5q52w86/ori_mae_11.pth?dl=1 -O IN-initial.pth
-pretrain_path=${cur_dir}/IN-initial.pth
+
+# cur_dir=$(pwd)
+# wget -nc https://www.dropbox.com/s/9nlz523a5q52w86/ori_mae_11.pth?dl=1 -O IN-initial.pth
+# pretrain_path=${cur_dir}/IN-initial.pth
 
 freeze_base=False
 head_lr=100 # newly initialized ft layers uses 10 times larger than the base lr
