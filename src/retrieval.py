@@ -232,12 +232,17 @@ def eval_retrieval(model, data, audio_conf, label_csv, direction, num_class, mod
         val_loader = torch.utils.data.DataLoader(dataloader.AudiosetDataset(data, label_csv=label_csv, audio_conf=val_audio_conf), batch_size=batch_size, shuffle=False, num_workers=32, pin_memory=True)
     # cav-mae only been ssl pretrained
 
+    if 'ch' in model_type:
+        model_type = model_type.replace('_ch', '')
+        contrastive_heads = True
+    else:
+        contrastive_heads = False
     if model_type == 'sync_pretrain_registers':
-        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens, total_frame=audio_conf['total_frame'])
+        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens, total_frame=audio_conf['total_frame'], contrastive_heads=contrastive_heads)
     elif model_type == 'sync_pretrain_registers_cls':
-        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens, cls_token=True, total_frame=audio_conf['total_frame'])
+        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens, cls_token=True, total_frame=audio_conf['total_frame'], contrastive_heads=contrastive_heads)
     elif model_type == 'sync_pretrain_registers_cls_global_local':
-        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens, cls_token=True, global_local_losses=True, total_frame=audio_conf['total_frame'])
+        audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=num_register_tokens, cls_token=True, global_local_losses=True, total_frame=audio_conf['total_frame'], contrastive_heads=contrastive_heads)
     elif model_type == 'sync_pretrain':
         audio_model = models.CAVMAESync(audio_length=val_audio_conf['target_length'], modality_specific_depth=11, num_register_tokens=0, total_frame=audio_conf['total_frame'])
     elif model_type == 'pretrain' or model_type == 'pretrain_enhanced':
