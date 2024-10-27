@@ -61,6 +61,7 @@ global_local_losses=${4:-False}
 contrast_loss_weight=${5:-0.1}
 debug=${6:-False}
 contrastive_heads=${7:-False}
+multi_ratio_masking=${8:-False}
 if [ "$debug" = True ]; then
     echo "Debug mode"
     num_samples=${batch_size}
@@ -94,5 +95,6 @@ CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_pretrain_sync.py --model ${
 --tr_pos ${tr_pos} --masking_ratio ${masking_ratio} --mask_mode ${mask_mode} \
 --lr_scheduler ${lr_scheduler} --n_regster_tokens ${n_regster_tokens} --cls_token ${cls_token} \
 --global_local_losses ${global_local_losses} \
---num_samples ${num_samples} --contrastive_heads ${contrastive_heads}
+--num_samples ${num_samples} --contrastive_heads ${contrastive_heads} \
+--multi_ratio_masking ${multi_ratio_masking}
 # --wandb-name sync_pt_as2m_$(hostname)_lr${lr}_epoch${epoch}
