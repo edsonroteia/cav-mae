@@ -517,14 +517,20 @@ class CAVMAE(nn.Module):
 
     def forward(self, audio, imgs, mask_ratio_a=0.75, mask_ratio_v=0.75, mae_loss_weight=1., contrast_loss_weight=0.01, mask_mode='unstructured', mode='train'):
         if self.multi_ratio_masking:
-
-            # Use first element of batch as additional seed component to change between batches
-            seed = int(audio[0][0][0].item() * 1000)
+            # Use same seed across all GPUs for each batch
+            # Get same random number across all GPUs by using torch's random generator
+            generator = torch.Generator(device=audio.device)
+            # Set same seed across all GPUs
+            if torch.distributed.is_initialized():
+                # Ensure all GPUs use same seed by broadcasting from rank 0
+                seed = torch.tensor(int(torch.empty((), device=audio.device).uniform_().item() * 1e6), device=audio.device)
+                torch.distributed.broadcast(seed, src=0)
+                generator.manual_seed(seed.item())
+            else:
+                generator.manual_seed(0)
             
-            # Set seed for reproducibility across GPUs
-            torch.manual_seed(seed)
-            mask_ratio_a = 0.6 + 0.3 * torch.rand(1, device=audio.device).item()
-            mask_ratio_v = 0.6 + 0.3 * torch.rand(1, device=audio.device).item()
+            mask_ratio_a = 0.6 + 0.3 * torch.rand(1, device=audio.device, generator=generator).item()
+            mask_ratio_v = 0.6 + 0.3 * torch.rand(1, device=audio.device, generator=generator).item()
         if self.cls_token:    
             latent, mask_a, ids_restore_a, mask_v, ids_restore_v, latent_c_a, latent_c_v, cls_a, cls_v = self.forward_encoder(audio, imgs, mask_ratio_a, mask_ratio_v, mask_mode=mask_mode)
         else:
