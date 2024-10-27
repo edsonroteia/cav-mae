@@ -69,7 +69,7 @@ class CAVMAE(nn.Module):
                  embed_dim=768, modality_specific_depth=11, num_heads=12,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, num_register_tokens=4,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=False, 
-                 cls_token=False, global_local_losses=False, total_frame=16):
+                 cls_token=False, global_local_losses=False, total_frame=16, contrastive_heads=True):
         super().__init__()
         print('A CAV-MAE Model')
         print('Use norm_pix_loss: ', norm_pix_loss)
@@ -105,8 +105,9 @@ class CAVMAE(nn.Module):
         # unified branch
         # self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(12-modality_specific_depth+2)])
         self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(12-modality_specific_depth)])
-
-
+        if contrastive_heads:
+            self.constrative_head_audio = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(2)])
+            self.constrative_head_visual = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(2)])
         # independent normalization layer for audio, visual, and audio-visual
         self.norm_a, self.norm_v, self.norm = norm_layer(embed_dim), norm_layer(embed_dim), norm_layer(embed_dim)
 
@@ -373,6 +374,12 @@ class CAVMAE(nn.Module):
         for blk in self.blocks_u:
             cv = blk(v, 'v')
         
+        if self.contrastive_heads:
+            for blk in self.constrative_head_audio:
+                ca = blk(ca)
+            for blk in self.constrative_head_visual:
+                cv = blk(cv)
+
         if self.cls_token:
             # split the local patch tokens from the cls tokens
             #cls tokens
@@ -615,6 +622,12 @@ class CAVMAE(nn.Module):
             ca = blk(a, 'a')
         for blk in self.blocks_u:
             cv = blk(v, 'v')
+
+        if self.contrastive_heads:
+            for blk in self.contrastive_head_audio:
+                ca = blk(ca)
+            for blk in self.contrastive_head_visual:
+                cv = blk(cv)
         
         if self.cls_token:
             # split the local patch tokens from the cls tokens
