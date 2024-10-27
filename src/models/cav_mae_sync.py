@@ -105,7 +105,8 @@ class CAVMAE(nn.Module):
         # unified branch
         # self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(12-modality_specific_depth+2)])
         self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(12-modality_specific_depth)])
-        if contrastive_heads:
+        self.contrastive_heads = contrastive_heads
+        if self.contrastive_heads:
             self.constrative_head_audio = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(2)])
             self.constrative_head_visual = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(2)])
         # independent normalization layer for audio, visual, and audio-visual
