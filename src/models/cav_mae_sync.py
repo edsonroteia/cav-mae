@@ -517,8 +517,14 @@ class CAVMAE(nn.Module):
 
     def forward(self, audio, imgs, mask_ratio_a=0.75, mask_ratio_v=0.75, mae_loss_weight=1., contrast_loss_weight=0.01, mask_mode='unstructured', mode='train'):
         if self.multi_ratio_masking:
-            mask_ratio_a = random.uniform(0.6, 0.9)
-            mask_ratio_v = random.uniform(0.6, 0.9)
+
+            # Use first element of batch as additional seed component to change between batches
+            seed += int(audio[0][0][0].item() * 1000)
+            
+            # Set seed for reproducibility across GPUs
+            torch.manual_seed(seed)
+            mask_ratio_a = 0.6 + 0.3 * torch.rand(1, device=audio.device).item()
+            mask_ratio_v = 0.6 + 0.3 * torch.rand(1, device=audio.device).item()
         if self.cls_token:    
             latent, mask_a, ids_restore_a, mask_v, ids_restore_v, latent_c_a, latent_c_v, cls_a, cls_v = self.forward_encoder(audio, imgs, mask_ratio_a, mask_ratio_v, mask_mode=mask_mode)
         else:
