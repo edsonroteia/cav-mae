@@ -69,11 +69,13 @@ class CAVMAE(nn.Module):
                  embed_dim=768, modality_specific_depth=11, num_heads=12,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, num_register_tokens=4,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=False, 
-                 cls_token=False, global_local_losses=False, total_frame=16, contrastive_heads=True):
+                 cls_token=False, global_local_losses=False, total_frame=16, contrastive_heads=True, multi_ratio_masking=False):
         super().__init__()
         print('A CAV-MAE Model')
         print('Use norm_pix_loss: ', norm_pix_loss)
         print('Learnable Positional Embedding: ', tr_pos)
+
+        self.multi_ratio_masking = multi_ratio_masking
 
         # the encoder part
         # overide the timm package
@@ -514,6 +516,9 @@ class CAVMAE(nn.Module):
         return loss
 
     def forward(self, audio, imgs, mask_ratio_a=0.75, mask_ratio_v=0.75, mae_loss_weight=1., contrast_loss_weight=0.01, mask_mode='unstructured', mode='train'):
+        if self.multi_ratio_masking:
+            mask_ratio_a = random.uniform(0.6, 0.9)
+            mask_ratio_v = random.uniform(0.6, 0.9)
         if self.cls_token:    
             latent, mask_a, ids_restore_a, mask_v, ids_restore_v, latent_c_a, latent_c_v, cls_a, cls_v = self.forward_encoder(audio, imgs, mask_ratio_a, mask_ratio_v, mask_mode=mask_mode)
         else:
