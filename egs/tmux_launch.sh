@@ -2,8 +2,8 @@
 
 # if help is called, print the usage with the default values
 if [ "$1" = "-h" ]; then
-  echo "Usage: $0 [aggregate] [freeze_base] [debug] [model_name] [cls_token]"
-  echo "Default values: aggregate=self_attention_cls, freeze_base=True, debug=False, model_name=model_2145, cls_token=False"
+  echo "Usage: $0 [aggregate] [freeze_base] [debug] [model_name] [cls_token] [dataset]"
+  echo "Default values: aggregate=self_attention_cls, freeze_base=True, debug=False, model_name=model_2145, cls_token=False, dataset=audioset"
   exit 0
 fi
 
@@ -12,15 +12,15 @@ tmux new-window -n 'job_run'
 
 # Split the window into 7 panes
 tmux select-layout tiled
-for i in {1..6}; do
+for i in {1..3}; do
   tmux split-window -h
 done
 tmux select-layout tiled
 
 # Declare arrays for the parameter variations
-lrs=(1e-3 1e-4)
+lrs=(1e-4)
 ftmodes=(multimodal audioonly videoonly)
-cuda_devices=('0,1' 2 3 '4,5' 6 7)  # Each run uses one GPU
+cuda_devices=('0,1,2' '3,4,5' '6,7')  # Each run uses three GPUs
 # Parse command line arguments
 aggregate=${1:-self_attention_cls}
 freeze_base=${2:-True}
@@ -43,7 +43,12 @@ echo "Debug mode: $debug"
 echo "Number of samples: $num_samples"
 echo "Number of epochs: $num_epochs"
 # Command to run in each pane
-cmd_prefix="bash egs/audioset/cluster_nodes/run_cavmae_ft_bal_sync.sh"
+dataset=${6:-audioset}
+if [ "$dataset" = "audioset" ]; then
+    cmd_prefix="bash egs/audioset/cluster_nodes/run_cavmae_ft_bal_sync.sh"
+elif [ "$dataset" = "vggsound" ]; then
+    cmd_prefix="bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh"
+fi
 
 neptune_tag1=aggr_${aggregate}_freeze_${freeze_base}
 # get pretrain_path from models.csv
@@ -88,30 +93,21 @@ num_workers=8
 # Start running commands in each pane
 pane=0
 
-# Loop through learning rates and feature modes
-for lr in "${lrs[@]}"; do
-  for ftmode in "${ftmodes[@]}"; do
+# Loop through feature modes (only one learning rate)
+for ftmode in "${ftmodes[@]}"; do
     # Assign GPU based on pane number
-    case $pane in
-      0) cuda_device=${cuda_devices[0]} ;; # 0,1
-      1) cuda_device=${cuda_devices[1]} ;; # 2
-      2) cuda_device=${cuda_devices[2]} ;; # 3
-      3) cuda_device=${cuda_devices[3]} ;; # 4,5
-      4) cuda_device=${cuda_devices[4]} ;; # 6
-      5) cuda_device=${cuda_devices[5]} ;; # 7
-    esac
+    cuda_device=${cuda_devices[$pane]}
     
     # Print the process information
-    echo "Launching process: lr=$lr, ftmode=$ftmode on GPU(s) $cuda_device"
+    echo "Launching process: lr=${lrs[0]}, ftmode=$ftmode on GPU(s) $cuda_device"
     
-    tmux send-keys -t $pane "echo 'Launching process: lr=$lr, ftmode=$ftmode on GPU(s) $cuda_device' && dev_init && $cmd_prefix $lr $batch_size $ftmode $cuda_device ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path $cls_token $num_register_tokens $total_frame; echo 'Run completed with parameters: lr=$lr, batch_size=$batch_size, ftmode=$ftmode, cuda_device=$cuda_device, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs, num_register_tokens=$num_register_tokens, total_frame=$total_frame'" C-m
+    tmux send-keys -t $pane "echo 'Launching process: lr=${lrs[0]}, ftmode=$ftmode on GPU(s) $cuda_device' && dev_init && $cmd_prefix ${lrs[0]} $batch_size $ftmode $cuda_device ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path $cls_token $num_register_tokens $total_frame; echo 'Run completed with parameters: lr=${lrs[0]}, batch_size=$batch_size, ftmode=$ftmode, cuda_device=$cuda_device, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs, num_register_tokens=$num_register_tokens, total_frame=$total_frame'" C-m
     
     ((pane++))
-  done
 done
 
-# Add the 7th pane with the brocm-smi.sh command
-tmux send-keys -t 6 "watch -n 1 bash ~/brocm-smi.sh" C-m
+# Add the 4th pane with the brocm-smi.sh command
+tmux send-keys -t 3 "watch -n 1 bash ~/brocm-smi.sh" C-m
 
 # Attach to the tmux session (optional)
 tmux select-pane -t 0  # Move back to the first pane

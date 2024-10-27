@@ -91,6 +91,7 @@ parser.add_argument("--cls_token", type=ast.literal_eval, default=True, help="Wh
 parser.add_argument("--global_local_losses", type=ast.literal_eval, default=True, help="Whether to use global and local losses")
 parser.add_argument("--augmentation", type=ast.literal_eval, default=False, help="Whether to use data augmentation")
 parser.add_argument("--total_frame", type=int, default=16)
+parser.add_argument("--contrastive_heads", type=ast.literal_eval, default=False, help="Whether to use contrastive heads")
 
 args = parser.parse_args()
 
@@ -152,12 +153,13 @@ if args.data_eval != None:
         batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True,
         collate_fn=train_collate_fn)
 
+print('total frame: ', args.total_frame)
 
 if args.model == 'cav-mae':
     print('pretrain a cav-mae model with 11 modality-specific layers and 1 modality-sharing layers')
     # audio_model = models.CAVMAE(audio_length=args.target_length, norm_pix_loss=args.norm_pix_loss, modality_specific_depth=11, tr_pos=args.tr_pos)
     audio_model = models.CAVMAESync(audio_length=args.target_length, norm_pix_loss=args.norm_pix_loss, modality_specific_depth=11, tr_pos=args.tr_pos, 
-                                    num_register_tokens=args.n_regster_tokens, cls_token=args.cls_token, global_local_losses=args.global_local_losses)
+                                    num_register_tokens=args.n_regster_tokens, cls_token=args.cls_token, global_local_losses=args.global_local_losses, total_frame=args.total_frame, contrastive_heads=args.contrastive_heads)
 else:
     raise ValueError('model not supported')
 
@@ -180,6 +182,13 @@ if args.pretrain_path != 'None':
     print(f"Unexpected keys: {unexpected}")
     print('now load mae pretrained weights from ', args.pretrain_path)
     print(miss, unexpected)
+
+    # Copy weights from blocks_u to contrastive heads
+    if hasattr(audio_model.module, 'blocks_u') and hasattr(audio_model.module, 'constrative_head_audio') and hasattr(audio_model.module, 'constrative_head_visual'):
+        for i in range(min(len(audio_model.module.blocks_u), len(audio_model.module.constrative_head_audio))):
+            audio_model.module.constrative_head_audio[i].load_state_dict(audio_model.module.blocks_u[i].state_dict())
+            audio_model.module.constrative_head_visual[i].load_state_dict(audio_model.module.blocks_u[i].state_dict())
+        print('Copied weights from blocks_u to contrastive heads')
 
 # if args.cont_model != None:
 #     print('now load pretrained weights from : ' + args.cont_model)

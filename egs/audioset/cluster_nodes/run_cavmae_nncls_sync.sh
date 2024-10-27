@@ -15,67 +15,79 @@ export TORCH_HOME=../../pretrained_models
 
 model=cav-mae-ft
 
-# you can replace with any checkpoint you want, but by default, we use cav-mae-scale++
-# pretrain_dir=/local/$SLURM_JOB_ID/models/
-# pretrain_dir=/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_021700/models/
-# pretrain_path=${pretrain_dir}/best_audio_model.pth
-pretrain_path=${11:-/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_183505/models/audio_model.25.pth}
-
-freeze_base=${7:-True}
-# if freeze_base is True, then head_lr is 1, else 100
-if [ "$freeze_base" = True ]; then
-    head_lr=1 # newly initialized ft layers uses 10 times larger than the base lr
-else
-    head_lr=10
-fi
-
-bal=bal
-lr=${1:-1e-4}  # Use the first argument as lr, default to 1e-4 if not provided
+bal=None
+lr=${1:-2e-4}  # Use the first argument as lr, default to 1e-4 if not provided
 batch_size=${2:-48}  # Use the second argument as batch_size, default to 24 if not provided
 ftmode=${3:-multimodal}
 cuda_devices=${4:-0,1,2,3,4,5,6,7}
 aggregate=${5:-self_attention_cls}
 num_workers=${6:-48}
-num_samples=${8:-9999999}
+freeze_base=${7:-True}
+# if freeze_base is True, then head_lr is 1, else 100
+if [ "$freeze_base" = True ]; then
+    head_lr=1 # newly initialized ft layers uses 10 times larger than the base lr
+else
+    head_lr=100
+fi
+num_samples=${8:-999999}
 epoch=${9:-25}
 neptune_tag=${10:-finetuning}
-lrscheduler_start=2
+lrscheduler_start=5
 lrscheduler_decay=0.5
 lrscheduler_step=1
 wa=True
-wa_start=3
-wa_end=10
+wa_start=13
+wa_end=25
 lr_adapt=False
 dataset_mean=-5.081
 dataset_std=4.4849
-target_length=96
+target_length=1024
 noise=True
 freqm=48
 timem=192
 mixup=0.5
 label_smooth=0.1
 lr_scheduler=cosine
+pretrain_path=${11:-/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/audio_model.25.pth}
 cls_token=${12:-False}
 n_register_tokens=${13:-4}
-total_frame=${14:-16}
+total_frame=${14:-10}
 
-dataset=vggsound
-tr_data=datafilles/vggsound/cluster_nodes/vgg_train_cleaned.json
-te_data=datafilles/vggsound/cluster_nodes/vgg_test_cleaned.json
-label_csv=datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv
+#Print all arguments that expect to be passed in
+echo "Arguments:"
+echo "lr: $lr"
+echo "batch_size: $batch_size"
+echo "ftmode: $ftmode"
+echo "cuda_devices: $cuda_devices"
+echo "aggregate: $aggregate"
+echo "num_workers: $num_workers"
+echo "freeze_base: $freeze_base"
+echo "num_samples: $num_samples"
+echo "epoch: $epoch"
+echo "neptune_tag: $neptune_tag"
+echo "target_length: $target_length"
+echo "pretrain_path: $pretrain_path"
+echo "cls_token: $cls_token"
+echo "n_register_tokens: $n_register_tokens"
+echo "total_frame: $total_frame"
+
+dataset=audioset
+tr_data=datafilles/audioset_20k/cluster_nodes/audioset_20k_cleaned.json
+te_data=datafilles/audioset_20k/cluster_nodes/audioset_eval_cleaned_aug24.json
+label_csv=datafilles/audioset_20k/cluster_nodes/class_labels_indices.csv
 
 exp_dir=./exp/testmae02-${dataset}-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-a5-$(date +%Y%m%d_%H%M%S)
 mkdir -p $exp_dir
 
-CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model} --dataset ${dataset} \
+CUDA_VISIBLE_DEVICES=${cuda_devices} CUDA_CACHE_DISABLE=1 python -W ignore src/run_knn_classification_sync.py --model ${model} --dataset ${dataset} \
 --data-train ${tr_data} --data-val ${te_data} --exp-dir $exp_dir \
---label-csv ${label_csv} --n_class 309 \
+--label-csv ${label_csv} --n_class 527 \
 --lr $lr --n-epochs ${epoch} --batch-size $batch_size --save_model True \
 --freqm $freqm --timem $timem --mixup ${mixup} --bal ${bal} \
 --label_smooth ${label_smooth} \
 --lrscheduler_start ${lrscheduler_start} --lrscheduler_decay ${lrscheduler_decay} --lrscheduler_step ${lrscheduler_step} \
 --dataset_mean ${dataset_mean} --dataset_std ${dataset_std} --target_length ${target_length} --noise ${noise} \
---loss CE --metrics acc --warmup True \
+--loss BCE --metrics mAP --warmup True \
 --wa ${wa} --wa_start ${wa_start} --wa_end ${wa_end} --lr_adapt ${lr_adapt} \
 --pretrain_path ${pretrain_path} --ftmode ${ftmode} \
 --freeze_base ${freeze_base} --head_lr ${head_lr} \

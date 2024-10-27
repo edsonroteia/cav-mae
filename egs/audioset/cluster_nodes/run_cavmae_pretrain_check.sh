@@ -37,7 +37,7 @@ noise=True
 mixup=0.0
 batch_size=512
 lr_adapt=False
-lr_scheduler=cosine
+lr_scheduler=step
 
 
 dataset=audioset

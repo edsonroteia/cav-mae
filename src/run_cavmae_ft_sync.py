@@ -116,7 +116,7 @@ run["last_val_ACC"] = 0
 im_res = 224
 
 if args.aggregate != "None":
-    mode = 'eval'
+    mode = 'retrieval'
 else:
     mode = 'train'
 
@@ -171,7 +171,7 @@ if args.data_eval != None:
 
 if args.model == 'cav-mae-ft':
     print('finetune a cav-mae model with 11 modality-specific layers and 1 modality-sharing layers')
-    audio_model = models.CAVMAEFTSync(audio_length=args.target_length, label_dim=args.n_class, modality_specific_depth=11, aggregate=args.aggregate, num_register_tokens=args.n_register_tokens, cls_token=args.cls_token)
+    audio_model = models.CAVMAEFTSync(audio_length=args.target_length, label_dim=args.n_class, modality_specific_depth=11, aggregate=args.aggregate, num_register_tokens=args.n_register_tokens, cls_token=args.cls_token, total_frame=args.total_frame)
 else:
     raise ValueError('model not supported')
 
