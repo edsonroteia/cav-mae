@@ -519,7 +519,7 @@ class CAVMAE(nn.Module):
         if self.multi_ratio_masking:
 
             # Use first element of batch as additional seed component to change between batches
-            seed += int(audio[0][0][0].item() * 1000)
+            seed = int(audio[0][0][0].item() * 1000)
             
             # Set seed for reproducibility across GPUs
             torch.manual_seed(seed)
