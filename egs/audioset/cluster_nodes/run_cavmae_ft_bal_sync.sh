@@ -11,6 +11,12 @@
 # finetune cav-mae pretrained on AS-2M with VGGSound dataset
 # you can change pretrain_path to other cav-mae models
 
+# print help if -h is called
+if [ "$1" = "-h" ]; then
+    echo "Usage: $0 [lr] [batch_size] [ftmode] [cuda_devices] [aggregate] [num_workers] [freeze_base] [num_samples] [epoch] [neptune_tag] [pretrain_path] [cls_token] [n_register_tokens] [total_frame]"
+    exit 0
+fi
+
 export TORCH_HOME=../../pretrained_models
 
 model=cav-mae-ft
