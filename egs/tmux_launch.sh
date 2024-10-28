@@ -100,6 +100,9 @@ for ftmode in "${ftmodes[@]}"; do
     
     # Print the process information
     echo "Launching process: lr=${lrs[0]}, ftmode=$ftmode on GPU(s) $cuda_device"
+    # Print the exact command that will be run
+    echo "Running command:"
+    echo "$cmd_prefix ${lrs[0]} $batch_size $ftmode $cuda_device ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path $cls_token $num_register_tokens $total_frame"
     
     tmux send-keys -t $pane "echo 'Launching process: lr=${lrs[0]}, ftmode=$ftmode on GPU(s) $cuda_device' && dev_init && $cmd_prefix ${lrs[0]} $batch_size $ftmode $cuda_device ${aggregate} $num_workers $freeze_base $num_samples $num_epochs $neptune_tag1 $pretrain_path $cls_token $num_register_tokens $total_frame; echo 'Run completed with parameters: lr=${lrs[0]}, batch_size=$batch_size, ftmode=$ftmode, cuda_device=$cuda_device, aggregate=$aggregate, num_workers=$num_workers, freeze_base=$freeze_base, num_samples=$num_samples, num_epochs=$num_epochs, num_register_tokens=$num_register_tokens, total_frame=$total_frame'" C-m
     
