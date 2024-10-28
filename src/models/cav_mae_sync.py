@@ -644,7 +644,7 @@ class CAVMAE(nn.Module):
         if self.contrastive_heads:
             for blk in self.constrative_head_audio:
                 ca = blk(ca)
-            for blk in self.constrative_head_video:
+            for blk in self.constrative_head_visual:
                 cv = blk(cv)
         
         if self.cls_token:
