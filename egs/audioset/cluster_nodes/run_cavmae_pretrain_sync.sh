@@ -12,7 +12,7 @@
 
 # print manual arguments if any or if help is requested
 if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    echo "Usage: $0 [target_length] [n_regster_tokens] [cls_token] [global_local_losses] [contrast_loss_weight] [debug]"
+    echo "Usage: $0 [target_length] [n_regster_tokens] [cls_token] [global_local_losses] [contrast_loss_weight] [debug] [contrastive_heads] [multi_ratio_masking]"
     exit 0
 fi
 
@@ -51,6 +51,9 @@ if [ $# -gt 0 ]; then
     echo "cls_token: $3"
     echo "global_local_losses: $4"
     echo "contrast_loss_weight: $5"
+    echo "debug: $6"
+    echo "contrastive_heads: $7"
+    echo "multi_ratio_masking: $8"
 fi
 
 # receive target_length, n_regster_tokens, cls_token, global_local_losses as arguments
