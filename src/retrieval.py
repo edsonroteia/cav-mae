@@ -270,6 +270,8 @@ if __name__ == "__main__":
                         help='Directions for evaluation')
     parser.add_argument('--nums_samples', type=int, nargs='+', 
                         help='Number of samples to test')
+    parser.add_argument('--model_names', type=str, nargs='+', 
+                        help='Model names to test')
     args = parser.parse_args()
 
     # Print out the parsed arguments
@@ -315,7 +317,7 @@ if __name__ == "__main__":
         # 'model_2145_25_local': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240925_112229/models/audio_model.25.pth', 'sync_pretrain_registers_cls_global_local'),
         # 'model_2145_25_both': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240925_112229/models/audio_model.25.pth', 'sync_pretrain_registers_cls_global_local'),
         #'cav_mae+++': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.01-p1.0-tpFalse-mr-unstructured-0.75-20241025_161731/models/audio_model.25.pth', 'pretrain_enhanced'),
-        'cav_mae+++0.1_enh': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241026_204342/models/audio_model.25.pth', 'pretrain_enhanced'),
+        #'cav_mae+++0.1_enh': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241026_204342/models/audio_model.25.pth', 'pretrain_enhanced'),
         #'cav_mae+++0.1': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241026_204342/models/audio_model.25.pth', 'pretrain'),
         # 'cav_mae++': ('cav-mae-scale++.pth', 'pretrain_enhanced'),
         # 'cav_mae+': ('cav-mae-scale+.pth', 'pretrain_enhanced'),
@@ -336,9 +338,13 @@ if __name__ == "__main__":
         # 'model_2711_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241018_154127/models/audio_model.25.pth', 'sync_pretrain_registers_cls_2s'),
         # 'model_2782_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241023_220340/models/audio_model.25.pth', 'sync_pretrain_registers_cls_7s'),
         # 'model_2785_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241024_153823/models/audio_model.25.pth', 'sync_pretrain_registers_cls_10s')    
-        #'model_2897_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241027_025558/models/audio_model.25.pth', 'sync_pretrain_registers_cls_3s_ch'),
+        # 'model_2897_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241027_025558/models/audio_model.25.pth', 'sync_pretrain_registers_cls_3s_ch'),
+        'model_2918_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241027_193318/models/audio_model.25.pth', 'sync_pretrain_registers_cls_3s'),
+        'model_2922_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.6-20241027_235223/models/audio_model.25.pth', 'sync_pretrain_registers_cls_3s'),
+        'model_2919_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.9-20241027_234424/models/audio_model.25.pth', 'sync_pretrain_registers_cls_3s'),
+        'model_2926_25': ('/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241028_002037/models/audio_model.25.pth', 'sync_pretrain_registers_cls_3s'),
     }
-    
+
     if len(model_names) == 0:
         print("Model names dictionary is empty. Searching for models in /scratch/ssml/araujo/exp/")
         base_dir = '/scratch/ssml/araujo/exp/'
@@ -357,7 +363,10 @@ if __name__ == "__main__":
         
         print(f"Found {len(model_names)} models to evaluate.")
 
-
+    if args.model_names:
+        model_names = {name: model_names[name] for name in args.model_names}
+    
+    print("Running retrieval for the following models: ", model_names.keys())
 
     res = []
     for dataset in ['audioset', 'vggsound']:
@@ -401,9 +410,9 @@ if __name__ == "__main__":
                     audio_conf = {'num_mel_bins': 128, 'target_length': target_length, 'freqm': 0, 'timem': 0, 'mixup': 0, 'dataset': dataset,
                                 'mode': 'retrieval', 'mean': -5.081, 'std': 4.4849, 'noise': False, 'im_res': 224, 'frame_use': 5, 'num_samples': num_samples, 'total_frame': 16}
                     if 'local' in model_name:
-                        r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=50, strategy=strategy, num_register_tokens=8 if '1970' in model_name else 4, cls_token=cls_token, local_matching=True)
+                        r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=50, strategy=strategy, num_register_tokens=8 if '2918' in model_name else 4, cls_token=cls_token, local_matching=True)
                     else:
-                        r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=50, strategy=strategy, num_register_tokens=8 if '1970' in model_name else 4, cls_token=cls_token, local_matching=False)
+                        r1, r5, r10, mr = eval_retrieval(model_path, data, audio_conf=audio_conf, label_csv=label_csv, num_class=num_class, direction=direction, model_type=model_type, batch_size=50, strategy=strategy, num_register_tokens=8 if '2918' in model_name else 4, cls_token=cls_token, local_matching=False)
                     res.append([model_name, dataset, direction, num_samples, r1, r5, r10, mr])
                     res_sorted = sorted(res, key=lambda x: x[-1])  # Sort by MR
                     print("\nCurrent Results Table:")
