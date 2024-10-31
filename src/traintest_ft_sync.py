@@ -175,7 +175,7 @@ def train(audio_model, train_loader, test_loader, args, run):
         print("Max Iterations {} = epochs {} * iter_per_epoch{}".format(max_iter, args.n_epochs, len(train_loader)))
         scheduler = scheduler = CosineWarmupScheduler(
             optimizer,
-            warmup_epochs=max_iter * 0.1,
+            warmup_epochs=max_iter * 0.02,
             max_epochs=max_iter,
             min_lr=args.lr * 0.1,
             max_lr=args.lr
