@@ -68,9 +68,9 @@ total_frame=${14:-16}
 
 
 dataset=vggsound
-tr_data=datafilles/vggsound/cluster_nodes/vgg_train_cleaned.json
-te_data=datafilles/vggsound/cluster_nodes/vgg_test_cleaned.json
-label_csv=datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv
+tr_data=${15:-datafilles/vggsound/cluster_nodes/vgg_train_cleaned.json}
+te_data=${16:-datafilles/vggsound/cluster_nodes/vgg_test_cleaned.json}
+label_csv=${17:-datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv}
 
 exp_dir=./exp/testmae02-${dataset}-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-a5-$(date +%Y%m%d_%H%M%S)
 mkdir -p $exp_dir
