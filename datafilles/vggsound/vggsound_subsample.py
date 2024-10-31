@@ -4,14 +4,15 @@ import os
 from pathlib import Path
 from collections import Counter
 import numpy as np
-
+import argparse
 def create_subsampled_dataset(n_classes, train_path='datafilles/vggsound/cluster_nodes/vgg_train_cleaned.json', 
                             eval_path='datafilles/vggsound/cluster_nodes/vgg_test_cleaned.json', 
                             output_dir='datafilles/vggsound/cluster_nodes/',
                             random_seed=42):
-    # Set random seed
+    # Set all seeds for reproducibility
     random.seed(random_seed)
     np.random.seed(random_seed)
+    os.environ['PYTHONHASHSEED'] = str(random_seed)
     
     # Load the training dataset
     with open(train_path, 'r') as f:
@@ -101,7 +102,12 @@ def create_subsampled_dataset(n_classes, train_path='datafilles/vggsound/cluster
     print(f"Class labels: {labels_output}")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Create subsampled VGGSound dataset")
+    parser.add_argument("--num_classes", type=int, default=30, help="Number of classes to subsample")
+    parser.add_argument("--random_seed", type=int, default=42, help="Random seed for reproducibility")
+    args = parser.parse_args()
+
     # You can modify these numbers to get different class counts
-    N_CLASSES = 30
-    RANDOM_SEED = 42
+    N_CLASSES = args.num_classes
+    RANDOM_SEED = args.random_seed
     create_subsampled_dataset(N_CLASSES, random_seed=RANDOM_SEED)

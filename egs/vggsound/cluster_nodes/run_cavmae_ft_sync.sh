@@ -71,13 +71,14 @@ dataset=vggsound
 tr_data=${15:-datafilles/vggsound/cluster_nodes/vgg_train_cleaned.json}
 te_data=${16:-datafilles/vggsound/cluster_nodes/vgg_test_cleaned.json}
 label_csv=${17:-datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv}
+num_classes=${18:-309}
 
 exp_dir=./exp/testmae02-${dataset}-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-a5-$(date +%Y%m%d_%H%M%S)
 mkdir -p $exp_dir
 
 CUDA_VISIBLE_DEVICES=${cuda_devices} CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model} --dataset ${dataset} \
 --data-train ${tr_data} --data-val ${te_data} --exp-dir $exp_dir \
---label-csv ${label_csv} --n_class 309 \
+--label-csv ${label_csv} --n_class ${num_classes} \
 --lr $lr --n-epochs ${epoch} --batch-size $batch_size --save_model True \
 --freqm $freqm --timem $timem --mixup ${mixup} --bal ${bal} \
 --label_smooth ${label_smooth} \
