@@ -208,7 +208,10 @@ def train(audio_model, train_loader, test_loader, args, run):
         print(datetime.datetime.now())
         print("current #epochs=%s, #steps=%s" % (epoch, global_step))
 
-        for i, (a_input, v_input, labels, _, _) in tqdm(enumerate(train_loader)):
+        # Show a progress bar with tqdm
+        pbar = tqdm(train_loader, desc=f'Epoch {epoch}/{args.n_epochs}', leave=True)
+        
+        for i, (a_input, v_input, labels, _, _) in enumerate(pbar):
                 
             B = a_input.size(0)
             a_input, v_input = a_input.to(device, non_blocking=True), v_input.to(device, non_blocking=True)
@@ -251,13 +254,13 @@ def train(audio_model, train_loader, test_loader, args, run):
             print_step = print_step or early_print_step
 
             if print_step and global_step != 0:
-                print('Epoch: [{0}][{1}/{2}]\t'
-                  'Per Sample Total Time {per_sample_time.avg:.5f}\t'
-                  'Per Sample Data Time {per_sample_data_time.avg:.5f}\t'
-                  'Per Sample DNN Time {per_sample_dnn_time.avg:.5f}\t'
-                  'Train Loss {loss_meter.val:.4f}\t'.format(
-                   epoch, i, len(train_loader), per_sample_time=per_sample_time, per_sample_data_time=per_sample_data_time,
-                      per_sample_dnn_time=per_sample_dnn_time, loss_meter=loss_meter), flush=True)
+                # print('Epoch: [{0}][{1}/{2}]\t'
+                #   'Per Sample Total Time {per_sample_time.avg:.5f}\t'
+                #   'Per Sample Data Time {per_sample_data_time.avg:.5f}\t'
+                #   'Per Sample DNN Time {per_sample_dnn_time.avg:.5f}\t'
+                #   'Train Loss {loss_meter.val:.4f}\t'.format(
+                #    epoch, i, len(train_loader), per_sample_time=per_sample_time, per_sample_data_time=per_sample_data_time,
+                #       per_sample_dnn_time=per_sample_dnn_time, loss_meter=loss_meter), flush=True)
                 if np.isnan(loss_meter.avg):
                     print("training diverged...")
                     return
@@ -274,6 +277,7 @@ def train(audio_model, train_loader, test_loader, args, run):
         acc = stats[0]['acc'] # this is just a trick, acc of each class entry is the same, which is the accuracy of all classes, not class-wise accuracy
 
         print("mAP: {:.6f}".format(mAP))
+        print("acc: {:.6f}".format(acc))
         print("AUC: {:.6f}".format(mAUC))
         print("d_prime: {:.6f}".format(d_prime(mAUC)))
         print("train_loss: {:.6f}".format(loss_meter.avg))
@@ -282,6 +286,8 @@ def train(audio_model, train_loader, test_loader, args, run):
         # Log important metrics
         run["valid/mAP"].log(mAP, step=epoch)
         run["valid/AUC"].log(mAUC, step=epoch)
+        run["valid/acc/ours"].log(acc, step=epoch)
+        run["valid/acc/cavmae"].log(0.542, step=epoch)
         run["valid/d_prime"].log(d_prime(mAUC), step=epoch)
         run["train/epoch_loss"].log(loss_meter.avg, step=epoch)
         run["valid/loss"].log(valid_loss, step=epoch)

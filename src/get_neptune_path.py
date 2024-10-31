@@ -1,9 +1,25 @@
 import neptune
 import logging
+import argparse
 logging.getLogger("neptune").setLevel(logging.CRITICAL)
 
-with open('run_ids.txt', 'r') as file:
-    run_ids = [line.strip() for line in file.readlines()]
+# Add argument parser
+parser = argparse.ArgumentParser(description='Get Neptune model paths for given run IDs')
+parser.add_argument('--file', type=str, help='File containing run IDs (one per line)')
+parser.add_argument('--ids', nargs='+', help='Space-separated list of run IDs')
+args = parser.parse_args()
+
+# Get run IDs either from file or command line
+run_ids = []
+if args.file:
+    with open(args.file, 'r') as file:
+        run_ids.extend(line.strip() for line in file.readlines())
+if args.ids:
+    run_ids.extend(args.ids)
+
+# Ensure we have at least one run ID
+if not run_ids:
+    parser.error("Please provide run IDs either through --file or --ids")
 
 for run_id in run_ids:
     # Initialize Neptune connection

@@ -1,0 +1,16 @@
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-2 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-3 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-4 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;    
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-5 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-2 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2922 True 4 16 ;
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-3 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2922 True 4 16 ;
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-4 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2922 True 4 16 ;    
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-5 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2922 True 4 16 ;
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-2 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2919 True 4 16 ;
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-3 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2919 True 4 16 ;
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-4 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2919 True 4 16 ;    
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-5 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2919 True 4 16 ;
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-2 96 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-3 96 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-4 96 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;    
+bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-5 96 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;

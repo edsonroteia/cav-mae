@@ -280,23 +280,26 @@ for wa_start in range(args.wa_start, args.n_epochs, 5):
         # Save the results with the corresponding wa configuration
         results.append((f"wa_start: {wa_start}, wa_interval: {wa_interval}", cur_res))
 
-# Print results in a table format
-print("\nResults Summary:")
-print("{:<30} {:<10}".format("Models Aggregated", "Final Result"))
-for model_info, result in results:
-    print("{:<30} {:<10.4f}".format(model_info, result))
+try:
+    # Print results in a table format
+    print("\nResults Summary:")
+    print("{:<30} {:<10}".format("Models Aggregated", "Final Result"))
+    for model_info, result in results:
+        print("{:<30} {:<10.4f}".format(model_info, result))
 
-import pandas as pd
-# Log the results summary table to Neptune
-table_data = {
-    "Models Aggregated": [model_info for model_info, _ in results],
-    "Final Result": [result for _, result in results]
-}
-run["results/summary"].upload(neptune.types.File.as_html(pd.DataFrame(table_data)))
+    import pandas as pd
+    # Log the results summary table to Neptune
+    table_data = {
+        "Models Aggregated": [model_info for model_info, _ in results],
+        "Final Result": [result for _, result in results]
+    }
+    run["results/summary"].upload(neptune.types.File.as_html(pd.DataFrame(table_data)))
 
-# Log the best performing weight averaging configuration
-best_wa_result = max(results, key=lambda x: x[1])
-run["best_wa_config"] = best_wa_result[0]
-run["best_wa_result"] = best_wa_result[1]
+    # Log the best performing weight averaging configuration
+    best_wa_result = max(results, key=lambda x: x[1])
+    run["best_wa_config"] = best_wa_result[0]
+    run["best_wa_result"] = best_wa_result[1]
+except Exception as e:
+    print(f"No aggregation was performed")
 
 run.stop()
