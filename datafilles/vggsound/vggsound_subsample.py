@@ -33,10 +33,10 @@ def create_subsampled_dataset(n_classes, train_path='datafilles/vggsound/cluster
             return
     
     # Get unique classes from training data
-    all_classes = set(item['labels'] for item in train_data)
+    all_classes = sorted(list(set(item['labels'] for item in train_data)))  # Sort for consistency
     
     # Randomly select n_classes
-    selected_classes = random.sample(list(all_classes), n_classes)
+    selected_classes = random.sample(all_classes, n_classes)
     
     # Filter both datasets to only include selected classes
     subsampled_train = [item for item in train_data if item['labels'] in selected_classes]
