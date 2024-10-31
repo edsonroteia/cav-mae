@@ -1,16 +1,46 @@
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-2 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-3 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-4 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;    
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-5 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-2 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2922 True 4 16 ;
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-3 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2922 True 4 16 ;
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-4 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2922 True 4 16 ;    
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-5 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2922 True 4 16 ;
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-2 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2919 True 4 16 ;
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-3 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2919 True 4 16 ;
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-4 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2919 True 4 16 ;    
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-5 48 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2919 True 4 16 ;
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-2 96 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-3 96 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-4 96 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;    
-bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh 1e-5 96 multimodal 0,1,2,3,4,5,6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound 2776 True 4 16 ;
+#!/bin/bash
+
+num_classes=${1:-20}
+
+# 1. Create subsampled dataset with 30 classes
+echo "Creating subsampled dataset with $num_classes classes..."
+python datafiles/vggsound/vggsound_subsample.py --num_classes $num_classes
+
+# 2. Clean json files
+echo "Cleaning json files..."
+python datafiles/clean_json_files.py datafiles/vggsound/cluster_nodes
+
+# 3. Create tmux session
+SESSION="training"
+tmux new-session -d -s $SESSION
+
+# Split window into 6 panes
+tmux split-window -h -t $SESSION:0
+tmux split-window -v -t $SESSION:0.1
+tmux select-pane -t $SESSION:0.0
+tmux split-window -v -t $SESSION:0.0
+tmux split-window -v -t $SESSION:0.2
+tmux split-window -v -t $SESSION:0.4
+
+# Launch htop in top-right pane
+tmux send-keys -t $SESSION:0.1 'htop' C-m
+
+# Launch nvidia-smi watch in bottom-right pane
+tmux send-keys -t $SESSION:0.3 'watch -n 1 bash ~/.brocm-smi.sh' C-m
+
+# let's have as parameters, the learning rate, and the model ID
+# Comma-separated learning rates, default "1e-2,1e-3,1e-4,1e-5"
+lr1=1e-3
+lr2=8e-4
+lr3=5e-4
+lr4=1e-4
+model_id=${2:-2776}  # Use second argument as model_id, default to 2776 if not provided
+
+# Launch training runs in remaining panes with different model IDs
+tmux send-keys -t $SESSION:0.0 "bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh $lr1 48 multimodal 0,1 self_attention_cls 16 True 99999 10 finetuning_vggsound $model_id True 4 16" C-m
+tmux send-keys -t $SESSION:0.2 "bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh $lr2 48 multimodal 2,3 self_attention_cls 16 True 99999 10 finetuning_vggsound $model_id True 4 16" C-m
+tmux send-keys -t $SESSION:0.4 "bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh $lr3 48 multimodal 4,5 self_attention_cls 16 True 99999 10 finetuning_vggsound $model_id True 4 16" C-m
+tmux send-keys -t $SESSION:0.5 "bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh $lr4 96 multimodal 6,7 self_attention_cls 16 True 99999 10 finetuning_vggsound $model_id True 4 16" C-m
+
+# Attach to tmux session
+tmux attach-session -t $SESSION
