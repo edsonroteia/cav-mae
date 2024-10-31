@@ -8,11 +8,11 @@ python datafiles/vggsound/vggsound_subsample.py --num_classes $num_classes
 
 # 2. Clean json files
 echo "Cleaning json files..."
-python datafiles/clean_json_files.py datafiles/vggsound/cluster_nodes
+python datafilles/clean_json_files.py datafiles/vggsound/cluster_nodes
 
-# 3. Create tmux session
+# 3. Create new window in existing tmux session
 SESSION="training"
-tmux new-session -d -s $SESSION
+tmux new-window -t $SESSION
 
 # Split window into 6 panes
 tmux split-window -h -t $SESSION:0
