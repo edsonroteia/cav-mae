@@ -26,7 +26,7 @@ model_id=${2:-2776}
 lr1=1e-3
 lr2=8e-4
 lr3=5e-4
-lr4=1e-4
+lr4=3e-3
 
 # Print the commands that will be run
 echo "Running the following commands:"
