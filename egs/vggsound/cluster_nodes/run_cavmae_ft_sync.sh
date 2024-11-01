@@ -36,7 +36,6 @@ freqm=48
 timem=192
 mixup=0.5
 label_smooth=0.1
-lr_scheduler=cosine
 
 bal=bal
 lr=${1:-1e-4}  # Use the first argument as lr, default to 1e-4 if not provided
@@ -91,6 +90,7 @@ tr_data=${15:-datafilles/vggsound/cluster_nodes/vgg_train_cleaned.json}
 te_data=${16:-datafilles/vggsound/cluster_nodes/vgg_test_cleaned.json}
 label_csv=${17:-datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv}
 num_classes=${18:-309}
+lr_scheduler=${19:-step}
 
 exp_dir=./exp/testmae02-${dataset}-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-a5-$(date +%Y%m%d_%H%M%S)
 mkdir -p $exp_dir
