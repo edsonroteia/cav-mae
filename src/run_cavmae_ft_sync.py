@@ -98,6 +98,7 @@ parser.add_argument("--augmentation", type=ast.literal_eval, default=True)
 parser.add_argument("--neptune_tag", type=str, default="finetuning")
 parser.add_argument("--cls_token", type=ast.literal_eval, default=True)
 parser.add_argument("--total_frame", type=int, default=16)
+parser.add_argument("--model_id", type=int, default=None)
 args = parser.parse_args()
 
 run = neptune.init_run(
@@ -105,6 +106,9 @@ run = neptune.init_run(
     api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJmNGE4NDA2NS1hYmE2LTQ3YWYtODllMC02ODk4NGNlODY0MDUifQ==",
     tags=["finetuning", args.neptune_tag],
 )  # your credentials
+
+run["model_id"] = args.model_id
+run["lr_scheduler"] = args.lr_scheduler
 
 # Add these variables after initializing the Neptune run
 run["best_val_mAP"] = 0

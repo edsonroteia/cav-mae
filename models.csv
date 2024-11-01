@@ -16,4 +16,4 @@ cav_mae++,cav-mae-scale++.pth,0,10,False
 2922,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.6-20241027_235223/models/audio_model.25.pth,0,16,False
 2919,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.9-20241027_234424/models/audio_model.25.pth,0,16,False
 2926,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241028_002037/models/audio_model.25.pth,0,16,False
-2918,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241027_193318/models/audio_model.25.pth,4,16,False
+2918,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241027_193318/models/audio_model.25.pth,8,16,False

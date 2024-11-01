@@ -66,6 +66,25 @@ cls_token=${12:-True}
 n_register_tokens=${13:-4}
 total_frame=${14:-16}
 
+#name,path,num_register_tokens,total_frame,contrastive_head
+# 1624,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_021700/models/audio_model.25.pth,0,10,False
+# 1921,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240920_204943/models/audio_model.25.pth,4,10,False
+# 1970,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240922_181136/models/audio_model.25.pth,8,10,False
+# 1983,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240922_222603/models/audio_model.25.pth,4,10,False
+# 1984,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.05-p1.0-tpFalse-mr-unstructured-0.75-20240922_222719/models/audio_model.25.pth,4,10,False
+# 2145,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240925_112229/models/audio_model.25.pth,4,10,False
+# 2618,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_183505/models/audio_model.25.pth,0,16,False
+# 2625,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_184319/models/audio_model.25.pth,4,16,False
+# 2626,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_184455/models/audio_model.25.pth,4,16,False
+# 2675,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.01-p1.0-tpFalse-mr-unstructured-0.75-20241017_184725/models/audio_model.25.pth,0,16,False
+# 2676,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.01-p1.0-tpFalse-mr-unstructured-0.75-20241017_184808/models/audio_model.25.pth,4,16,False
+# cav_mae++,cav-mae-scale++.pth,0,10,False
+# 2776,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241023_112228/models/audio_model.25.pth,4,16,False
+# 2897,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241027_025558/models/audio_model.25.pth,4,16,True
+# 2922,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.6-20241027_235223/models/audio_model.25.pth,0,16,False
+# 2919,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.9-20241027_234424/models/audio_model.25.pth,0,16,False
+# 2926,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241028_002037/models/audio_model.25.pth,0,16,False
+# 2918,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241027_193318/models/audio_model.25.pth,4,16,False
 
 dataset=vggsound
 tr_data=${15:-datafilles/vggsound/cluster_nodes/vgg_train_cleaned.json}
@@ -90,4 +109,5 @@ CUDA_VISIBLE_DEVICES=${cuda_devices} CUDA_CACHE_DISABLE=1 python -W ignore src/r
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
 --num-workers ${num_workers} --aggregate ${aggregate} --lr_scheduler ${lr_scheduler} \
 --num_samples ${num_samples} --neptune_tag ${neptune_tag} --cls_token ${cls_token} \
---n_register_tokens ${n_register_tokens} --total_frame ${total_frame}
+--n_register_tokens ${n_register_tokens} --total_frame ${total_frame} \
+--model_id ${pretrain_model}
