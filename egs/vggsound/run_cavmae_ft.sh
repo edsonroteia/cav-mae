@@ -16,7 +16,6 @@ ftmode=multimodal
 
 # you can replace with any checkpoint you want, but by default, we use cav-mae-scale++
 cur_dir=$(pwd)
-wget -nc https://www.dropbox.com/s/l5t5geufdy3qvnv/audio_model.21.pth?dl=1 -O cav-mae-scale++.pth
 pretrain_path=${cur_dir}/${1:-cav-mae-scale++.pth}
 
 freeze_base=True
@@ -43,8 +42,8 @@ batch_size=48
 label_smooth=0.1
 
 dataset=vggsound
-tr_data=datafilles/vggsound/cluster_nodes/vgg_train_20.json
-te_data=datafilles/vggsound/cluster_nodes/vgg_test_20.json
+tr_data=datafilles/vggsound/cluster_nodes/vgg_train_cleaned.json
+te_data=datafilles/vggsound/cluster_nodes/vgg_test_cleaned.json
 
 exp_dir=./exp/testmae02-${dataset}-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-a5
 mkdir -p $exp_dir
@@ -52,7 +51,7 @@ mkdir -p $exp_dir
 visible_devices=${2:-0,1,2,3}
 CUDA_VISIBLE_DEVICES=$visible_devices CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft.py --model ${model} --dataset ${dataset} \
 --data-train ${tr_data} --data-val ${te_data} --exp-dir $exp_dir \
---label-csv datafilles/vggsound/cluster_nodes/class_labels_indices_vgg_20.csv --n_class 20 \
+--label-csv datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv --n_class 309 \
 --lr $lr --n-epochs ${epoch} --batch-size $batch_size --save_model True \
 --freqm $freqm --timem $timem --mixup ${mixup} --bal ${bal} \
 --label_smooth ${label_smooth} \
@@ -62,4 +61,4 @@ CUDA_VISIBLE_DEVICES=$visible_devices CUDA_CACHE_DISABLE=1 python -W ignore src/
 --wa ${wa} --wa_start ${wa_start} --wa_end ${wa_end} --lr_adapt ${lr_adapt} \
 --pretrain_path ${pretrain_path} --ftmode ${ftmode} \
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
---num-workers 32
+--num-workers 48
