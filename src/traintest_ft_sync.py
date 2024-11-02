@@ -211,6 +211,10 @@ def train(audio_model, train_loader, test_loader, args, run):
         # Show a progress bar with tqdm
         pbar = tqdm(train_loader, desc=f'Epoch {epoch}/{args.n_epochs}', leave=True)
         
+        # Track predictions and targets during training
+        train_predictions = []
+        train_targets = []
+        
         for i, (a_input, v_input, labels, _, _) in enumerate(pbar):
                 
             B = a_input.size(0)
@@ -267,6 +271,17 @@ def train(audio_model, train_loader, test_loader, args, run):
 
             end_time = time.time()
             global_step += 1
+
+            # Store predictions and targets for accuracy calculation
+            with torch.no_grad():
+                train_predictions.append(audio_output.detach().cpu())
+                # Store original binary labels, not smoothed ones
+                if args.label_smooth > 0:
+                    # Convert smoothed labels back to binary
+                    binary_labels = (labels > 0.5).float()
+                    train_targets.append(binary_labels.detach().cpu())
+                else:
+                    train_targets.append(labels.detach().cpu())
 
         print('start validation')
 
@@ -370,6 +385,27 @@ def train(audio_model, train_loader, test_loader, args, run):
         run["valid/epoch_acc"].log(acc, step=epoch)
         run["valid/epoch_auc"].log(mAUC, step=epoch)
 
+        # Calculate training accuracy at the end of each epoch
+        train_predictions = torch.cat(train_predictions)
+        train_targets = torch.cat(train_targets)
+        
+        # Apply appropriate activation based on loss type
+        if args.loss == 'BCE':
+            train_predictions = torch.sigmoid(train_predictions)
+        else:  # CE loss
+            train_predictions = torch.softmax(train_predictions, dim=-1)
+            
+        train_stats = calculate_stats(train_predictions, train_targets)
+        train_acc = train_stats[0]['acc']
+        train_mAP = np.mean([stat['AP'] for stat in train_stats])
+        
+        # Log training metrics
+        run["train/epoch_acc"].log(train_acc, step=epoch)
+        run["train/epoch_mAP"].log(train_mAP, step=epoch)
+        
+        print("Train acc: {:.6f}".format(train_acc))
+        print("Train mAP: {:.6f}".format(train_mAP))
+
         epoch += 1
 
         batch_time.reset()
@@ -421,7 +457,6 @@ def validate(audio_model, val_loader, args, output_pred=False):
         audio_output = torch.cat(A_predictions)
         target = torch.cat(A_targets)
         loss = torch.stack(A_loss).mean().item()
-
         stats = calculate_stats(audio_output, target)
 
     if output_pred == False:
