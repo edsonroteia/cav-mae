@@ -666,7 +666,7 @@ class CAVMAE(nn.Module):
 # the finetuned CAV-MAE model
 class CAVMAEFT(nn.Module):
     def __init__(self, label_dim, img_size=224, audio_length=1024, patch_size=16, in_chans=3,
-                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True, aggregate='None', num_register_tokens=0, cls_token=False, total_frame=16):
+                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True, aggregate='None', num_register_tokens=0, cls_token=False, total_frame=16, contrastive_head=False, joint_layers=1):
         super().__init__()
         timm.models.vision_transformer.Block = Block
         print('Use norm_pix_loss: ', norm_pix_loss)
@@ -690,7 +690,10 @@ class CAVMAEFT(nn.Module):
 
         self.blocks_a = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
         self.blocks_v = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(modality_specific_depth)])
-        self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(12 - modality_specific_depth)])
+        if joint_layers > 1:
+            self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(joint_layers)])
+        else:
+            self.blocks_u = nn.ModuleList([Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer) for i in range(12 - modality_specific_depth)])
 
         self.num_register_tokens = num_register_tokens
         print('Number of Registers: {:d}'.format(self.num_register_tokens))
