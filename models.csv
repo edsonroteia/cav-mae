@@ -35,5 +35,3 @@ name,path,num_register_tokens,total_frame,contrastive_head,target_length,joint_l
 2919,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.9-20241027_234424/models/audio_model.25.pth,4,16,False,304,1
 2926,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241028_002037/models/audio_model.25.pth,4,16,False,304,1
 2918,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241027_193318/models/audio_model.25.pth,8,16,False,304,1
-
-bash run_ft_sequential.sh 20 261 step

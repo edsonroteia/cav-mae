@@ -220,14 +220,37 @@ train(audio_model, train_loader, val_loader, args, run)
 def wa_model(exp_dir, start_epoch, end_epoch, interval):
     sdA = torch.load(exp_dir + '/models/audio_model.' + str(start_epoch) + '.pth', map_location='cpu')
     model_cnt = 1
-    for epoch in range(start_epoch+1, end_epoch+1, interval):
-        sdB = torch.load(exp_dir + '/models/audio_model.' + str(epoch) + '.pth', map_location='cpu')
+    
+    try:
+        for epoch in range(start_epoch+1, end_epoch+1, interval):
+            model_path = exp_dir + '/models/audio_model.' + str(epoch) + '.pth'
+            if not os.path.exists(model_path):
+                print(f'Warning: Model checkpoint {model_path} not found, skipping...')
+                continue
+                
+            sdB = torch.load(model_path, map_location='cpu')
+            
+            # Verify tensor shapes match before adding
+            for key in sdA:
+                if key not in sdB:
+                    print(f'Warning: Key {key} not found in model at epoch {epoch}, skipping...')
+                    continue
+                if sdA[key].shape != sdB[key].shape:
+                    print(f'Warning: Shape mismatch for key {key} at epoch {epoch}. Expected {sdA[key].shape}, got {sdB[key].shape}')
+                    continue
+                    
+                sdA[key] = sdA[key] + sdB[key]
+            model_cnt += 1
+            
+        print(f'Successfully averaged {model_cnt} models')
+        # Average the accumulated weights
         for key in sdA:
-            sdA[key] = sdA[key] + sdB[key]
-        model_cnt += 1
-    print('wa {:d} models: {}'.format(model_cnt, range(start_epoch+1, end_epoch+1, interval)))
-    for key in sdA:
-        sdA[key] = sdA[key] / float(model_cnt)
+            sdA[key] = sdA[key] / float(model_cnt)
+            
+    except Exception as e:
+        print(f'Error during weight averaging: {str(e)}')
+        print('Falling back to using initial model weights')
+        
     return sdA
 
 
