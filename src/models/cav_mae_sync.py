@@ -766,6 +766,7 @@ class CAVMAEFT(nn.Module):
         torch.nn.init.normal_(self.modality_a, std=.02)
         torch.nn.init.normal_(self.modality_v, std=.02)
 
+        torch.nn.init.normal_(self.cls_cls_token, std=.02)
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
