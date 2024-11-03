@@ -732,8 +732,8 @@ class CAVMAEFT(nn.Module):
             ])
             self.classifier_norm = norm_layer(embed_dim)
             self.classifier_head = nn.Linear(embed_dim, label_dim)
-            # Add positional embedding for this transformer classifier
-            self.classifier_pos_embed = nn.Parameter(torch.zeros(1, total_frame+1, embed_dim), requires_grad=tr_pos)
+            # # Add positional embedding for this transformer classifier
+            # self.classifier_pos_embed = nn.Parameter(torch.zeros(1, total_frame+1, embed_dim), requires_grad=tr_pos)
         else:
             self.mlp_head = nn.Sequential(nn.LayerNorm(embed_dim), nn.Linear(embed_dim, label_dim))
 
@@ -756,9 +756,9 @@ class CAVMAEFT(nn.Module):
         pos_embed_v = get_2d_sincos_pos_embed(self.pos_embed_v.shape[-1], int(self.patch_embed_v.num_patches ** .5), int(self.patch_embed_v.num_patches ** .5), cls_token=False)
         self.pos_embed_v.data.copy_(torch.from_numpy(pos_embed_v).float().unsqueeze(0))
 
-        classifier_seq_len = self.total_frame + 1
-        pos_embed_classifier = get_2d_sincos_pos_embed(self.classifier_pos_embed.shape[-1], int(classifier_seq_len ** .5), int(classifier_seq_len ** .5), cls_token=True)
-        self.classifier_pos_embed.data.copy_(torch.from_numpy(pos_embed_classifier).float().unsqueeze(0))
+        # classifier_seq_len = self.total_frame + 1
+        # pos_embed_classifier = get_2d_sincos_pos_embed(self.classifier_pos_embed.shape[-1], int(classifier_seq_len ** .5), int(classifier_seq_len ** .5), cls_token=True)
+        # self.classifier_pos_embed.data.copy_(torch.from_numpy(pos_embed_classifier).float().unsqueeze(0))
         
         w = self.patch_embed_a.proj.weight.data
         torch.nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
@@ -853,10 +853,10 @@ class CAVMAEFT(nn.Module):
                 #     cls_tokens = cls_tokens.unsqueeze(1)
                 #     x = torch.cat((cls_tokens, x), dim=2)
                 # Add CLS token
-                classifier_pos_embed = self.classifier_pos_embed.expand(batch_size, -1, -1)
+                # classifier_pos_embed = self.classifier_pos_embed.expand(batch_size, -1, -1)
                 cls_tokens = self.cls_cls_token.expand(batch_size, -1, -1)
                 x = torch.cat((cls_tokens, x), dim=1)
-                x = x + classifier_pos_embed
+                # x = x + classifier_pos_embed
 
                 # Apply classifier layers
                 for block in self.classifier_layers:
