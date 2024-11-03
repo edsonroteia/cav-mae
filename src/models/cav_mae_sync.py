@@ -725,13 +725,13 @@ class CAVMAEFT(nn.Module):
                 nn.Linear(embed_dim, label_dim)
             )
         elif self.aggregate == "self_attention_cls":
-            self.cls_cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
+            self.cls_cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim*2))
             self.classifier_layers = nn.ModuleList([
-                Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer)
+                Block(embed_dim*2, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer)
                 for _ in range(2)  # You can adjust the number of layers as needed
             ])
-            self.classifier_norm = norm_layer(embed_dim)
-            self.classifier_head = nn.Linear(embed_dim, label_dim)
+            self.classifier_norm = norm_layer(embed_dim*2)
+            self.classifier_head = nn.Linear(embed_dim*2, label_dim)
             # # Add positional embedding for this transformer classifier
             # self.classifier_pos_embed = nn.Parameter(torch.zeros(1, total_frame+1, embed_dim), requires_grad=tr_pos)
         else:
@@ -831,29 +831,28 @@ class CAVMAEFT(nn.Module):
             num_a_tokens = a.shape[1]  # Includes CLS_A
             num_v_tokens = v.shape[1]  # Includes CLS_V
 
-            # Concatenate audio and visual tokens without cls tokens
+            # Concatenate audio and visual tokens with cls tokens
             x = torch.cat((a, v), dim=1) 
 
             for blk in self.blocks_u:
                 x = blk(x)
             x = self.norm(x)
+            if self.cls_token:
+                # Extract the cls tokens
+                cls_tokens_a = a[:, 0, :]
+                cls_tokens_v = v[:, 0, :]
+
+                x = torch.cat((cls_tokens_a, cls_tokens_v), dim=1)
+            else:
+                a = a.mean(dim=1).squeeze()
+                v = v.mean(dim=1).squeeze()
+                x = torch.cat((a, v), dim=1)
 
             if self.aggregate == "self_attention_cls":
                 # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
                 batch_size = x.shape[0] // self.total_frame 
-                x = x.view(batch_size, self.total_frame, -1, x.shape[-1])
+                x = x.view(batch_size, self.total_frame, x.shape[-1])
                 
-                # Average across patches
-                x = x.mean(dim=2)
-                # if backbone had a cls_token, initialize the ft cls token with the average of the cls tokens from each modality
-                # if self.cls_token:
-                #     cls_tokens_a = x[:, 0, :].mean(dim=1)
-                #     cls_tokens_v = x[:, len(),:].mean(dim=1)
-                #     cls_tokens = torch.cat((cls_tokens_a, cls_tokens_v), dim=1)
-                #     cls_tokens = cls_tokens.unsqueeze(1)
-                #     x = torch.cat((cls_tokens, x), dim=2)
-                # Add CLS token
-                # classifier_pos_embed = self.classifier_pos_embed.expand(batch_size, -1, -1)
                 cls_tokens = self.cls_cls_token.expand(batch_size, -1, -1)
                 x = torch.cat((cls_tokens, x), dim=1)
                 # x = x + classifier_pos_embed
