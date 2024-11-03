@@ -17,6 +17,7 @@ from torch.cuda.amp import autocast
 from torch import nn
 from tqdm import tqdm
 from sklearn.manifold import TSNE
+from sklearn.decomposition import TruncatedSVD
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -31,14 +32,18 @@ def extract_features(audio_model, val_loader, model_type='pretrain', cls_token=F
 
     A_a_feat, A_v_feat = [], []
     video_ids = []
+    all_labels = []  # Renamed to avoid confusion
+    
     with torch.no_grad():
         for i, batch in tqdm(enumerate(val_loader), total=len(val_loader), desc="Processing batches"):
             if 'sync' or 'enhanced' in model_type:
-                a_input, v_input, labels, video_id, frame_indices = batch
+                a_input, v_input, batch_labels, video_id, frame_indices = batch
                 video_ids.extend(video_id)
+                all_labels.extend(batch_labels)  # Store batch labels
             else:
-                (a_input, v_input, labels) = batch
-                video_ids.extend([f"video_{i}_{j}" for j in range(len(labels))])
+                (a_input, v_input, batch_labels) = batch
+                video_ids.extend([f"video_{i}_{j}" for j in range(len(batch_labels))])
+                all_labels.extend(batch_labels)  # Store batch labels
             
             if i == 0:
                 print("A_shape", a_input.shape)
@@ -85,7 +90,7 @@ def extract_features(audio_model, val_loader, model_type='pretrain', cls_token=F
     A_a_feat = torch.cat(A_a_feat)
     A_v_feat = torch.cat(A_v_feat)
     
-    return A_a_feat, A_v_feat, video_ids
+    return A_a_feat, A_v_feat, video_ids, all_labels
 
 def load_and_extract_features(model_path, data_path, audio_conf, label_csv, model_type='pretrain', batch_size=48, num_register_tokens=4, cls_token=False):
     # Load the model
@@ -125,63 +130,84 @@ def load_and_extract_features(model_path, data_path, audio_conf, label_csv, mode
     )
     
     # Extract features
-    audio_features, video_features, video_ids = extract_features(audio_model, val_loader, model_type, cls_token)
+    audio_features, video_features, video_ids, labels = extract_features(audio_model, val_loader, model_type, cls_token)
     
-    return audio_features, video_features, video_ids
+    return audio_features, video_features, video_ids, labels
 
-def visualize_tsne(audio_features, video_features, video_ids, output_dir):
+def visualize_tsne(audio_features, video_features, video_ids, labels, output_dir):
     """
-    Create TSNE visualizations for audio and video features
-    Args:
-        audio_features: numpy array of audio features
-        video_features: numpy array of video features
-        video_ids: list of video IDs for coloring
-        output_dir: directory to save visualizations
+    Create multiple TSNE visualizations with different parameters to explore the data
     """
-    # Convert features to 2D array if they're 3D (in case of sync models)
-    if len(audio_features.shape) == 3:
-        audio_features = audio_features.reshape(audio_features.shape[0], -1)
-        video_features = video_features.reshape(video_features.shape[0], -1)
-    
-    # Create TSNE models
-    tsne = TSNE(n_components=2, random_state=42, perplexity=30)
-    
-    # Fit and transform the features
-    audio_tsne = tsne.fit_transform(audio_features)
-    video_tsne = tsne.fit_transform(video_features)
-    
-    # Create unique colors for each video ID
-    unique_ids = list(set(video_ids))
-    color_palette = sns.color_palette('husl', n_colors=len(unique_ids))
-    id_to_color = dict(zip(unique_ids, color_palette))
-    colors = [id_to_color[vid] for vid in video_ids]
-    
-    # Plot audio features
-    plt.figure(figsize=(10, 10))
-    plt.scatter(audio_tsne[:, 0], audio_tsne[:, 1], c=colors, alpha=0.6)
-    plt.title('t-SNE Visualization of Audio Features')
-    plt.savefig(os.path.join(output_dir, 'audio_tsne.png'))
-    plt.close()
-    
-    # Plot video features
-    plt.figure(figsize=(10, 10))
-    plt.scatter(video_tsne[:, 0], video_tsne[:, 1], c=colors, alpha=0.6)
-    plt.title('t-SNE Visualization of Video Features')
-    plt.savefig(os.path.join(output_dir, 'video_tsne.png'))
-    plt.close()
-    
-    # Plot both features side by side
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
-    
-    ax1.scatter(audio_tsne[:, 0], audio_tsne[:, 1], c=colors, alpha=0.6)
-    ax1.set_title('Audio Features')
-    
-    ax2.scatter(video_tsne[:, 0], video_tsne[:, 1], c=colors, alpha=0.6)
-    ax2.set_title('Video Features')
-    
-    plt.suptitle('t-SNE Visualization of Audio-Video Features')
-    plt.savefig(os.path.join(output_dir, 'combined_tsne.png'))
-    plt.close()
+    try:
+        # Convert features to 2D array if they're 3D (in case of sync models)
+        if len(audio_features.shape) == 3:
+            audio_features = audio_features.reshape(-1, audio_features.shape[-1])
+            video_features = video_features.reshape(-1, video_features.shape[-1])
+            # Repeat labels for each frame
+            labels = [label for label in labels for _ in range(16)]  # 16 frames per video
+        labels = [int(x.argmax()) for x in labels]
+        # Combine features for TSNE
+        combined_features = np.vstack([audio_features, video_features])
+        
+        # Different parameter combinations to try
+        perplexities = [5, 30, 50]
+        learning_rates = [200, 1000]
+        n_iter_options = [500, 1000, 2500]
+        
+        for perp in perplexities:
+            for lr in learning_rates:
+                for n_iter in n_iter_options:
+                    print(f"Computing t-SNE with perplexity={perp}, learning_rate={lr}, n_iter={n_iter}")
+                    
+                    # Create TSNE model with current parameters
+                    tsne = TSNE(n_components=2, random_state=42, verbose=1,
+                              perplexity=perp, learning_rate=lr, n_iter=n_iter, metric='cosine')
+                    # reduce the dimensionality of the data to 50 using truncated svd
+                    svd = TruncatedSVD(n_components=50)
+                    combined_features = svd.fit_transform(combined_features)
+
+                    combined_tsne = tsne.fit_transform(combined_features)
+                    
+                    # Split back into audio and video
+                    n_audio = len(audio_features)
+                    audio_tsne = combined_tsne[:n_audio]
+                    video_tsne = combined_tsne[n_audio:]
+                    
+                    
+                    # Create unique colors for each class
+                    unique_classes = list(set(labels))
+                    colors = plt.cm.rainbow(np.linspace(0, 1, len(unique_classes)))
+                    class_to_color = dict(zip(unique_classes, colors))
+                    
+                    # Create plot
+                    plt.figure(figsize=(15, 15))
+                    
+                    # Plot audio features (circles)
+                    for cls in unique_classes:
+                        mask = np.array([x == cls for x in labels])
+                        plt.scatter(audio_tsne[mask, 0], audio_tsne[mask, 1], 
+                                  c=[class_to_color[cls]], marker='o', alpha=0.6, 
+                                  label=f'Audio - {cls}')
+                    
+                    # Plot video features (triangles)
+                    for cls in unique_classes:
+                        mask = np.array([x == cls for x in labels])
+                        plt.scatter(video_tsne[mask, 0], video_tsne[mask, 1], 
+                                  c=[class_to_color[cls]], marker='+', alpha=0.6, 
+                                  label=f'Video - {cls}')
+                    
+                    plt.title(f't-SNE Visualization (perp={perp}, lr={lr}, n_iter={n_iter})\n(○: Audio, +: Video)')
+                    # plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+                    plt.tight_layout()
+                    
+                    # Save with parameters in filename
+                    filename = f'tsne_perp{perp}_lr{lr}_iter{n_iter}.png'
+                    plt.savefig(os.path.join(output_dir, filename), bbox_inches='tight')
+                    plt.close()
+                    
+    except Exception as e:
+        print(f"Error during t-SNE visualization: {e}")
+        print("Continuing with the rest of the program...")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Extract audio and video features from a model')
@@ -192,9 +218,9 @@ if __name__ == "__main__":
                         help='Path to the model checkpoint')
     parser.add_argument('--model_type', type=str, required=True,
                         help='Type of model architecture')
-    parser.add_argument('--num_samples', type=int, default=None,
+    parser.add_argument('--num_samples', type=int, default=10,
                         help='Number of samples to process')
-    parser.add_argument('--batch_size', type=int, default=50,
+    parser.add_argument('--batch_size', type=int, default=10,
                         help='Batch size for processing')
     parser.add_argument('--output_dir', type=str, default='./features',
                         help='Directory to save extracted features')
@@ -235,6 +261,7 @@ if __name__ == "__main__":
     model_type = args.model_type
     model_type = model_type.replace('_2s', '').replace('_3s', '').replace('_5s', '').replace('_7s', '').replace('_10s', '')
     cls_token = 'cls' in model_type
+    num_register_tokens = 4 if 'registers' in model_type else 0
 
     # Set up audio configuration
     audio_conf = {
@@ -254,24 +281,37 @@ if __name__ == "__main__":
         'total_frame': 16
     }
 
-    # Extract features
-    print(f"Extracting features from {args.model_path}")
-    audio_features, video_features, video_ids = load_and_extract_features(
-        args.model_path,
-        data_path,
-        audio_conf,
-        label_csv,
-        model_type=model_type,
-        batch_size=args.batch_size,
-        num_register_tokens=8 if '2918' in args.model_path else 4,
-        cls_token=cls_token
-    )
-
-    # Save features
+    # Check if features already exist
     output_base = os.path.join(args.output_dir, os.path.basename(args.model_path).replace('.pth', ''))
-    np.save(f"{output_base}_audio_features.npy", audio_features.numpy())
-    np.save(f"{output_base}_video_features.npy", video_features.numpy())
-    print(f"Features saved to {output_base}_audio_features.npy and {output_base}_video_features.npy")
+    audio_features_path = f"{output_base}_audio_features.npy"
+    video_features_path = f"{output_base}_video_features.npy"
+
+    if os.path.exists(audio_features_path) and os.path.exists(video_features_path):
+        print("Loading pre-computed features...")
+        audio_features = torch.from_numpy(np.load(audio_features_path))
+        video_features = torch.from_numpy(np.load(video_features_path))
+        labels = torch.from_numpy(np.load(f"{output_base}_labels.npy"))
+        # Note: video_ids and labels won't be available for visualization
+        video_ids = [f"video_{i}" for i in range(len(audio_features))]
+    else:
+        # Extract features
+        print(f"Extracting features from {args.model_path}")
+        audio_features, video_features, video_ids, labels = load_and_extract_features(
+            args.model_path,
+            data_path,
+            audio_conf,
+            label_csv,
+            model_type=model_type,
+            batch_size=args.batch_size,
+            num_register_tokens=8 if '2918' in args.model_path else num_register_tokens,
+            cls_token=cls_token
+        )
+
+        # Save features
+        np.save(audio_features_path, audio_features.numpy())
+        np.save(video_features_path, video_features.numpy())
+        np.save(f"{output_base}_labels.npy", labels)
+        print(f"Features saved to {audio_features_path} and {video_features_path}")
 
     # Create visualizations
     print("Creating t-SNE visualizations...")
@@ -279,13 +319,14 @@ if __name__ == "__main__":
         audio_features.numpy(), 
         video_features.numpy(), 
         video_ids, 
+        labels, 
         args.output_dir
     )
     print(f"Visualizations saved to {args.output_dir}")
 
 
 '''
-python visualize_vectors.py \
+python src/visualize_vectors.py \
     --dataset audioset \
     --model_path /scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241027_025558/models/audio_model.25.pth \
     --model_type sync_pretrain_registers_cls_3s_ch \
