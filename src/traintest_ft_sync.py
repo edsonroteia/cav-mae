@@ -175,7 +175,7 @@ def train(audio_model, train_loader, test_loader, args, run):
         print("Max Iterations {} = epochs {} * iter_per_epoch{}".format(max_iter, args.n_epochs, len(train_loader)))
         scheduler = scheduler = CosineWarmupScheduler(
             optimizer,
-            warmup_epochs=max_iter * 0.1,
+            warmup_epochs=max_iter * 0.02,
             max_epochs=max_iter,
             min_lr=args.lr * 0.1,
             max_lr=args.lr
@@ -208,7 +208,14 @@ def train(audio_model, train_loader, test_loader, args, run):
         print(datetime.datetime.now())
         print("current #epochs=%s, #steps=%s" % (epoch, global_step))
 
-        for i, (a_input, v_input, labels, _, _) in tqdm(enumerate(train_loader)):
+        # Show a progress bar with tqdm
+        pbar = tqdm(train_loader, desc=f'Epoch {epoch}/{args.n_epochs}', leave=True)
+        
+        # Track predictions and targets during training
+        train_predictions = []
+        train_targets = []
+        
+        for i, (a_input, v_input, labels, _, _) in enumerate(pbar):
                 
             B = a_input.size(0)
             a_input, v_input = a_input.to(device, non_blocking=True), v_input.to(device, non_blocking=True)
@@ -251,19 +258,30 @@ def train(audio_model, train_loader, test_loader, args, run):
             print_step = print_step or early_print_step
 
             if print_step and global_step != 0:
-                print('Epoch: [{0}][{1}/{2}]\t'
-                  'Per Sample Total Time {per_sample_time.avg:.5f}\t'
-                  'Per Sample Data Time {per_sample_data_time.avg:.5f}\t'
-                  'Per Sample DNN Time {per_sample_dnn_time.avg:.5f}\t'
-                  'Train Loss {loss_meter.val:.4f}\t'.format(
-                   epoch, i, len(train_loader), per_sample_time=per_sample_time, per_sample_data_time=per_sample_data_time,
-                      per_sample_dnn_time=per_sample_dnn_time, loss_meter=loss_meter), flush=True)
+                # print('Epoch: [{0}][{1}/{2}]\t'
+                #   'Per Sample Total Time {per_sample_time.avg:.5f}\t'
+                #   'Per Sample Data Time {per_sample_data_time.avg:.5f}\t'
+                #   'Per Sample DNN Time {per_sample_dnn_time.avg:.5f}\t'
+                #   'Train Loss {loss_meter.val:.4f}\t'.format(
+                #    epoch, i, len(train_loader), per_sample_time=per_sample_time, per_sample_data_time=per_sample_data_time,
+                #       per_sample_dnn_time=per_sample_dnn_time, loss_meter=loss_meter), flush=True)
                 if np.isnan(loss_meter.avg):
                     print("training diverged...")
                     return
 
             end_time = time.time()
             global_step += 1
+
+            # Store predictions and targets for accuracy calculation
+            with torch.no_grad():
+                train_predictions.append(audio_output.detach().cpu())
+                # Store original binary labels, not smoothed ones
+                if args.label_smooth > 0:
+                    # Convert smoothed labels back to binary
+                    binary_labels = (labels > 0.5).float()
+                    train_targets.append(binary_labels.detach().cpu())
+                else:
+                    train_targets.append(labels.detach().cpu())
 
         print('start validation')
 
@@ -274,6 +292,7 @@ def train(audio_model, train_loader, test_loader, args, run):
         acc = stats[0]['acc'] # this is just a trick, acc of each class entry is the same, which is the accuracy of all classes, not class-wise accuracy
 
         print("mAP: {:.6f}".format(mAP))
+        print("acc: {:.6f}".format(acc))
         print("AUC: {:.6f}".format(mAUC))
         print("d_prime: {:.6f}".format(d_prime(mAUC)))
         print("train_loss: {:.6f}".format(loss_meter.avg))
@@ -282,6 +301,8 @@ def train(audio_model, train_loader, test_loader, args, run):
         # Log important metrics
         run["valid/mAP"].log(mAP, step=epoch)
         run["valid/AUC"].log(mAUC, step=epoch)
+        run["valid/acc/ours"].log(acc, step=epoch)
+        run["valid/acc/cavmae"].log(0.542, step=epoch)
         run["valid/d_prime"].log(d_prime(mAUC), step=epoch)
         run["train/epoch_loss"].log(loss_meter.avg, step=epoch)
         run["valid/loss"].log(valid_loss, step=epoch)
@@ -364,6 +385,27 @@ def train(audio_model, train_loader, test_loader, args, run):
         run["valid/epoch_acc"].log(acc, step=epoch)
         run["valid/epoch_auc"].log(mAUC, step=epoch)
 
+        # Calculate training accuracy at the end of each epoch
+        train_predictions = torch.cat(train_predictions)
+        train_targets = torch.cat(train_targets)
+        
+        # Apply appropriate activation based on loss type
+        if args.loss == 'BCE':
+            train_predictions = torch.sigmoid(train_predictions)
+        else:  # CE loss
+            train_predictions = torch.softmax(train_predictions, dim=-1)
+            
+        train_stats = calculate_stats(train_predictions, train_targets)
+        train_acc = train_stats[0]['acc']
+        train_mAP = np.mean([stat['AP'] for stat in train_stats])
+        
+        # Log training metrics
+        run["train/epoch_acc"].log(train_acc, step=epoch)
+        run["train/epoch_mAP"].log(train_mAP, step=epoch)
+        
+        print("Train acc: {:.6f}".format(train_acc))
+        print("Train mAP: {:.6f}".format(train_mAP))
+
         epoch += 1
 
         batch_time.reset()
@@ -415,7 +457,6 @@ def validate(audio_model, val_loader, args, output_pred=False):
         audio_output = torch.cat(A_predictions)
         target = torch.cat(A_targets)
         loss = torch.stack(A_loss).mean().item()
-
         stats = calculate_stats(audio_output, target)
 
     if output_pred == False:

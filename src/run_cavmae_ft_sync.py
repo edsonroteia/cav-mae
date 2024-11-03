@@ -98,6 +98,9 @@ parser.add_argument("--augmentation", type=ast.literal_eval, default=True)
 parser.add_argument("--neptune_tag", type=str, default="finetuning")
 parser.add_argument("--cls_token", type=ast.literal_eval, default=True)
 parser.add_argument("--total_frame", type=int, default=16)
+parser.add_argument("--model_id", type=int, default=None)
+parser.add_argument("--contrastive_head", type=ast.literal_eval, default=False)
+parser.add_argument("--joint_layers", type=int, default=1)
 args = parser.parse_args()
 
 run = neptune.init_run(
@@ -105,6 +108,9 @@ run = neptune.init_run(
     api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJmNGE4NDA2NS1hYmE2LTQ3YWYtODllMC02ODk4NGNlODY0MDUifQ==",
     tags=["finetuning", args.neptune_tag],
 )  # your credentials
+
+run["model_id"] = args.model_id
+run["lr_scheduler"] = args.lr_scheduler
 
 # Add these variables after initializing the Neptune run
 run["best_val_mAP"] = 0
@@ -171,7 +177,7 @@ if args.data_eval != None:
 
 if args.model == 'cav-mae-ft':
     print('finetune a cav-mae model with 11 modality-specific layers and 1 modality-sharing layers')
-    audio_model = models.CAVMAEFTSync(audio_length=args.target_length, label_dim=args.n_class, modality_specific_depth=11, aggregate=args.aggregate, num_register_tokens=args.n_register_tokens, cls_token=args.cls_token, total_frame=args.total_frame)
+    audio_model = models.CAVMAEFTSync(audio_length=args.target_length, label_dim=args.n_class, modality_specific_depth=11, aggregate=args.aggregate, num_register_tokens=args.n_register_tokens, cls_token=args.cls_token, total_frame=args.total_frame, contrastive_head=args.contrastive_head, joint_layers=args.joint_layers)
 else:
     raise ValueError('model not supported')
 
@@ -214,14 +220,37 @@ train(audio_model, train_loader, val_loader, args, run)
 def wa_model(exp_dir, start_epoch, end_epoch, interval):
     sdA = torch.load(exp_dir + '/models/audio_model.' + str(start_epoch) + '.pth', map_location='cpu')
     model_cnt = 1
-    for epoch in range(start_epoch+1, end_epoch+1, interval):
-        sdB = torch.load(exp_dir + '/models/audio_model.' + str(epoch) + '.pth', map_location='cpu')
+    
+    try:
+        for epoch in range(start_epoch+1, end_epoch+1, interval):
+            model_path = exp_dir + '/models/audio_model.' + str(epoch) + '.pth'
+            if not os.path.exists(model_path):
+                print(f'Warning: Model checkpoint {model_path} not found, skipping...')
+                continue
+                
+            sdB = torch.load(model_path, map_location='cpu')
+            
+            # Verify tensor shapes match before adding
+            for key in sdA:
+                if key not in sdB:
+                    print(f'Warning: Key {key} not found in model at epoch {epoch}, skipping...')
+                    continue
+                if sdA[key].shape != sdB[key].shape:
+                    print(f'Warning: Shape mismatch for key {key} at epoch {epoch}. Expected {sdA[key].shape}, got {sdB[key].shape}')
+                    continue
+                    
+                sdA[key] = sdA[key] + sdB[key]
+            model_cnt += 1
+            
+        print(f'Successfully averaged {model_cnt} models')
+        # Average the accumulated weights
         for key in sdA:
-            sdA[key] = sdA[key] + sdB[key]
-        model_cnt += 1
-    print('wa {:d} models: {}'.format(model_cnt, range(start_epoch+1, end_epoch+1, interval)))
-    for key in sdA:
-        sdA[key] = sdA[key] / float(model_cnt)
+            sdA[key] = sdA[key] / float(model_cnt)
+            
+    except Exception as e:
+        print(f'Error during weight averaging: {str(e)}')
+        print('Falling back to using initial model weights')
+        
     return sdA
 
 
@@ -280,23 +309,26 @@ for wa_start in range(args.wa_start, args.n_epochs, 5):
         # Save the results with the corresponding wa configuration
         results.append((f"wa_start: {wa_start}, wa_interval: {wa_interval}", cur_res))
 
-# Print results in a table format
-print("\nResults Summary:")
-print("{:<30} {:<10}".format("Models Aggregated", "Final Result"))
-for model_info, result in results:
-    print("{:<30} {:<10.4f}".format(model_info, result))
+try:
+    # Print results in a table format
+    print("\nResults Summary:")
+    print("{:<30} {:<10}".format("Models Aggregated", "Final Result"))
+    for model_info, result in results:
+        print("{:<30} {:<10.4f}".format(model_info, result))
 
-import pandas as pd
-# Log the results summary table to Neptune
-table_data = {
-    "Models Aggregated": [model_info for model_info, _ in results],
-    "Final Result": [result for _, result in results]
-}
-run["results/summary"].upload(neptune.types.File.as_html(pd.DataFrame(table_data)))
+    import pandas as pd
+    # Log the results summary table to Neptune
+    table_data = {
+        "Models Aggregated": [model_info for model_info, _ in results],
+        "Final Result": [result for _, result in results]
+    }
+    run["results/summary"].upload(neptune.types.File.as_html(pd.DataFrame(table_data)))
 
-# Log the best performing weight averaging configuration
-best_wa_result = max(results, key=lambda x: x[1])
-run["best_wa_config"] = best_wa_result[0]
-run["best_wa_result"] = best_wa_result[1]
+    # Log the best performing weight averaging configuration
+    best_wa_result = max(results, key=lambda x: x[1])
+    run["best_wa_config"] = best_wa_result[0]
+    run["best_wa_result"] = best_wa_result[1]
+except Exception as e:
+    print(f"No aggregation was performed")
 
 run.stop()

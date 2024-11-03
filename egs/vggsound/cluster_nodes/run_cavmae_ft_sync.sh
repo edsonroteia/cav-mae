@@ -19,15 +19,22 @@ model=cav-mae-ft
 # pretrain_dir=/local/$SLURM_JOB_ID/models/
 # pretrain_dir=/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_021700/models/
 # pretrain_path=${pretrain_dir}/best_audio_model.pth
-pretrain_path=${11:-/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_183505/models/audio_model.25.pth}
 
-freeze_base=${7:-True}
-# if freeze_base is True, then head_lr is 1, else 100
-if [ "$freeze_base" = True ]; then
-    head_lr=1 # newly initialized ft layers uses 10 times larger than the base lr
-else
-    head_lr=10
-fi
+
+
+lrscheduler_start=2
+lrscheduler_decay=0.5
+lrscheduler_step=1
+wa=True
+
+lr_adapt=False
+dataset_mean=-5.081
+dataset_std=4.4849
+noise=True
+freqm=48
+timem=192
+mixup=0.5
+label_smooth=0.1
 
 bal=bal
 lr=${1:-1e-4}  # Use the first argument as lr, default to 1e-4 if not provided
@@ -35,41 +42,66 @@ batch_size=${2:-48}  # Use the second argument as batch_size, default to 24 if n
 ftmode=${3:-multimodal}
 cuda_devices=${4:-0,1,2,3,4,5,6,7}
 aggregate=${5:-self_attention_cls}
-num_workers=${6:-48}
+num_workers=${6:-64}
+freeze_base=${7:-True}
+# if freeze_base is True, then head_lr is 1, else 100
+if [ "$freeze_base" = True ]; then
+    head_lr=1 # newly initialized ft layers uses 10 times larger than the base lr
+else
+    head_lr=10
+fi
 num_samples=${8:-9999999}
-epoch=${9:-25}
-neptune_tag=${10:-finetuning}
-lrscheduler_start=2
-lrscheduler_decay=0.5
-lrscheduler_step=1
-wa=True
-wa_start=3
-wa_end=10
-lr_adapt=False
-dataset_mean=-5.081
-dataset_std=4.4849
-target_length=96
-noise=True
-freqm=48
-timem=192
-mixup=0.5
-label_smooth=0.1
-lr_scheduler=cosine
-cls_token=${12:-False}
+epoch=${9:-10}
+# wa_start should be the min between epoch and 3
+# wa_end should be the min between epoch and 10
+wa_start=$((${epoch:-10} < 3 ? ${epoch:-10} : 3))
+wa_end=$((${epoch:-10} < 10 ? ${epoch:-10} : 10))
+neptune_tag=${10:-finetuning_vggsound}
+# receive pretrain_model as argument and fetch the path from models.csv
+pretrain_model=${11}
+pretrain_path=$(awk -F, -v model="$pretrain_model" '$1 == model {print $2}' models.csv)
+cls_token=${12:-True}
 n_register_tokens=${13:-4}
 total_frame=${14:-16}
 
+
+
+#name,path,num_register_tokens,total_frame,contrastive_head
+# 1624,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_021700/models/audio_model.25.pth,0,10,False
+# 1921,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240920_204943/models/audio_model.25.pth,4,10,False
+# 1970,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240922_181136/models/audio_model.25.pth,8,10,False
+# 1983,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240922_222603/models/audio_model.25.pth,4,10,False
+# 1984,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.05-p1.0-tpFalse-mr-unstructured-0.75-20240922_222719/models/audio_model.25.pth,4,10,False
+# 2145,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240925_112229/models/audio_model.25.pth,4,10,False
+# 2618,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_183505/models/audio_model.25.pth,0,16,False
+# 2625,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_184319/models/audio_model.25.pth,4,16,False
+# 2626,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241012_184455/models/audio_model.25.pth,4,16,False
+# 2675,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.01-p1.0-tpFalse-mr-unstructured-0.75-20241017_184725/models/audio_model.25.pth,0,16,False
+# 2676,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.01-p1.0-tpFalse-mr-unstructured-0.75-20241017_184808/models/audio_model.25.pth,4,16,False
+# cav_mae++,cav-mae-scale++.pth,0,10,False
+# 2776,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241023_112228/models/audio_model.25.pth,4,16,False
+# 2897,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241027_025558/models/audio_model.25.pth,4,16,True
+# 2922,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.6-20241027_235223/models/audio_model.25.pth,0,16,False
+# 2919,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.9-20241027_234424/models/audio_model.25.pth,0,16,False
+# 2926,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241028_002037/models/audio_model.25.pth,0,16,False
+# 2918,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20241027_193318/models/audio_model.25.pth,4,16,False
+
 dataset=vggsound
-tr_data=datafilles/vggsound/cluster_nodes/vgg_train_cleaned.json
-te_data=datafilles/vggsound/cluster_nodes/vgg_test_cleaned.json
-label_csv=datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv
+tr_data=${15:-datafilles/vggsound/cluster_nodes/vgg_train_cleaned.json}
+te_data=${16:-datafilles/vggsound/cluster_nodes/vgg_test_cleaned.json}
+label_csv=${17:-datafilles/vggsound/cluster_nodes/class_labels_indices_vgg.csv}
+num_classes=${18:-309}
+lr_scheduler=${19:-step}
+target_length=${20:-1024}
+contrastive_head=${21:-False}
+joint_layers=${22:-1}
 
 exp_dir=./exp/testmae02-${dataset}-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-a5-$(date +%Y%m%d_%H%M%S)
 mkdir -p $exp_dir
 
-CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model} --dataset ${dataset} \
+CUDA_VISIBLE_DEVICES=${cuda_devices} CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model} --dataset ${dataset} \
 --data-train ${tr_data} --data-val ${te_data} --exp-dir $exp_dir \
---label-csv ${label_csv} --n_class 309 \
+--label-csv ${label_csv} --n_class ${num_classes} \
 --lr $lr --n-epochs ${epoch} --batch-size $batch_size --save_model True \
 --freqm $freqm --timem $timem --mixup ${mixup} --bal ${bal} \
 --label_smooth ${label_smooth} \
@@ -81,4 +113,5 @@ CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_ft_sync.py --model ${model}
 --freeze_base ${freeze_base} --head_lr ${head_lr} \
 --num-workers ${num_workers} --aggregate ${aggregate} --lr_scheduler ${lr_scheduler} \
 --num_samples ${num_samples} --neptune_tag ${neptune_tag} --cls_token ${cls_token} \
---n_register_tokens ${n_register_tokens} --total_frame ${total_frame}
+--n_register_tokens ${n_register_tokens} --total_frame ${total_frame} \
+--model_id ${pretrain_model} --contrastive_head ${contrastive_head} --joint_layers ${joint_layers}

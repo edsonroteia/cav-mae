@@ -54,7 +54,9 @@ timem=192
 mixup=0.5
 label_smooth=0.1
 lr_scheduler=cosine
-pretrain_path=${11:-/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240918_185818/models/audio_model.25.pth}
+# receive pretrain_model as argument and fetch the path from models.csv
+pretrain_model=${11}
+pretrain_path=$(awk -F, -v model="$pretrain_model" '$1 == model {print $2}' models.csv)
 cls_token=${12:-False}
 n_register_tokens=${13:-4}
 total_frame=${14:-16}

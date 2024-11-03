@@ -18,14 +18,14 @@ model=cav-mae-ft
 # you can replace with any checkpoint you want, but by default, we use cav-mae-scale++
 cur_dir=$(pwd)
 wget -nc https://www.dropbox.com/s/l5t5geufdy3qvnv/audio_model.21.pth?dl=1 -O cav-mae-scale++.pth
-pretrain_path=${cur_dir}/cav-mae-scale++.pth
+pretrain_path=${cur_dir}/${1}
 
 freeze_base=False
 head_lr=10 # newly initialized ft layers uses 10 times larger than the base lr
 
 bal=bal
-lr=${1:-1e-4}  # Use the first argument as lr, default to 1e-4 if not provided
-batch_size=${2:-48}  # Use the second argument as batch_size, default to 24 if not provided
+lr=${2:-1e-4}  # Use the first argument as lr, default to 1e-4 if not provided
+batch_size=${3:-48}  # Use the second argument as batch_size, default to 24 if not provided
 ftmode=${3:-multimodal}
 epoch=10
 lrscheduler_start=2
