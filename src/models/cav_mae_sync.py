@@ -727,11 +727,17 @@ class CAVMAEFT(nn.Module):
         elif self.aggregate == "self_attention_cls":
             self.cls_cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim*2))
             self.classifier_layers = nn.ModuleList([
-                Block(embed_dim*2, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, norm_layer=norm_layer)
-                for _ in range(2)  # You can adjust the number of layers as needed
+                Block(embed_dim*2, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, 
+                      norm_layer=norm_layer, drop=0.4, attn_drop=0.2)
+                for _ in range(2)  # 1. Add more dropout in the classifier layers
             ])
             self.classifier_norm = norm_layer(embed_dim*2)
-            self.classifier_head = nn.Linear(embed_dim*2, label_dim)
+            self.classifier_head = nn.Sequential(
+                nn.Linear(embed_dim*2, embed_dim),
+                nn.GELU(),
+                nn.Dropout(0.5),
+                nn.Linear(embed_dim, label_dim)
+            )
             # # Add positional embedding for this transformer classifier
             # self.classifier_pos_embed = nn.Parameter(torch.zeros(1, total_frame+1, embed_dim), requires_grad=tr_pos)
         else:

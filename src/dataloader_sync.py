@@ -340,9 +340,11 @@ class AudiosetDataset(Dataset):
                 try:
                     image = self.get_image(frame_path)
                 except Exception as e:
-                    print(f"Error processing frame {frame_idx} for video {datum['video_id']}: {str(e)}")
-                    image = torch.zeros(3,224,224)
-                    
+                    # Try to use previous frame if available, otherwise use zero tensor
+                    image = (images[frame_idx - 1].clone() if frame_idx > 0 and images 
+                            else torch.zeros(3, 224, 224))
+                    self.failed_image_loadings += 1
+                
                 fbanks.append(fbank)
                 images.append(image)
                 frame_indices.append(frame_idx)
