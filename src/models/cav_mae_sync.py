@@ -69,13 +69,14 @@ class CAVMAE(nn.Module):
                  embed_dim=768, modality_specific_depth=11, num_heads=12,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, num_register_tokens=4,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=False, 
-                 cls_token=False, global_local_losses=False, total_frame=16, contrastive_heads=True, multi_ratio_masking=False):
+                 cls_token=False, global_local_losses=False, total_frame=16, contrastive_heads=True, multi_ratio_masking=False, keep_register_tokens=False):
         super().__init__()
         print('A CAV-MAE Model')
         print('Use norm_pix_loss: ', norm_pix_loss)
         print('Learnable Positional Embedding: ', tr_pos)
 
         self.multi_ratio_masking = multi_ratio_masking
+        self.keep_register_tokens = keep_register_tokens
 
         # the encoder part
         # overide the timm package
@@ -359,7 +360,7 @@ class CAVMAE(nn.Module):
         for blk in self.blocks_v:
             v = blk(v)
 
-        if self.num_register_tokens > 0:
+        if self.num_register_tokens > 0 and not self.keep_register_tokens:
             # Remove register tokens, keeping the cls token, if present
             a = a[:, :-self.num_register_tokens, :]
             v = v[:, :-self.num_register_tokens, :]
@@ -382,6 +383,13 @@ class CAVMAE(nn.Module):
                 ca = blk(ca)
             for blk in self.constrative_head_visual:
                 cv = blk(cv)
+
+        # Remove register tokens, keeping the cls token, if present
+        if self.num_register_tokens > 0 and self.keep_register_tokens:
+            ca = ca[:, :-self.num_register_tokens, :]
+            cv = cv[:, :-self.num_register_tokens, :]
+            # To remove from x, we have to remove from where it was concatenated and at the end
+            x = torch.cat((x[:,:self.patch_embed_a.num_patches, :], x[:,self.patch_embed_a.num_patches+self.num_register_tokens:-self.num_register_tokens, :]), dim=1)
 
         if self.cls_token:
             # split the local patch tokens from the cls tokens
@@ -631,7 +639,7 @@ class CAVMAE(nn.Module):
         for blk in self.blocks_v:
             v = blk(v)
 
-        if self.num_register_tokens > 0:
+        if self.num_register_tokens > 0 and not self.keep_register_tokens:
             # Remove register tokens
             a = a[:, :-self.num_register_tokens, :]
             v = v[:, :-self.num_register_tokens, :]
@@ -666,7 +674,7 @@ class CAVMAE(nn.Module):
 # the finetuned CAV-MAE model
 class CAVMAEFT(nn.Module):
     def __init__(self, label_dim, img_size=224, audio_length=1024, patch_size=16, in_chans=3,
-                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True, aggregate='None', num_register_tokens=0, cls_token=False, total_frame=16, contrastive_head=False, joint_layers=1):
+                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True, aggregate='None', num_register_tokens=0, cls_token=False, total_frame=16, contrastive_head=False, joint_layers=1, keep_register_tokens=False):
         super().__init__()
         timm.models.vision_transformer.Block = Block
         print('Use norm_pix_loss: ', norm_pix_loss)
@@ -680,6 +688,7 @@ class CAVMAEFT(nn.Module):
         self.patch_embed_a.num_patches = int(audio_length * 128 / 256)
         print('Number of Audio Patches: {:d}, Visual Patches: {:d}'.format(self.patch_embed_a.num_patches, self.patch_embed_v.num_patches))
 
+        self.keep_register_tokens = keep_register_tokens
         self.aggregate = aggregate
 
         self.modality_a = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -829,7 +838,7 @@ class CAVMAEFT(nn.Module):
             for blk in self.blocks_v:
                 v = blk(v)
 
-            if self.num_register_tokens > 0:
+            if self.num_register_tokens > 0 and not self.keep_register_tokens:
                 # Remove register tokens
                 a = a[:, :-self.num_register_tokens, :]
                 v = v[:, :-self.num_register_tokens, :]
@@ -843,6 +852,13 @@ class CAVMAEFT(nn.Module):
             for blk in self.blocks_u:
                 x = blk(x)
             x = self.norm(x)
+
+            if self.num_register_tokens > 0 and self.keep_register_tokens:
+                # Remove register tokens
+                a = a[:, :-self.num_register_tokens, :]
+                v = v[:, :-self.num_register_tokens, :]
+                x = torch.cat((x[:, :self.patch_embed_a.num_patches, :], x[:, self.patch_embed_a.num_patches+self.num_register_tokens:-self.num_register_tokens, :]), dim=1)
+
             if self.cls_token:
                 # Extract the cls tokens
                 cls_tokens_a = a[:, 0, :]

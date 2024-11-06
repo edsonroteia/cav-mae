@@ -12,7 +12,7 @@
 
 # print manual arguments if any or if help is requested
 if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    echo "Usage: $0 [target_length] [n_regster_tokens] [cls_token] [global_local_losses] [contrast_loss_weight] [debug] [contrastive_heads] [multi_ratio_masking]"
+    echo "Usage: $0 [target_length] [n_regster_tokens] [cls_token] [global_local_losses] [contrast_loss_weight] [debug] [contrastive_heads] [multi_ratio_masking] [keep_register_tokens]"
     exit 0
 fi
 
@@ -54,6 +54,7 @@ if [ $# -gt 0 ]; then
     echo "debug: $6"
     echo "contrastive_heads: $7"
     echo "multi_ratio_masking: $8"
+    echo "keep_register_tokens: $9"
 fi
 
 # receive target_length, n_regster_tokens, cls_token, global_local_losses as arguments
@@ -65,6 +66,7 @@ contrast_loss_weight=${5:-0.1}
 debug=${6:-False}
 contrastive_heads=${7:-False}
 multi_ratio_masking=${8:-False}
+keep_register_tokens=${9:-False}
 if [ "$debug" = True ]; then
     echo "Debug mode"
     num_samples=${batch_size}
@@ -99,5 +101,5 @@ CUDA_CACHE_DISABLE=1 python -W ignore src/run_cavmae_pretrain_sync.py --model ${
 --lr_scheduler ${lr_scheduler} --n_regster_tokens ${n_regster_tokens} --cls_token ${cls_token} \
 --global_local_losses ${global_local_losses} \
 --num_samples ${num_samples} --contrastive_heads ${contrastive_heads} \
---multi_ratio_masking ${multi_ratio_masking}
+--multi_ratio_masking ${multi_ratio_masking} --keep_register_tokens ${keep_register_tokens}
 # --wandb-name sync_pt_as2m_$(hostname)_lr${lr}_epoch${epoch}
