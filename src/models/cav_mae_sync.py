@@ -77,6 +77,7 @@ class CAVMAE(nn.Module):
 
         self.multi_ratio_masking = multi_ratio_masking
         self.keep_register_tokens = keep_register_tokens
+        print('Keep Register Tokens: ', self.keep_register_tokens)
 
         # the encoder part
         # overide the timm package
@@ -689,6 +690,7 @@ class CAVMAEFT(nn.Module):
         print('Number of Audio Patches: {:d}, Visual Patches: {:d}'.format(self.patch_embed_a.num_patches, self.patch_embed_v.num_patches))
 
         self.keep_register_tokens = keep_register_tokens
+        print('Keep Register Tokens: ', self.keep_register_tokens)
         self.aggregate = aggregate
 
         self.modality_a = nn.Parameter(torch.zeros(1, 1, embed_dim))

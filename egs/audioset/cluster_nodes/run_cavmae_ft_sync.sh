@@ -44,6 +44,7 @@ target_length=${19}
 contrastive_head=${20}
 joint_layers=${21}
 num_workers=${22}
+keep_register_tokens=${23}
 
 # Get pretrain path from models.csv
 pretrain_path=$(awk -F, -v model="$pretrain_model" '$1 == model {print $2}' models.csv)
@@ -86,4 +87,4 @@ CUDA_VISIBLE_DEVICES=${cuda_devices} CUDA_CACHE_DISABLE=1 python -W ignore src/r
 -w 16 --aggregate ${aggregate} --lr_scheduler ${lr_scheduler} \
 --num_samples ${num_samples} --neptune_tag ${neptune_tag} --cls_token ${cls_token} \
 --n_register_tokens ${n_register_tokens} --total_frame ${total_frame} --model_id ${pretrain_model} \
---contrastive_head ${contrastive_head} --joint_layers ${joint_layers}
+--contrastive_head ${contrastive_head} --joint_layers ${joint_layers} --keep_register_tokens ${keep_register_tokens}
