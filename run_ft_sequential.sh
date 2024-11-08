@@ -37,21 +37,22 @@ get_model_params() {
     local target_length=$(awk -F, -v model="$model" '$1 == model {print $6}' models.csv)
     local contrastive_head=$(awk -F, -v model="$model" '$1 == model {print $5}' models.csv)
     local joint_layers=$(awk -F, -v model="$model" '$1 == model {print $7}' models.csv)
-    echo "$n_register_tokens $total_frames $target_length $contrastive_head $joint_layers"
+    local keep_register_tokens=$(awk -F, -v model="$model" '$1 == model {print $8}' models.csv)
+    echo "$n_register_tokens $total_frames $target_length $contrastive_head $joint_layers $keep_register_tokens"
 }
 
 # Create windows for each model ID
 for i in 1 2 3 4; do
     model_var="model_id$i"
     model_id=${!model_var}
-    read n_register_tokens total_frames target_length contrastive_head joint_layers <<< $(get_model_params $model_id)
+    read n_register_tokens total_frames target_length contrastive_head joint_layers keep_register_tokens <<< $(get_model_params $model_id)
     
     gpu_ids=$(( (i-1)*2 )),$(( (i-1)*2+1 ))
     
 
     # Print the command to be run
-    echo "Running command: bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh $lr 48 multimodal $gpu_ids self_attention_cls $total_frames True 99999 10 finetuning_vggsound $model_id True $n_register_tokens $total_frames $tr_data $te_data $label_csv $num_classes $lr_scheduler $target_length $contrastive_head $joint_layers"
-    tmux new-window -n "model_${model_id}" "bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh $lr 48 multimodal $gpu_ids self_attention_cls $total_frames True 99999 10 finetuning_vggsound $model_id True $n_register_tokens $total_frames $tr_data $te_data $label_csv $num_classes $lr_scheduler $target_length $contrastive_head $joint_layers"
+    echo "Running command: bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh $lr 48 multimodal $gpu_ids None $total_frames True 9999999 10 finetuning_vggsound $model_id True $n_register_tokens $total_frames $tr_data $te_data $label_csv $num_classes $lr_scheduler $target_length $contrastive_head $joint_layers $keep_register_tokens"
+    tmux new-window -n "model_${model_id}" "bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh $lr 48 multimodal $gpu_ids self_attention_cls $total_frames True 9999999 10 finetuning_vggsound $model_id True $n_register_tokens $total_frames $tr_data $te_data $label_csv $num_classes $lr_scheduler $target_length $contrastive_head $joint_layers $keep_register_tokens"
 done
 
 # Command that will be run in each window if default values are used

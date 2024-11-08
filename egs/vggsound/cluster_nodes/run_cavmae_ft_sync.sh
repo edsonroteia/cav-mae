@@ -66,6 +66,7 @@ total_frame=${14:-16}
 
 
 
+
 #name,path,num_register_tokens,total_frame,contrastive_head
 # 1624,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240912_021700/models/audio_model.25.pth,0,10,False
 # 1921,/scratch/ssml/araujo/exp/sync-audioset-cav-mae-balNone-lr2e-4-epoch25-bs512-normTrue-c0.1-p1.0-tpFalse-mr-unstructured-0.75-20240920_204943/models/audio_model.25.pth,4,10,False
@@ -95,6 +96,7 @@ lr_scheduler=${19:-step}
 target_length=${20:-1024}
 contrastive_head=${21:-False}
 joint_layers=${22:-1}
+keep_register_tokens=${23:-False}
 
 exp_dir=./exp/testmae02-${dataset}-${model}-${lr}-${lrscheduler_start}-${lrscheduler_decay}-${lrscheduler_step}-bs${batch_size}-lda${lr_adapt}-${ftmode}-fz${freeze_base}-h${head_lr}-a5-$(date +%Y%m%d_%H%M%S)
 mkdir -p $exp_dir
@@ -114,4 +116,5 @@ CUDA_VISIBLE_DEVICES=${cuda_devices} CUDA_CACHE_DISABLE=1 python -W ignore src/r
 --num-workers ${num_workers} --aggregate ${aggregate} --lr_scheduler ${lr_scheduler} \
 --num_samples ${num_samples} --neptune_tag ${neptune_tag} --cls_token ${cls_token} \
 --n_register_tokens ${n_register_tokens} --total_frame ${total_frame} \
---model_id ${pretrain_model} --contrastive_head ${contrastive_head} --joint_layers ${joint_layers}
+--model_id ${pretrain_model} --contrastive_head ${contrastive_head} --joint_layers ${joint_layers} \
+--keep_register_tokens ${keep_register_tokens}
