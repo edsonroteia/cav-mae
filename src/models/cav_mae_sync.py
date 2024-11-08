@@ -743,11 +743,7 @@ class CAVMAEFT(nn.Module):
                 for _ in range(2)  # 1. Add more dropout in the classifier layers
             ])
             self.classifier_norm = norm_layer(embed_dim*2)
-            self.classifier_head = nn.Sequential(
-                nn.Linear(embed_dim*2, embed_dim),
-                nn.GELU(),
-                nn.Linear(embed_dim, label_dim)
-            )
+            self.classifier_head = nn.Linear(embed_dim*2, label_dim)
             # # Add positional embedding for this transformer classifier
             # self.classifier_pos_embed = nn.Parameter(torch.zeros(1, total_frame+1, embed_dim), requires_grad=tr_pos)
         else:
