@@ -783,8 +783,8 @@ class CAVMAEFT(nn.Module):
 
         torch.nn.init.normal_(self.modality_a, std=.02)
         torch.nn.init.normal_(self.modality_v, std=.02)
-
-        torch.nn.init.normal_(self.cls_cls_token, std=.02)
+        if self.aggregate == "self_attention_cls":
+            torch.nn.init.normal_(self.cls_cls_token, std=.02)
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -1106,3 +1106,74 @@ class CAVMAEFT(nn.Module):
 
             a = self.norm_a(a)
             return a
+
+    def get_features(self, a, v, mode='multimodal'):
+        # multi-modal fine-tuning, our default method for fine-tuning
+        if mode == 'multimodal':
+            a = a.unsqueeze(1)
+            a = a.transpose(2, 3)
+            a = self.patch_embed_a(a)
+            a = a + self.pos_embed_a
+            a = a + self.modality_a
+
+            v = self.patch_embed_v(v)
+            v = v + self.pos_embed_v
+            v = v + self.modality_v
+
+            batch_size = a.shape[0]
+
+            #Append CLS tokens
+            if self.cls_token:
+                cls_tokens_a = self.cls_token_a.expand(batch_size, -1, -1)
+                cls_tokens_v = self.cls_token_v.expand(batch_size, -1, -1)
+
+                a = torch.cat([cls_tokens_a, a], dim=1)
+                v = torch.cat([cls_tokens_v, v], dim=1)
+
+            # Append register tokens
+            if self.num_register_tokens > 0:
+                batch_size = a.shape[0]
+                r_a = self.register_tokens[:self.num_register_tokens].unsqueeze(0).expand(batch_size, -1, -1)
+                r_v = self.register_tokens[self.num_register_tokens:].unsqueeze(0).expand(batch_size, -1, -1)
+                
+                a = torch.cat([a, r_a], dim=1)
+                v = torch.cat([v, r_v], dim=1)
+
+            for blk in self.blocks_a:
+                a = blk(a)
+
+            for blk in self.blocks_v:
+                v = blk(v)
+
+            if self.num_register_tokens > 0 and not self.keep_register_tokens:
+                # Remove register tokens
+                a = a[:, :-self.num_register_tokens, :]
+                v = v[:, :-self.num_register_tokens, :]
+
+            num_a_tokens = a.shape[1]  # Includes CLS_A
+            num_v_tokens = v.shape[1]  # Includes CLS_V
+
+            # Concatenate audio and visual tokens with cls tokens
+            x = torch.cat((a, v), dim=1) 
+
+            for blk in self.blocks_u:
+                x = blk(x)
+            x = self.norm(x)
+
+            if self.num_register_tokens > 0 and self.keep_register_tokens:
+                # Remove register tokens
+                a = a[:, :-self.num_register_tokens, :]
+                v = v[:, :-self.num_register_tokens, :]
+                x = torch.cat((x[:, :self.patch_embed_a.num_patches, :], x[:, self.patch_embed_a.num_patches+self.num_register_tokens:-self.num_register_tokens, :]), dim=1)
+
+            if self.cls_token:
+                # Extract the cls tokens
+                cls_tokens_a = a[:, 0, :]
+                cls_tokens_v = v[:, 0, :]
+
+                x = torch.cat((cls_tokens_a, cls_tokens_v), dim=1)
+            else:
+                a = a.mean(dim=1).squeeze()
+                v = v.mean(dim=1).squeeze()
+                x = torch.cat((a, v), dim=1)
+            return x

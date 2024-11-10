@@ -28,7 +28,7 @@
    get_model_params() {
        local model=$1
        local n_register_tokens=$(awk -F, -v model="$model" '$1 == model {print $3}' models.csv)
-       local total_frames=$(awk -F, -v model="$model" '$1 == model {print $4-1}' models.csv)
+       local total_frames=$(awk -F, -v model="$model" '$1 == model {print $4}' models.csv)
        local target_length=$(awk -F, -v model="$model" '$1 == model {print $6}' models.csv)
        local contrastive_head=$(awk -F, -v model="$model" '$1 == model {print $5}' models.csv)
        local joint_layers=$(awk -F, -v model="$model" '$1 == model {print $7}' models.csv)
