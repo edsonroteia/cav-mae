@@ -675,7 +675,7 @@ class CAVMAE(nn.Module):
 # the finetuned CAV-MAE model
 class CAVMAEFT(nn.Module):
     def __init__(self, label_dim, img_size=224, audio_length=1024, patch_size=16, in_chans=3,
-                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True, aggregate='None', num_register_tokens=0, cls_token=False, total_frame=16, contrastive_head=False, joint_layers=1, keep_register_tokens=False):
+                 embed_dim=768, modality_specific_depth=11, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, tr_pos=True, aggregate='None', num_register_tokens=0, cls_token=False, total_frame=16, contrastive_head=False, joint_layers=1, keep_register_tokens=False, mode='multimodal'):
         super().__init__()
         timm.models.vision_transformer.Block = Block
         print('Use norm_pix_loss: ', norm_pix_loss)
@@ -721,6 +721,8 @@ class CAVMAEFT(nn.Module):
             self.cls_token_a = nn.Parameter(torch.randn(1, 1, embed_dim))
             self.cls_token_v = nn.Parameter(torch.randn(1, 1, embed_dim))
 
+
+        self.mode = mode
         self.total_frame = total_frame
         print('Using {:d} frames'.format(self.total_frame))
 
@@ -736,14 +738,18 @@ class CAVMAEFT(nn.Module):
                 nn.Linear(embed_dim, label_dim)
             )
         elif self.aggregate == "self_attention_cls":
-            self.cls_cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim*2))
+            if self.mode == 'multimodal':
+                cls_dim = embed_dim*2
+            else:
+                cls_dim = embed_dim
+            self.cls_cls_token = nn.Parameter(torch.zeros(1, 1, cls_dim))
             self.classifier_layers = nn.ModuleList([
-                Block(embed_dim*2, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, 
+                Block(cls_dim, num_heads, mlp_ratio, qkv_bias=True, qk_scale=None, 
                       norm_layer=norm_layer)
                 for _ in range(2)  # 1. Add more dropout in the classifier layers
             ])
-            self.classifier_norm = norm_layer(embed_dim*2)
-            self.classifier_head = nn.Linear(embed_dim*2, label_dim)
+            self.classifier_norm = norm_layer(cls_dim)
+            self.classifier_head = nn.Linear(cls_dim, label_dim)
             # # Add positional embedding for this transformer classifier
             # self.classifier_pos_embed = nn.Parameter(torch.zeros(1, total_frame+1, embed_dim), requires_grad=tr_pos)
         else:
@@ -908,13 +914,31 @@ class CAVMAEFT(nn.Module):
             a = a + self.pos_embed_a
             a = a + self.modality_a
 
+            batch_size = a.shape[0]
+
+            # Append CLS token if using
+            if self.cls_token:
+                cls_tokens_a = self.cls_token_a.expand(batch_size, -1, -1)
+                a = torch.cat([cls_tokens_a, a], dim=1)
+
+            # Append register tokens if using
+            if self.num_register_tokens > 0:
+                r_a = self.register_tokens[:self.num_register_tokens].unsqueeze(0).expand(batch_size, -1, -1)
+                a = torch.cat([a, r_a], dim=1)
+
+            # Process through audio blocks
             for blk in self.blocks_a:
                 a = blk(a)
 
+            # Remove register tokens if needed
+            if self.num_register_tokens > 0 and not self.keep_register_tokens:
+                a = a[:, :-self.num_register_tokens, :]
+
+            # Process through unified blocks
             for blk in self.blocks_u:
                 a = blk(a)
             a = self.norm(a)
-            
+
             if self.aggregate == "self_attention_cls":
                 # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
                 batch_size = a.shape[0] // self.total_frame
@@ -933,21 +957,12 @@ class CAVMAEFT(nn.Module):
                 
                 a = self.classifier_norm(a)
                 a = self.classifier_head(a[:, 0])  # Use CLS token for classification
-                return a
-            if self.aggregate == "self_attention_cls":
-                # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
-                batch_size = a.shape[0] // self.total_frame
-                a = a.view(batch_size, self.total_frame, -1, a.shape[-1])
-                
-                # Average across patches
-                a = a.mean(dim=2)
-                
-                # Concatenate frames
-                # Expected dimension: (batch_size, self.total_frame * embed_dim)
-                x = a.view(batch_size, -1)
-                x = self.mlp_head(x)
+                x = a
             else:
-                x = a.mean(dim=1)
+                if self.cls_token:
+                    x = a[:, 0, :]  # Use CLS token
+                else:
+                    x = a.mean(dim=1)  # Average pooling
                 x = self.mlp_head(x)
             return x
 
@@ -957,9 +972,27 @@ class CAVMAEFT(nn.Module):
             v = v + self.pos_embed_v
             v = v + self.modality_v
 
+            batch_size = v.shape[0]
+
+            # Append CLS token if using
+            if self.cls_token:
+                cls_tokens_v = self.cls_token_v.expand(batch_size, -1, -1)
+                v = torch.cat([cls_tokens_v, v], dim=1)
+
+            # Append register tokens if using
+            if self.num_register_tokens > 0:
+                r_v = self.register_tokens[self.num_register_tokens:].unsqueeze(0).expand(batch_size, -1, -1)
+                v = torch.cat([v, r_v], dim=1)
+
+            # Process through visual blocks
             for blk in self.blocks_v:
                 v = blk(v)
 
+            # Remove register tokens if needed
+            if self.num_register_tokens > 0 and not self.keep_register_tokens:
+                v = v[:, :-self.num_register_tokens, :]
+
+            # Process through unified blocks
             for blk in self.blocks_u:
                 v = blk(v)
             v = self.norm(v)
@@ -982,22 +1015,12 @@ class CAVMAEFT(nn.Module):
                 
                 v = self.classifier_norm(v)
                 v = self.classifier_head(v[:, 0])  # Use CLS token for classification
-                return v
-
-            if self.aggregate == "self_attention_cls":
-                # Reshape to (batch_size, no_frames_per_video, num_patches, embed_dim)
-                batch_size = v.shape[0] // self.total_frame 
-                v = v.view(batch_size, self.total_frame, -1, v.shape[-1])
-                
-                # Average across patches
-                v = v.mean(dim=2)
-                
-                # Concatenate frames
-                # Expected dimension: (batch_size, self.total_frame * embed_dim)
-                x = v.view(batch_size, -1)
-                x = self.mlp_head(x)
+                x = v
             else:
-                x = v.mean(dim=1)
+                if self.cls_token:
+                    x = v[:, 0, :]  # Use CLS token
+                else:
+                    x = v.mean(dim=1)  # Average pooling
                 x = self.mlp_head(x)
             return x
 
