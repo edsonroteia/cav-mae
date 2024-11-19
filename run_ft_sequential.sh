@@ -1,6 +1,10 @@
 #!/bin/bash
 
 num_classes=${1:-20}
+model_id=${2:-2776}
+lr1=${3:-1e-3}
+lr2=${4:-1e-4}
+lr_scheduler=${5:-cosine}
 
 # 1. Create subsampled dataset with 30 classes
 echo "Creating subsampled dataset with $num_classes classes..."
@@ -21,14 +25,6 @@ tr_data=datafilles/vggsound/cluster_nodes/vgg_train_${num_classes}.json
 te_data=datafilles/vggsound/cluster_nodes/vgg_test_${num_classes}.json
 label_csv=datafilles/vggsound/cluster_nodes/class_labels_indices_vgg_${num_classes}.csv
 
-# Single learning rate, multiple model IDs
-lr=5e-3
-model_id1=${2:-2776}
-model_id2=${3:-2777}
-model_id3=${4:-2778}
-model_id4=${5:-2779}
-lr_scheduler=${6:-cosine}
-
 # Function to get model parameters
 get_model_params() {
     local model=$1
@@ -41,18 +37,24 @@ get_model_params() {
     echo "$n_register_tokens $total_frames $target_length $contrastive_head $joint_layers $keep_register_tokens"
 }
 
-# Create windows for each model ID
-for i in 1 2 3 4; do
-    model_var="model_id$i"
-    model_id=${!model_var}
-    read n_register_tokens total_frames target_length contrastive_head joint_layers keep_register_tokens <<< $(get_model_params $model_id)
-    
-    gpu_ids=$(( (i-1)*2 )),$(( (i-1)*2+1 ))
-    
+# Get model parameters once since we're using the same model
+read n_register_tokens total_frames target_length contrastive_head joint_layers keep_register_tokens <<< $(get_model_params $model_id)
 
-    # Print the command to be run
-    echo "Running command: bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh $lr 48 multimodal $gpu_ids None $total_frames True 9999999 10 finetuning_vggsound $model_id True $n_register_tokens $total_frames $tr_data $te_data $label_csv $num_classes $lr_scheduler $target_length $contrastive_head $joint_layers $keep_register_tokens"
-    tmux new-window -n "model_${model_id}" "bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh $lr 48 multimodal $gpu_ids self_attention_cls $total_frames True 9999999 10 finetuning_vggsound $model_id True $n_register_tokens $total_frames $tr_data $te_data $label_csv $num_classes $lr_scheduler $target_length $contrastive_head $joint_layers $keep_register_tokens"
+# Define configurations for the 4 runs
+configs=(
+    "audioonly $lr1"    # GPU 0,1: audioonly with lr1
+    "videoonly $lr1"    # GPU 2,3: videoonly with lr1
+    "audioonly $lr2"    # GPU 4,5: audioonly with lr2
+    "videoonly $lr2"    # GPU 6,7: videoonly with lr2
+)
+
+# Create windows for each configuration
+for i in {0..3}; do
+    modality=$(echo ${configs[$i]} | cut -d' ' -f1)
+    lr=$(echo ${configs[$i]} | cut -d' ' -f2)
+    gpu_ids=$(( i*2 )),$(( i*2+1 ))
+    
+    tmux new-window -n "${modality}_${lr}" "bash egs/vggsound/cluster_nodes/run_cavmae_ft_sync.sh $lr 48 $modality $gpu_ids self_attention_cls $total_frames True 9999999 10 finetuning_vggsound $model_id True $n_register_tokens $total_frames $tr_data $te_data $label_csv $num_classes $lr_scheduler $target_length $contrastive_head $joint_layers $keep_register_tokens"
 done
 
 # Command that will be run in each window if default values are used
