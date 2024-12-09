@@ -55,11 +55,11 @@ neptune_tag1=aggr_${aggregate}_freeze_${freeze_base}
 # Read the model name from command line argument
 model_name=${4:-model_2145}  # Default to model_2145 if not provided
 
-# Function to get the path for a given model name
-get_model_path() {
-    local model=$1
-    awk -F ',' -v model="$model" '$1 == model {print $2}' models.csv
-}
+# # Function to get the path for a given model name
+# get_model_path() {
+#     local model=$1
+#     awk -F ',' -v model="$model" '$1 == model {print $2}' models.csv
+# }
 
 get_num_register_tokens() {
     local model=$1
@@ -72,12 +72,13 @@ get_total_frame() {
 }
 
 # Get the pretrain_path
-pretrain_path=$(get_model_path "$model_name")
+# pretrain_path=$(get_model_path "$model_name")
+pretrain_path=$model_name
 cls_token=${5:-False}
-if [ -z "$pretrain_path" ]; then
-    echo "Error: Model $model_name not found in models.csv"
-    exit 1
-fi
+# if [ -z "$pretrain_path" ]; then
+#     echo "Error: Model $model_name not found in models.csv"
+#     exit 1
+# fi
 # Get the number of register tokens
 num_register_tokens=$(get_num_register_tokens "$model_name")
 total_frame=$(get_total_frame "$model_name")
