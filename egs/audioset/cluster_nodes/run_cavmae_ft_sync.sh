@@ -50,7 +50,11 @@ keep_register_tokens=${23}
 pretrain_path=$(awk -F, -v model="$pretrain_model" '$1 == model {print $2}' models.csv)
 
 # Set other default parameters that aren't passed
-head_lr=1  # since freeze_base is True
+if [ "$freeze_base" = True ]; then
+    head_lr=1  # since freeze_base is True
+else
+    head_lr=10
+fi
 lrscheduler_start=5
 lrscheduler_decay=0.5
 lrscheduler_step=1
