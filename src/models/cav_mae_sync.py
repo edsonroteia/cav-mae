@@ -1087,6 +1087,7 @@ class CAVMAEFT(nn.Module):
 
         # return both audio and visual
         if mode == 'av':
+            # embed patches
             a = a.unsqueeze(1)
             a = a.transpose(2, 3)
             a = self.patch_embed_a(a)
@@ -1096,22 +1097,57 @@ class CAVMAEFT(nn.Module):
             v = self.patch_embed_v(v)
             v = v + self.pos_embed_v
             v = v + self.modality_v
+            
+            batch_size = a.shape[0]
 
+            # Append cls tokens
+            if self.cls_token:
+                cls_tokens_a = self.cls_token_a.expand(batch_size, -1, -1)
+                cls_tokens_v = self.cls_token_v.expand(batch_size, -1, -1)
+
+                a = torch.cat([cls_tokens_a, a], dim=1)
+                v = torch.cat([cls_tokens_v, v], dim=1)
+
+            # Append register tokens
+            if self.num_register_tokens > 0:
+                r_a = self.register_tokens[:self.num_register_tokens].unsqueeze(0).expand(batch_size, -1, -1)
+                r_v = self.register_tokens[self.num_register_tokens:].unsqueeze(0).expand(batch_size, -1, -1)
+                
+                a = torch.cat([a, r_a], dim=1)
+                v = torch.cat([v, r_v], dim=1)
+
+            # audio and visual stream, independent blocks
             for blk in self.blocks_a:
                 a = blk(a)
 
             for blk in self.blocks_v:
                 v = blk(v)
 
+            if self.num_register_tokens > 0 and not self.keep_register_tokens:
+                # Remove register tokens
+                a = a[:, :-self.num_register_tokens, :]
+                v = v[:, :-self.num_register_tokens, :]
+            
             for blk in self.blocks_u:
                 a = blk(a, 'a')
-            a = self.norm_a(a)
-
+            
             for blk in self.blocks_u:
                 v = blk(v, 'v')
-
-            v = self.norm_v(v)
-            return a, v
+            
+            if self.cls_token:
+                # split the local patch tokens from the cls tokens
+                cls_a = self.norm_a(a[:, 0, :].unsqueeze(1))
+                cls_v = self.norm_v(v[:, 0, :].unsqueeze(1))
+                # local patch tokens
+                a = self.norm_a(a[:, 1:, :])
+                v = self.norm_v(v[:, 1:, :])
+                
+                return torch.cat([cls_a, a], dim=1), torch.cat([cls_v, v], dim=1)
+            else:
+                a = self.norm_a(a)
+                v = self.norm_v(v)
+                
+                return a, v
 
         # return only audio
         if mode == 'a':
@@ -1120,15 +1156,72 @@ class CAVMAEFT(nn.Module):
             a = self.patch_embed_a(a)
             a = a + self.pos_embed_a
             a = a + self.modality_a
+            
+            batch_size = a.shape[0]
+            
+            # Append cls token
+            if self.cls_token:
+                cls_tokens_a = self.cls_token_a.expand(batch_size, -1, -1)
+                a = torch.cat([cls_tokens_a, a], dim=1)
+            
+            # Append register tokens
+            if self.num_register_tokens > 0:
+                r_a = self.register_tokens[:self.num_register_tokens].unsqueeze(0).expand(batch_size, -1, -1)
+                a = torch.cat([a, r_a], dim=1)
 
             for blk in self.blocks_a:
                 a = blk(a)
+                
+            if self.num_register_tokens > 0 and not self.keep_register_tokens:
+                # Remove register tokens
+                a = a[:, :-self.num_register_tokens, :]
 
             for blk in self.blocks_u:
                 a = blk(a, 'a')
+                
+            if self.cls_token:
+                cls_a = self.norm_a(a[:, 0, :].unsqueeze(1))
+                a = self.norm_a(a[:, 1:, :])
+                return torch.cat([cls_a, a], dim=1)
+            else:
+                a = self.norm_a(a)
+                return a
+                
+        # return only visual
+        if mode == 'v':
+            v = self.patch_embed_v(v)
+            v = v + self.pos_embed_v
+            v = v + self.modality_v
+            
+            batch_size = v.shape[0]
+            
+            # Append cls token
+            if self.cls_token:
+                cls_tokens_v = self.cls_token_v.expand(batch_size, -1, -1)
+                v = torch.cat([cls_tokens_v, v], dim=1)
+            
+            # Append register tokens
+            if self.num_register_tokens > 0:
+                r_v = self.register_tokens[self.num_register_tokens:].unsqueeze(0).expand(batch_size, -1, -1)
+                v = torch.cat([v, r_v], dim=1)
 
-            a = self.norm_a(a)
-            return a
+            for blk in self.blocks_v:
+                v = blk(v)
+                
+            if self.num_register_tokens > 0 and not self.keep_register_tokens:
+                # Remove register tokens
+                v = v[:, :-self.num_register_tokens, :]
+
+            for blk in self.blocks_u:
+                v = blk(v, 'v')
+                
+            if self.cls_token:
+                cls_v = self.norm_v(v[:, 0, :].unsqueeze(1))
+                v = self.norm_v(v[:, 1:, :])
+                return torch.cat([cls_v, v], dim=1)
+            else:
+                v = self.norm_v(v)
+                return v
 
     def get_features(self, a, v, mode='multimodal'):
         # multi-modal fine-tuning, our default method for fine-tuning
