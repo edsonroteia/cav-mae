@@ -16,6 +16,7 @@
   - [VGGSound](#vggsound)
 - [Retrieval](#retrieval)
 - [Inpainting](#inpainting)
+- [Model Merging (Separate Objective Training)](#model-merging-separate-objective-training)
 - [Pretrained Models](#pretrained-models)
     - [CAV-MAE Pretrained Models (Main)](#cav-mae-pretrained-models-main)
     - [CAV-MAE Pretrained Models (Ablation Study)](#cav-mae-pretrained-models-ablation-study)
@@ -63,6 +64,7 @@ This repo contains everything you would need to reproduce our experiments and fu
 - The retrieval experiments script is in [`src/retrieval.py`](https://github.com/YuanGongND/cav-mae/blob/master/src/retrieval.py).
 - The inpainting experiments scripts is in [`src/inpainting.py`](https://github.com/YuanGongND/cav-mae/blob/master/src/inpaint.py).
 - The audio representation extraction scripts is in [`src/extract_audio_representation.py`](https://github.com/YuanGongND/cav-mae/blob/master/src/extract_audio_representation.py).
+- The model merging scripts for separate objective training are in [`src/merge_models.py`](src/merge_models.py) and [`egs/vggsound/`](egs/vggsound/).
 - Pretrained models and data lists, a detailed list is [[here]](#pretrained-models).
 
 ## The CAV-MAE Model 
@@ -199,7 +201,33 @@ Scripts for audio-visual retrieval are at `src/retrieval.py`, code is self-conta
 
 ## Inpainting
 
-Scripts for audio-visual retrieval are at `src/inpaint.py`, code is self-contained. You just need a CAV-MAE checkpoint (trained without pixel normalization) and a dataset. 
+Scripts for audio-visual retrieval are at `src/inpaint.py`, code is self-contained. You just need a CAV-MAE checkpoint (trained without pixel normalization) and a dataset.
+
+## Model Merging (Separate Objective Training)
+
+As an alternative to joint training, we provide scripts to train MAE and Contrastive objectives **separately**, then merge the resulting models. This baseline allows comparing joint multi-task learning vs. separate training with post-hoc model merging.
+
+**Training scripts** (in `egs/vggsound/`):
+- `run_cavmae_pretrain_mae_only.sh` - Train with MAE objective only (`contrast_loss_weight=0`)
+- `run_cavmae_pretrain_contrastive_only.sh` - Train with Contrastive objective only (`mae_loss_weight=0`)
+
+**Merging script** (`src/merge_models.py`) supports three strategies:
+
+| Method | Formula | Description |
+|--------|---------|-------------|
+| Simple Averaging | `(M_mae + M_contrastive) / 2` | Equal weight to both objectives |
+| Weighted Averaging | `α × M_mae + (1-α) × M_contrastive` | Tunable weight α ∈ [0,1] |
+| Task Arithmetic | `M_base + λ × (τ_mae + τ_contrastive)` | Where τ = M_trained - M_base |
+
+Example usage:
+```bash
+python src/merge_models.py --method simple \
+    --model_mae path/to/mae_model.pth \
+    --model_contrastive path/to/contrastive_model.pth \
+    --output path/to/merged_model.pth
+```
+
+See `egs/vggsound/README.md` for detailed instructions and `egs/vggsound/merge_models.sh` for example configurations.
 
 ## Pretrained Models
 
