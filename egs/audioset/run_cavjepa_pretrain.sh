@@ -57,10 +57,10 @@ tr_data=/weka/kuehne/kqr867/code/cav-mae/datafiles/audioset_2m_pretrain.json
 te_data=/weka/kuehne/kqr867/code/cav-mae/datafiles/audioset_eval_yuan.json
 label_csv=/weka/kuehne/kqr867/code/cav-mae/src/preprocess/sample_datafiles/class_labels_indices_as.csv
 
-# Pretrained weights path (set to 'None' for random init, or path to adapted JEPA weights)
-# To use I-JEPA initialization, first run:
-#   python src/adapt_jepa_weights.py --visual_ckpt <ijepa.pth> --audio_ckpt <ijepa.pth> --output cav_jepa_init.pth
-pretrain_path=None
+# Pretrained weights path
+# Using same ImageMAE-based initialization as CAV-MAE for fair comparison
+# Generated with: python src/adapt_cavmae_to_jepa.py --cavmae_ckpt IN-initial.pth --output cav_jepa_from_mae_init.pth
+pretrain_path=${cur_dir}/cav_jepa_from_mae_init.pth
 
 # Experiment directory
 exp_dir=./exp/cavjepa-${dataset}-lr${lr}-epoch${epoch}-bs${batch_size}-mr${masking_ratio}-mom${momentum_start}-${momentum_end}-pred${predictor_depth}
