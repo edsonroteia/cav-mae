@@ -32,16 +32,16 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 
 ## Active Experiments
 
-### Run 1: [Template - Not Yet Started]
+### Run 1: CAV-JEPA Initial Training (ImageMAE Init)
 | Field | Value |
 |-------|-------|
-| **Job ID** | - |
-| **Status** | Not Started |
-| **Submitted** | - |
+| **Job ID** | 312906 |
+| **Status** | Pending (Resources) |
+| **Submitted** | 2026-01-15 |
 | **Script** | `egs/audioset/run_cavjepa_pretrain.sh` |
-| **Output Dir** | `egs/audioset/exp/cavjepa-...` |
-| **Log File** | `egs/audioset/log/<jobid>_cavjepa.txt` |
-| **Initialization** | Option B (I-JEPA for both) |
+| **Output Dir** | `egs/audioset/exp/cavjepa-audioset-lr1e-4-epoch25-bs120-mr0.75-mom0.996-0.999-pred4` |
+| **Log File** | `egs/audioset/log/312906_cavjepa_pretrain.txt` |
+| **Initialization** | ImageMAE-based (same as CAV-MAE for fair comparison) |
 
 **JEPA Hyperparameters**:
 - Momentum start: 0.996
@@ -56,6 +56,9 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 - Batch size: 120
 - Epochs: 25
 - Masking ratio: 0.75
+- GPUs: 4 x H100
+
+**Notes**: Uses `cav_jepa_from_mae_init.pth` adapted from CAV-MAE's IN-initial.pth to ensure fair comparison. Target encoder initialized as copy of context encoder.
 
 ---
 
@@ -71,21 +74,22 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 
 ## Pending Experiments
 
-### Phase 1: Implementation
-- [ ] Implement `src/models/cav_jepa.py`
-- [ ] Create weight adaptation script `src/adapt_jepa_weights.py`
-- [ ] Create training loop `src/traintest_cavjepa.py`
-- [ ] Create training scripts for AudioSet/VGGSound
+### Phase 1: Implementation ✅
+- [x] Implement `src/models/cav_jepa.py`
+- [x] Create weight adaptation script `src/adapt_cavmae_to_jepa.py`
+- [x] Create training loop `src/traintest_cavjepa.py`
+- [x] Create entry point `src/run_cavjepa_pretrain.py`
+- [x] Create training script `egs/audioset/run_cavjepa_pretrain.sh`
 
-### Phase 2: Initial Training
-- [ ] Option B training (I-JEPA initialization)
-- [ ] Evaluate on downstream tasks
+### Phase 2: Initial Training (In Progress)
+- [x] ImageMAE-based initialization training (Job 312906) - PENDING
+- [ ] Evaluate on downstream tasks (VGGSound, AudioSet)
 
 ### Phase 3: Ablations
-- [ ] Option A training (I-JEPA + A-JEPA)
-- [ ] Option C training (V-JEPA)
+- [ ] I-JEPA initialization (if ViT-B checkpoints become available)
+- [ ] V-JEPA initialization
 - [ ] Predictor depth sweep (2, 4, 6 blocks)
-- [ ] Momentum schedule sweep
+- [ ] Momentum schedule sweep (0.99-0.999, 0.996-0.9999)
 
 ---
 
@@ -115,13 +119,18 @@ source activate_env.sh
 | Model | Init | JEPA Loss | Contrastive Acc | VGGSound Acc | AudioSet mAP | Notes |
 |-------|------|-----------|-----------------|--------------|--------------|-------|
 | CAV-MAE (baseline) | ImageMAE | N/A | ~70% | ~65.8% | ~42.0 | Joint MAE+Contrastive |
-| CAV-JEPA Option B | I-JEPA | - | - | - | - | Pending |
-| CAV-JEPA Option A | I-JEPA+A-JEPA | - | - | - | - | Pending |
-| CAV-JEPA Option C | V-JEPA | - | - | - | - | Pending |
+| CAV-JEPA (Job 312906) | ImageMAE | - | - | - | - | Training |
 
 ---
 
 ## Changelog
 
+- **2026-01-15**: Submitted CAV-JEPA initial training (Job 312906)
+- **2026-01-15**: Created `adapt_cavmae_to_jepa.py` for fair initialization from CAV-MAE weights
+- **2026-01-15**: Fixed numpy deprecation in `pos_embed.py` (np.float -> np.float64)
+- **2026-01-15**: Implemented full CAV-JEPA architecture with reference I-JEPA patterns
+  - Target encoder with EMA updates (in-place operations)
+  - Predictor network (4 blocks, 384 dim)
+  - smooth_l1_loss following I-JEPA reference
 - **2026-01-15**: Created experiment tracking infrastructure
 - **2026-01-15**: Ported environment setup from cav-mae-merge branch
