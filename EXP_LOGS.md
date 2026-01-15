@@ -35,12 +35,12 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 ### Run 1: CAV-JEPA Initial Training (ImageMAE Init)
 | Field | Value |
 |-------|-------|
-| **Job ID** | 312906 |
-| **Status** | Pending (Resources) |
+| **Job ID** | 312964 |
+| **Status** | Running |
 | **Submitted** | 2026-01-15 |
 | **Script** | `egs/audioset/run_cavjepa_pretrain.sh` |
 | **Output Dir** | `egs/audioset/exp/cavjepa-audioset-lr1e-4-epoch25-bs120-mr0.75-mom0.996-0.999-pred4` |
-| **Log File** | `egs/audioset/log/312906_cavjepa_pretrain.txt` |
+| **Log File** | `egs/audioset/log/312964_cavjepa_pretrain.txt` |
 | **Initialization** | ImageMAE-based (same as CAV-MAE for fair comparison) |
 
 **JEPA Hyperparameters**:
@@ -59,6 +59,8 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 - GPUs: 4 x H100
 
 **Notes**: Uses `cav_jepa_from_mae_init.pth` adapted from CAV-MAE's IN-initial.pth to ensure fair comparison. Target encoder initialized as copy of context encoder.
+
+**Test Run (Job 312962)**: Verified training works - losses stable (~0.11-0.13), JEPA audio ~0.04, JEPA visual ~0.05, contrastive ~0.02, momentum schedule working correctly.
 
 ---
 
@@ -82,7 +84,7 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 - [x] Create training script `egs/audioset/run_cavjepa_pretrain.sh`
 
 ### Phase 2: Initial Training (In Progress)
-- [x] ImageMAE-based initialization training (Job 312906) - PENDING
+- [x] ImageMAE-based initialization training (Job 312964) - RUNNING
 - [ ] Evaluate on downstream tasks (VGGSound, AudioSet)
 
 ### Phase 3: Ablations
@@ -119,13 +121,16 @@ source activate_env.sh
 | Model | Init | JEPA Loss | Contrastive Acc | VGGSound Acc | AudioSet mAP | Notes |
 |-------|------|-----------|-----------------|--------------|--------------|-------|
 | CAV-MAE (baseline) | ImageMAE | N/A | ~70% | ~65.8% | ~42.0 | Joint MAE+Contrastive |
-| CAV-JEPA (Job 312906) | ImageMAE | - | - | - | - | Training |
+| CAV-JEPA (Job 312964) | ImageMAE | - | - | - | - | Training |
 
 ---
 
 ## Changelog
 
-- **2026-01-15**: Submitted CAV-JEPA initial training (Job 312906)
+- **2026-01-15**: Launched full CAV-JEPA training (Job 312964) after successful test run
+- **2026-01-15**: Test run (Job 312962) verified training loop works correctly
+- **2026-01-15**: Fixed dtype mismatch in `forward_predictor` (torch.zeros needs explicit dtype)
+- **2026-01-15**: Fixed checkpoint loading order (load weights BEFORE DataParallel wrapping)
 - **2026-01-15**: Created `adapt_cavmae_to_jepa.py` for fair initialization from CAV-MAE weights
 - **2026-01-15**: Fixed numpy deprecation in `pos_embed.py` (np.float -> np.float64)
 - **2026-01-15**: Implemented full CAV-JEPA architecture with reference I-JEPA patterns
