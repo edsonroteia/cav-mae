@@ -428,11 +428,12 @@ class CAVJEPA(nn.Module):
         # First, create full sequence with context features at visible positions
 
         # Audio: expand to full sequence
-        a_full = torch.zeros(N, self.patch_embed_a.num_patches, self.predictor_embed_dim, device=a_ctx.device)
         # Place context features at their original positions (visible positions)
         visible_a = self.patch_embed_a.num_patches - num_mask_a
         # ids_restore tells us where each token should go
-        a_expanded = torch.zeros(N, self.patch_embed_a.num_patches, self.predictor_embed_dim, device=a_ctx.device)
+        # IMPORTANT: dtype must match a_ctx to avoid scatter_ dtype mismatch
+        a_expanded = torch.zeros(N, self.patch_embed_a.num_patches, self.predictor_embed_dim,
+                                 device=a_ctx.device, dtype=a_ctx.dtype)
 
         # Create index for scattering context features back
         # a_ctx has shape [N, visible_a, D], we need to place them at correct positions
@@ -441,7 +442,8 @@ class CAVJEPA(nn.Module):
 
         # Visual: same process
         visible_v = self.patch_embed_v.num_patches - num_mask_v
-        v_expanded = torch.zeros(N, self.patch_embed_v.num_patches, self.predictor_embed_dim, device=v_ctx.device)
+        v_expanded = torch.zeros(N, self.patch_embed_v.num_patches, self.predictor_embed_dim,
+                                 device=v_ctx.device, dtype=v_ctx.dtype)
         ids_keep_v = torch.argsort(ids_restore_v, dim=1)[:, :visible_v]
         v_expanded.scatter_(1, ids_keep_v.unsqueeze(-1).expand(-1, -1, self.predictor_embed_dim), v_ctx)
 

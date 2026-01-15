@@ -155,14 +155,28 @@ else:
     raise ValueError('Model not supported: {}'.format(args.model))
 
 # Load pretrained weights (e.g., adapted I-JEPA/V-JEPA checkpoint)
+# IMPORTANT: Load weights BEFORE wrapping with DataParallel to avoid key mismatch
 if args.pretrain_path != 'None':
     mdl_weight = torch.load(args.pretrain_path, map_location=torch.device('cpu'))
-    if not isinstance(audio_model, torch.nn.DataParallel):
-        audio_model = torch.nn.DataParallel(audio_model)
-    miss, unexpected = audio_model.load_state_dict(mdl_weight, strict=False)
+    # Handle checkpoints that may have 'module.' prefix
+    from collections import OrderedDict
+    new_weights = OrderedDict()
+    for k, v in mdl_weight.items():
+        # Remove 'module.' prefix if present (for consistency)
+        name = k.replace('module.', '') if k.startswith('module.') else k
+        new_weights[name] = v
+    miss, unexpected = audio_model.load_state_dict(new_weights, strict=False)
     print('Loaded pretrained weights from:', args.pretrain_path)
     print('Missing keys:', len(miss))
+    if miss:
+        print('  Sample missing:', miss[:5])
     print('Unexpected keys:', len(unexpected))
+    if unexpected:
+        print('  Sample unexpected:', unexpected[:5])
+
+# Wrap with DataParallel for multi-GPU training
+if not isinstance(audio_model, torch.nn.DataParallel):
+    audio_model = torch.nn.DataParallel(audio_model)
 
 # Create experiment directory
 print("\nCreating experiment directory: %s" % args.exp_dir)
