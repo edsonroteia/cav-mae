@@ -36,8 +36,9 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 | Field | Value |
 |-------|-------|
 | **Job ID** | 312964 |
-| **Status** | Running |
-| **Submitted** | 2026-01-15 |
+| **Status** | ✅ Running |
+| **Started** | 2026-01-15 20:41 |
+| **Node** | mlcbm012 |
 | **Script** | `egs/audioset/run_cavjepa_pretrain.sh` |
 | **Output Dir** | `egs/audioset/exp/cavjepa-audioset-lr1e-4-epoch25-bs120-mr0.75-mom0.996-0.999-pred4` |
 | **Log File** | `egs/audioset/log/312964_cavjepa_pretrain.txt` |
@@ -57,6 +58,14 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 - Epochs: 25
 - Masking ratio: 0.75
 - GPUs: 4 x H100
+
+**Initial Training Metrics** (Epoch 1, Step 1800/14609):
+- Total Loss: ~0.45-0.51
+- JEPA Audio Loss: ~0.10-0.20
+- JEPA Visual Loss: ~0.18-0.24
+- Contrastive Loss: ~0.11
+- Contrastive Acc: ~21%
+- Momentum: 0.996 (increasing)
 
 **Notes**: Uses `cav_jepa_from_mae_init.pth` adapted from CAV-MAE's IN-initial.pth to ensure fair comparison. Target encoder initialized as copy of context encoder.
 
@@ -127,6 +136,7 @@ source activate_env.sh
 
 ## Changelog
 
+- **2026-01-15 20:41**: Job 312964 started running on mlcbm012 - initial metrics look healthy
 - **2026-01-15**: Launched full CAV-JEPA training (Job 312964) after successful test run
 - **2026-01-15**: Test run (Job 312962) verified training loop works correctly
 - **2026-01-15**: Fixed dtype mismatch in `forward_predictor` (torch.zeros needs explicit dtype)
