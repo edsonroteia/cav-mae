@@ -6,4 +6,5 @@
 # @File    : __init__.py
 
 from .cav_mae import CAVMAE, CAVMAEFT
+from .cav_jepa import CAVJEPA, CAVJEPAFT
 from .audio_mdl import CAVMAEFTAudio
