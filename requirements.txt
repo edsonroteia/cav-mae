@@ -1,0 +1,22 @@
+# CAV-MAE dependencies
+# Compatible versions for H100 CUDA 12.2 / PyTorch 2.x
+
+# Core ML
+torch>=2.2.0
+torchaudio>=2.2.0
+torchvision>=0.17.0
+
+# timm (vision transformers) - compatible with cav-mae code
+timm>=0.6.0,<1.0
+
+# Scientific computing
+numpy>=1.24.0
+scipy
+einops
+
+# Audio processing
+librosa
+soundfile
+
+# Image processing
+pillow
