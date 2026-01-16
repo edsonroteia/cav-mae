@@ -28,7 +28,11 @@ print(f"Using device: {device}")
 
 def get_similarity(a, b):
     """Compute cosine similarity between two vectors."""
-    cos_sim = np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+    norm_a = np.linalg.norm(a)
+    norm_b = np.linalg.norm(b)
+    if norm_a == 0 or norm_b == 0:
+        return 0.0  # Return 0 for invalid vectors (missing data)
+    cos_sim = np.dot(a, b) / (norm_a * norm_b)
     return cos_sim
 
 
@@ -40,6 +44,33 @@ def get_sim_mat(a, b):
         for j in range(B):
             sim_mat[i, j] = get_similarity(a[i, :], b[j, :])
     return sim_mat
+
+
+def filter_valid_samples(audio_feat, video_feat):
+    """Filter out samples with zero-norm vectors (missing data)."""
+    # Convert to float32 to avoid precision issues with float16 from autocast
+    audio_feat = audio_feat.float()
+    video_feat = video_feat.float()
+
+    audio_norms = np.linalg.norm(audio_feat.numpy(), axis=1)
+    video_norms = np.linalg.norm(video_feat.numpy(), axis=1)
+
+    # Debug: print norm statistics
+    print(f"  DEBUG: Audio norms - min: {audio_norms.min():.6f}, max: {audio_norms.max():.6f}, mean: {audio_norms.mean():.6f}")
+    print(f"  DEBUG: Video norms - min: {video_norms.min():.6f}, max: {video_norms.max():.6f}, mean: {video_norms.mean():.6f}")
+    print(f"  DEBUG: Audio norms > 0.5: {(audio_norms > 0.5).sum()}, Video norms > 0.5: {(video_norms > 0.5).sum()}")
+
+    # Keep samples where both audio and video have non-zero norm
+    # Use a threshold that accounts for L2-normalized vectors (should be ~1.0)
+    valid_mask = (audio_norms > 0.5) & (video_norms > 0.5)
+
+    num_invalid = (~valid_mask).sum()
+    if num_invalid > 0:
+        print(f"  Filtered out {num_invalid} samples with missing data")
+    else:
+        print(f"  All {len(audio_feat)} samples valid")
+
+    return audio_feat[valid_mask], video_feat[valid_mask]
 
 
 def compute_metrics(x):
@@ -81,12 +112,24 @@ def get_retrieval_result(audio_model, val_loader, direction='audio'):
             audio_input, video_input = a_input.to(device), v_input.to(device)
             with autocast():
                 audio_output, video_output = audio_model.forward_feat(audio_input, video_input)
-                # Mean pool all patches
-                audio_output = torch.mean(audio_output, dim=1)
-                video_output = torch.mean(video_output, dim=1)
-                # L2 normalization
-                audio_output = torch.nn.functional.normalize(audio_output, dim=-1)
-                video_output = torch.nn.functional.normalize(video_output, dim=-1)
+            # Convert to float32 before pooling/normalization to avoid precision issues
+            audio_output = audio_output.float()
+            video_output = video_output.float()
+            # Debug first batch
+            if i == 0:
+                print(f"  DEBUG: Raw audio output shape: {audio_output.shape}, mean: {audio_output.mean():.6f}, std: {audio_output.std():.6f}")
+                print(f"  DEBUG: Raw video output shape: {video_output.shape}, mean: {video_output.mean():.6f}, std: {video_output.std():.6f}")
+            # Mean pool all patches
+            audio_output = torch.mean(audio_output, dim=1)
+            video_output = torch.mean(video_output, dim=1)
+            if i == 0:
+                print(f"  DEBUG: After pooling - audio mean: {audio_output.mean():.6f}, video mean: {video_output.mean():.6f}")
+                print(f"  DEBUG: Audio norms before L2: {torch.norm(audio_output, dim=1)[:4]}")
+            # L2 normalization
+            audio_output = torch.nn.functional.normalize(audio_output, dim=-1)
+            video_output = torch.nn.functional.normalize(video_output, dim=-1)
+            if i == 0:
+                print(f"  DEBUG: After L2 norm - audio norms: {torch.norm(audio_output, dim=1)[:4]}")
             audio_output = audio_output.to('cpu').detach()
             video_output = video_output.to('cpu').detach()
             A_a_feat.append(audio_output)
@@ -95,7 +138,10 @@ def get_retrieval_result(audio_model, val_loader, direction='audio'):
     A_a_feat = torch.cat(A_a_feat)
     A_v_feat = torch.cat(A_v_feat)
 
-    print(f'  Computing similarity matrix ({A_a_feat.shape[0]} samples)...')
+    # Filter out samples with missing data
+    A_a_feat, A_v_feat = filter_valid_samples(A_a_feat, A_v_feat)
+
+    print(f'  Computing similarity matrix ({A_a_feat.shape[0]} valid samples)...')
     if direction == 'audio':
         # audio -> visual retrieval
         sim_mat = get_sim_mat(A_a_feat.numpy(), A_v_feat.numpy())

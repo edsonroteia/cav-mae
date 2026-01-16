@@ -19,13 +19,29 @@ def load_model(path, device='cpu'):
     return torch.load(path, map_location=device)
 
 
-def simple_average(model_a, model_b):
+# Layers that should be taken from contrastive model only (not merged with MAE)
+# These layers don't receive gradients during MAE-only training
+CONTRASTIVE_ONLY_LAYERS = [
+    'norm_a.weight', 'norm_a.bias',
+    'norm_v.weight', 'norm_v.bias',
+    'module.norm_a.weight', 'module.norm_a.bias',
+    'module.norm_v.weight', 'module.norm_v.bias',
+]
+
+
+def is_contrastive_only_layer(key):
+    """Check if this layer should be taken from contrastive model only."""
+    return any(key.endswith(suffix) for suffix in ['norm_a.weight', 'norm_a.bias', 'norm_v.weight', 'norm_v.bias'])
+
+
+def simple_average(model_a, model_b, use_contrastive_for_norms=False):
     """
     Simple averaging: (model_mae + model_contrastive) / 2
 
     Args:
         model_a: MAE model weights (state_dict)
         model_b: Contrastive model weights (state_dict)
+        use_contrastive_for_norms: If True, take norm_a/norm_v from contrastive only
 
     Returns:
         Merged state_dict
@@ -35,10 +51,16 @@ def simple_average(model_a, model_b):
     # Get all keys from both models
     all_keys = set(model_a.keys()) | set(model_b.keys())
 
+    norm_layers_overridden = []
     for key in all_keys:
         if key in model_a and key in model_b:
-            # Both models have this parameter - average them
-            merged[key] = (model_a[key] + model_b[key]) / 2.0
+            # Check if this is a norm layer that should come from contrastive only
+            if use_contrastive_for_norms and is_contrastive_only_layer(key):
+                merged[key] = model_b[key]  # Use contrastive weights
+                norm_layers_overridden.append(key)
+            else:
+                # Both models have this parameter - average them
+                merged[key] = (model_a[key] + model_b[key]) / 2.0
         elif key in model_a:
             # Only in model_a
             merged[key] = model_a[key]
@@ -46,10 +68,13 @@ def simple_average(model_a, model_b):
             # Only in model_b
             merged[key] = model_b[key]
 
+    if norm_layers_overridden:
+        print(f"  Using contrastive-only weights for: {norm_layers_overridden}")
+
     return merged
 
 
-def weighted_average(model_a, model_b, alpha=0.5):
+def weighted_average(model_a, model_b, alpha=0.5, use_contrastive_for_norms=False):
     """
     Weighted averaging: alpha * model_mae + (1-alpha) * model_contrastive
 
@@ -58,6 +83,7 @@ def weighted_average(model_a, model_b, alpha=0.5):
         model_b: Contrastive model weights (state_dict)
         alpha: Weight for MAE model (default 0.5)
                alpha=1.0 means 100% MAE, alpha=0.0 means 100% Contrastive
+        use_contrastive_for_norms: If True, take norm_a/norm_v from contrastive only
 
     Returns:
         Merged state_dict
@@ -66,18 +92,26 @@ def weighted_average(model_a, model_b, alpha=0.5):
 
     all_keys = set(model_a.keys()) | set(model_b.keys())
 
+    norm_layers_overridden = []
     for key in all_keys:
         if key in model_a and key in model_b:
-            merged[key] = alpha * model_a[key] + (1 - alpha) * model_b[key]
+            if use_contrastive_for_norms and is_contrastive_only_layer(key):
+                merged[key] = model_b[key]  # Use contrastive weights
+                norm_layers_overridden.append(key)
+            else:
+                merged[key] = alpha * model_a[key] + (1 - alpha) * model_b[key]
         elif key in model_a:
             merged[key] = model_a[key]
         else:
             merged[key] = model_b[key]
 
+    if norm_layers_overridden:
+        print(f"  Using contrastive-only weights for: {norm_layers_overridden}")
+
     return merged
 
 
-def task_arithmetic(base_model, task_mae, task_contrastive, lambda_scale=1.0):
+def task_arithmetic(base_model, task_mae, task_contrastive, lambda_scale=1.0, use_contrastive_for_norms=False):
     """
     Task arithmetic: base + lambda * (tau_mae + tau_contrastive)
     where tau = trained - base (task vector)
@@ -90,24 +124,31 @@ def task_arithmetic(base_model, task_mae, task_contrastive, lambda_scale=1.0):
         task_contrastive: Contrastive-trained model weights
         lambda_scale: Scaling factor for task vectors (default 1.0)
                       Higher values = stronger effect of both objectives
+        use_contrastive_for_norms: If True, take norm_a/norm_v from contrastive only
 
     Returns:
         Merged state_dict
     """
     merged = OrderedDict()
 
+    norm_layers_overridden = []
     for key in base_model.keys():
         # Get weights from each model, defaulting to base if not present
         base_weight = base_model[key]
         mae_weight = task_mae.get(key, base_weight)
         contrastive_weight = task_contrastive.get(key, base_weight)
 
-        # Compute task vectors (delta from base)
-        tau_mae = mae_weight - base_weight
-        tau_contrastive = contrastive_weight - base_weight
+        # For norm layers, use contrastive only (MAE doesn't train these)
+        if use_contrastive_for_norms and is_contrastive_only_layer(key):
+            merged[key] = contrastive_weight
+            norm_layers_overridden.append(key)
+        else:
+            # Compute task vectors (delta from base)
+            tau_mae = mae_weight - base_weight
+            tau_contrastive = contrastive_weight - base_weight
 
-        # Apply task arithmetic: base + lambda * (sum of task vectors)
-        merged[key] = base_weight + lambda_scale * (tau_mae + tau_contrastive)
+            # Apply task arithmetic: base + lambda * (sum of task vectors)
+            merged[key] = base_weight + lambda_scale * (tau_mae + tau_contrastive)
 
     # Include any keys only in task models but not in base
     for model, name in [(task_mae, 'MAE'), (task_contrastive, 'Contrastive')]:
@@ -115,6 +156,9 @@ def task_arithmetic(base_model, task_mae, task_contrastive, lambda_scale=1.0):
             if key not in merged:
                 print(f"Warning: Key '{key}' found in {name} model but not in base. Using {name} weights directly.")
                 merged[key] = model[key]
+
+    if norm_layers_overridden:
+        print(f"  Using contrastive-only weights for: {norm_layers_overridden}")
 
     return merged
 
@@ -177,6 +221,9 @@ def main():
     parser.add_argument('--output', type=str, required=True,
                         help='Output path for merged model')
 
+    parser.add_argument('--use_contrastive_for_norms', action='store_true',
+                        help='Take norm_a/norm_v weights from contrastive model only (fixes MAE norm collapse issue)')
+
     args = parser.parse_args()
 
     # Validate arguments
@@ -202,14 +249,17 @@ def main():
     print(f"Merging with method: {args.method}")
     print("="*60)
 
+    if args.use_contrastive_for_norms:
+        print("NOTE: Using contrastive-only weights for norm_a/norm_v (fixes MAE collapse)")
+
     if args.method == 'simple':
         print("Formula: merged = (model_mae + model_contrastive) / 2")
-        merged = simple_average(model_mae, model_contrastive)
+        merged = simple_average(model_mae, model_contrastive, args.use_contrastive_for_norms)
         verify_merge(model_mae, model_contrastive, merged, 'simple')
 
     elif args.method == 'weighted':
         print(f"Formula: merged = {args.alpha} * model_mae + {1-args.alpha} * model_contrastive")
-        merged = weighted_average(model_mae, model_contrastive, args.alpha)
+        merged = weighted_average(model_mae, model_contrastive, args.alpha, args.use_contrastive_for_norms)
         verify_merge(model_mae, model_contrastive, merged, 'weighted', args.alpha)
 
     elif args.method == 'task_arithmetic':
@@ -217,7 +267,7 @@ def main():
         print_model_stats(model_base, "Base model")
         print(f"Formula: merged = base + {args.lambda_scale} * (tau_mae + tau_contrastive)")
         print("         where tau = trained_model - base_model")
-        merged = task_arithmetic(model_base, model_mae, model_contrastive, args.lambda_scale)
+        merged = task_arithmetic(model_base, model_mae, model_contrastive, args.lambda_scale, args.use_contrastive_for_norms)
 
     # Save merged model
     print("\n" + "="*60)
