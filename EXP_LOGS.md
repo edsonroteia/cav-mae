@@ -92,6 +92,12 @@ This document tracks all experiment runs for the model merging baseline project.
 - Eval Contrastive Acc: 68%
 - **Strong convergence** - contrastive objective trains well in isolation
 
+**VGGSound Retrieval Results**:
+| Direction | R@1 | R@5 | R@10 | Median Rank |
+|-----------|-----|-----|------|-------------|
+| Audio→Visual | **16.0%** | 35.7% | 44.9% | **15** |
+| Visual→Audio | **16.2%** | 37.3% | 46.1% | **14** |
+
 ---
 
 ## Existing Models (Baseline)
@@ -146,22 +152,27 @@ scontrol show job <JOB_ID>
 
 ## Results Summary
 
-| Model | MAE Loss | Contrastive Acc | Downstream Acc | Notes |
-|-------|----------|-----------------|----------------|-------|
+| Model | MAE Loss | Contrastive Acc | VGGSound R@1 | Notes |
+|-------|----------|-----------------|--------------|-------|
 | Joint (baseline) | TBD | TBD | TBD | Pre-existing |
 | MAE-only (lr=1e-4) | 3.40 | N/A | - | Job 312886 ✅ - Poor convergence |
 | MAE-only (lr=2e-4) | - | N/A | - | Job 313261 🔄 - Higher LR retry |
-| Contrastive-only | N/A | 68% | - | Job 312887 ✅ - Good convergence |
+| Contrastive-only | N/A | 68% | **16.0%** A→V | Job 312887 ✅ - Best retrieval |
 | Merged (simple) | - | - | - | Pending |
 | Merged (weighted 0.5) | - | - | - | Pending |
 | Merged (task arith 1.0) | - | - | - | Pending |
 
 **Training Curves**: See `egs/audioset/training_curves_ablation.png`
 
+**Retrieval Script**: `src/run_retrieval.py` (fixed for timm compatibility)
+
 ---
 
 ## Changelog
 
+- **2026-01-16**: VGGSound retrieval - Contrastive-only R@1=16.0% A→V, 16.2% V→A
+- **2026-01-16**: Created unified retrieval script `src/run_retrieval.py`
+- **2026-01-16**: Fixed timm compatibility in `src/models/cav_mae.py` (removed qk_scale from Attention)
 - **2026-01-16**: Launched MAE-only lr=2e-4 (Job 313261) to test higher LR hypothesis
 - **2026-01-16**: Created training curves plot `egs/audioset/training_curves_ablation.png`
 - **2026-01-16**: MAE-only (312886) completed - only 6% loss reduction, suggesting LR too low
