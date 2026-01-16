@@ -59,26 +59,41 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 - Masking ratio: 0.75
 - GPUs: 4 x H100
 
-**Training Progress** (as of Epoch 13/25):
+**Training Progress** (as of Epoch 20/25 - 80% complete):
 
-| Metric | Epoch 1 | Epoch 13 | Change |
-|--------|---------|----------|--------|
-| Total Loss | 0.440 | 0.321 | -27.0% |
-| JEPA Audio Loss | 0.167 | 0.086 | -48.7% |
-| JEPA Visual Loss | 0.187 | 0.196 | +5.0% |
-| Contrastive Loss | 0.086 | 0.039 | -54.5% |
-| Contrastive Acc | 36.9% | 69.3% | +32.4% |
-| Momentum | 0.996 | 0.9975 | +0.1% |
+| Metric | Epoch 1 | Epoch 13 | Epoch 20 | Total Change |
+|--------|---------|----------|----------|--------------|
+| Total Loss | 0.440 | 0.321 | 0.245 | -44.3% |
+| JEPA Audio Loss | 0.167 | 0.086 | 0.068 | -59.3% |
+| JEPA Visual Loss | 0.187 | 0.196 | 0.149 | -20.3% |
+| Contrastive Loss | 0.086 | 0.039 | 0.029 | -66.3% |
+| Contrastive Acc | 36.9% | 69.3% | 76-79% | +40% |
+| Momentum | 0.996 | 0.9975 | 0.9983 | - |
 
 **Key Observations**:
-- JEPA Audio loss decreased significantly (-49%), suggesting audio representations are well-suited for latent-space prediction
-- JEPA Visual loss remained stable (+5%), visual may be harder to predict in latent space
-- Contrastive accuracy reached 69%, comparable to CAV-MAE baseline (~70%)
+- JEPA Audio loss continues to decrease strongly (-59% overall)
+- JEPA Visual loss now also decreasing (epoch 13→20: 0.196→0.149)
+- Contrastive accuracy reached ~77%, approaching CAV-MAE baseline (~70% eval)
 - Training is stable with momentum schedule working as expected
 
 **Notes**: Uses `cav_jepa_from_mae_init.pth` adapted from CAV-MAE's IN-initial.pth to ensure fair comparison. Target encoder initialized as copy of context encoder.
 
 **Training Curves**: See `egs/audioset/training_curves_cavjepa.png`
+
+**VGGSound Retrieval Results** (epoch 20 checkpoint):
+
+| Model | Direction | R@1 | R@5 | R@10 | Median Rank |
+|-------|-----------|-----|-----|------|-------------|
+| **CAV-JEPA** | A→V | 12.5% | 29.9% | 38.7% | 23 |
+| **CAV-JEPA** | V→A | 14.1% | 31.9% | 40.5% | 19 |
+| Contrastive-only | A→V | 16.0% | 35.7% | 44.9% | 15 |
+| Contrastive-only | V→A | 16.2% | 37.3% | 46.1% | 14 |
+
+**Retrieval Analysis**:
+- Contrastive-only outperforms CAV-JEPA on retrieval (R@1 +3-4%, MR 6-8 positions better)
+- This is expected: contrastive learning directly optimizes audio-visual alignment
+- JEPA objective focuses on latent prediction, may benefit different downstream tasks
+- V→A direction shows closer performance than A→V
 
 **Test Run (Job 312962)**: Verified training works - losses stable (~0.11-0.13), JEPA audio ~0.04, JEPA visual ~0.05, contrastive ~0.02, momentum schedule working correctly.
 
@@ -157,15 +172,18 @@ source activate_env.sh
 
 ## Results Summary
 
-| Model | Init | JEPA Loss | Contrastive Acc | VGGSound Acc | AudioSet mAP | Notes |
-|-------|------|-----------|-----------------|--------------|--------------|-------|
-| CAV-MAE (baseline) | ImageMAE | N/A | ~70% | ~65.8% | ~42.0 | Joint MAE+Contrastive |
-| CAV-JEPA (Job 312964) | ImageMAE | 0.28 (A:0.09, V:0.20) | 69.3% | - | - | Training (13/25 epochs) |
+| Model | Init | JEPA/MAE Loss | Contrastive Acc | VGGSound R@1 | Notes |
+|-------|------|---------------|-----------------|--------------|-------|
+| CAV-MAE (baseline) | ImageMAE | N/A | ~70% | - | Joint MAE+Contrastive |
+| Contrastive-only | ImageMAE | N/A | 68% eval | **16.0%** A→V | Best retrieval |
+| CAV-JEPA (Job 312964) | ImageMAE | 0.22 (A:0.07, V:0.15) | 77% | 12.5% A→V | Training (20/25 epochs) |
 
 ---
 
 ## Changelog
 
+- **2026-01-16**: VGGSound retrieval evaluation - CAV-JEPA R@1=12.5%, Contrastive-only R@1=16.0%
+- **2026-01-16**: CAV-JEPA training progress (epoch 20/25): Total Loss 0.245, Contrastive Acc ~77%
 - **2026-01-16**: CAV-JEPA training progress analysis (epoch 13/25): JEPA audio -49%, contrastive acc 69%
 - **2026-01-16**: Created `egs/audioset/parse_and_plot_cavjepa_logs.py` for JEPA training analysis
 - **2026-01-16**: Launched MAE-only lr=2e-4 (Job 313261) to test if higher LR improves MAE convergence
