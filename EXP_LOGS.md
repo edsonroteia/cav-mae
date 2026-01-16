@@ -16,19 +16,16 @@ This document tracks all experiment runs for the model merging baseline project.
 
 ## Active Experiments
 
-### Run 1: MAE-Only Pretraining
+### Run 1: MAE-Only Pretraining (lr=1e-4)
 | Field | Value |
 |-------|-------|
-| **Job ID** | 312886 (prev: 312874 failed - missing timm; 312868 failed - tenv alias issue) |
-| **Status** | Running |
+| **Job ID** | 312886 |
+| **Status** | ✅ Completed |
 | **Submitted** | 2026-01-15 |
+| **Completed** | 2026-01-16 |
 | **Script** | `egs/audioset/run_cavmae_pretrain_mae_only.sh` |
 | **Output Dir** | `egs/audioset/exp/mae-only-audioset-cav-mae-balNone-lr1e-4-epoch25-bs120-normTrue-mr-unstructured-0.75/` |
 | **Log File** | `egs/audioset/log/312886_mae_only.txt` |
-| **Error File** | `egs/audioset/log/312886_mae_only.err` |
-| **Partition** | h100-ferranti |
-| **GPUs** | 4 |
-| **Time Limit** | 2 days |
 
 **Hyperparameters**:
 - Learning rate: 1e-4
@@ -38,21 +35,47 @@ This document tracks all experiment runs for the model merging baseline project.
 - MAE loss weight: 1.0
 - Contrastive loss weight: 0.0 (disabled)
 
+**Results**:
+- Train MAE Loss: 3.67 → 3.40 (**only 6% reduction**)
+- Audio MAE: 2.36 → 2.16
+- Visual MAE: 1.31 → 1.24
+- Eval MAE Loss: 3.30
+- **Issue**: Loss barely decreased - LR may be too low without contrastive gradients
+
+---
+
+### Run 1b: MAE-Only Pretraining (lr=2e-4) - RETRY WITH HIGHER LR
+| Field | Value |
+|-------|-------|
+| **Job ID** | 313261 |
+| **Status** | 🔄 Running |
+| **Submitted** | 2026-01-16 |
+| **Script** | `egs/audioset/run_mae_only_lr2e-4.sh` |
+| **Output Dir** | `egs/audioset/exp/mae-only-audioset-cav-mae-balNone-lr2e-4-epoch25-bs120-normTrue-mr-unstructured-0.75/` |
+| **Log File** | `egs/audioset/log/313261_mae_only_lr2e-4.txt` |
+
+**Hyperparameters**:
+- Learning rate: **2e-4** (2x previous)
+- Batch size: 120
+- Epochs: 25
+- Masking ratio: 0.75
+- MAE loss weight: 1.0
+- Contrastive loss weight: 0.0 (disabled)
+
+**Hypothesis**: MAE-only training needs higher LR since it lacks the additional gradient signal from contrastive loss
+
 ---
 
 ### Run 2: Contrastive-Only Pretraining
 | Field | Value |
 |-------|-------|
-| **Job ID** | 312887 (prev: 312875 failed - missing timm; 312869 failed - tenv alias issue) |
-| **Status** | Running |
+| **Job ID** | 312887 |
+| **Status** | ✅ Completed |
 | **Submitted** | 2026-01-15 |
+| **Completed** | 2026-01-16 |
 | **Script** | `egs/audioset/run_cavmae_pretrain_contrastive_only.sh` |
 | **Output Dir** | `egs/audioset/exp/contrastive-only-audioset-cav-mae-balNone-lr1e-4-epoch25-bs120-mr-unstructured-0.75/` |
 | **Log File** | `egs/audioset/log/312887_contrastive_only.txt` |
-| **Error File** | `egs/audioset/log/312887_contrastive_only.err` |
-| **Partition** | h100-ferranti |
-| **GPUs** | 4 |
-| **Time Limit** | 2 days |
 
 **Hyperparameters**:
 - Learning rate: 1e-4
@@ -61,6 +84,13 @@ This document tracks all experiment runs for the model merging baseline project.
 - Masking ratio: 0.75
 - MAE loss weight: 0.0 (disabled)
 - Contrastive loss weight: 1.0
+
+**Results**:
+- Train Contrastive Loss: 13.5 → 2.1 (**84% reduction**)
+- Train Contrastive Acc: 5% → 83%
+- Eval Contrastive Loss: 4.44
+- Eval Contrastive Acc: 68%
+- **Strong convergence** - contrastive objective trains well in isolation
 
 ---
 
@@ -116,19 +146,26 @@ scontrol show job <JOB_ID>
 
 ## Results Summary
 
-| Model | MAE Loss | Contrastive Loss | Downstream Acc | Notes |
-|-------|----------|------------------|----------------|-------|
+| Model | MAE Loss | Contrastive Acc | Downstream Acc | Notes |
+|-------|----------|-----------------|----------------|-------|
 | Joint (baseline) | TBD | TBD | TBD | Pre-existing |
-| MAE-only | - | - | - | Job 312874 |
-| Contrastive-only | - | - | - | Job 312875 |
+| MAE-only (lr=1e-4) | 3.40 | N/A | - | Job 312886 ✅ - Poor convergence |
+| MAE-only (lr=2e-4) | - | N/A | - | Job 313261 🔄 - Higher LR retry |
+| Contrastive-only | N/A | 68% | - | Job 312887 ✅ - Good convergence |
 | Merged (simple) | - | - | - | Pending |
 | Merged (weighted 0.5) | - | - | - | Pending |
 | Merged (task arith 1.0) | - | - | - | Pending |
+
+**Training Curves**: See `egs/audioset/training_curves_ablation.png`
 
 ---
 
 ## Changelog
 
+- **2026-01-16**: Launched MAE-only lr=2e-4 (Job 313261) to test higher LR hypothesis
+- **2026-01-16**: Created training curves plot `egs/audioset/training_curves_ablation.png`
+- **2026-01-16**: MAE-only (312886) completed - only 6% loss reduction, suggesting LR too low
+- **2026-01-16**: Contrastive-only (312887) completed - 68% eval acc, strong convergence
 - **2026-01-15**: Relaunched MAE-only (312886) and Contrastive-only (312887) with dedicated cav-mae venv
 - **2026-01-15**: Created dedicated venv with uv, fixed timm/numpy API compatibility issues
 - **2026-01-15**: Previous runs (312874, 312875) failed - missing timm module in avllm-eval env
