@@ -126,6 +126,48 @@ python ../../src/merge_models.py \
     --output ${OUTPUT_DIR}/merged_task_arith_1.5.pth
 
 # =============================================================================
+# Method 4: Orthogonal Conflict-Aware Merge
+# Formula: For aligned objectives (cos >= tau): merged = base + tau_mae + beta*tau_con
+#          For conflicting objectives (cos < tau): merged = base + tau_mae + beta*tau_con_orthogonal
+# =============================================================================
+
+# Default orthogonal merge (beta=1.0, tau=0.0)
+echo "Running orthogonal conflict-aware merge with beta=1.0, tau=0.0..."
+python ../../src/merge_models.py \
+    --method orthogonal \
+    --model_mae ${MAE_MODEL} \
+    --model_contrastive ${CONTRASTIVE_MODEL} \
+    --model_base ${BASE_MODEL} \
+    --ortho_beta 1.0 \
+    --ortho_tau 0.0 \
+    --use_contrastive_for_norms \
+    --output ${OUTPUT_DIR}/merged_orthogonal_default.pth
+
+# Orthogonal merge with stricter conflict detection (tau=0.2)
+echo "Running orthogonal conflict-aware merge with beta=1.0, tau=0.2..."
+python ../../src/merge_models.py \
+    --method orthogonal \
+    --model_mae ${MAE_MODEL} \
+    --model_contrastive ${CONTRASTIVE_MODEL} \
+    --model_base ${BASE_MODEL} \
+    --ortho_beta 1.0 \
+    --ortho_tau 0.2 \
+    --use_contrastive_for_norms \
+    --output ${OUTPUT_DIR}/merged_orthogonal_tau0.2.pth
+
+# Orthogonal merge with reduced contrastive weight (beta=0.5)
+echo "Running orthogonal conflict-aware merge with beta=0.5, tau=0.0..."
+python ../../src/merge_models.py \
+    --method orthogonal \
+    --model_mae ${MAE_MODEL} \
+    --model_contrastive ${CONTRASTIVE_MODEL} \
+    --model_base ${BASE_MODEL} \
+    --ortho_beta 0.5 \
+    --ortho_tau 0.0 \
+    --use_contrastive_for_norms \
+    --output ${OUTPUT_DIR}/merged_orthogonal_beta0.5.pth
+
+# =============================================================================
 # Summary
 # =============================================================================
 echo ""
@@ -138,6 +180,15 @@ echo "Next steps:"
 echo "1. Fine-tune each merged model using run_cavmae_ft.sh"
 echo "2. Compare downstream task performance (mAP/accuracy)"
 echo "3. Optionally evaluate on retrieval tasks"
+echo ""
+echo "For comprehensive sweeps, use:"
+echo "  ./sweep_orthogonal.sh      # 25 orthogonal merge variants"
+echo "  ./sweep_weighted_full.sh   # 11 weighted averaging variants"
+echo "  ./sweep_task_arithmetic.sh # 7 task arithmetic variants"
+echo "  ./sweep_dare_ties.sh       # 12 DARE-TIES variants"
+echo ""
+echo "For batch retrieval evaluation:"
+echo "  sbatch run_retrieval_sweep.sh"
 echo ""
 echo "Example finetuning command:"
 echo "  sbatch run_cavmae_ft.sh ${OUTPUT_DIR}/merged_simple.pth"

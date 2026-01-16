@@ -44,19 +44,19 @@ This document tracks all experiment runs for the model merging baseline project.
   - This causes the model to output all zeros for any input
   - Root cause: MAE-only loss doesn't provide sufficient gradient signal to norm layers
   - The model is unusable for retrieval/downstream tasks
-  - Waiting for lr=2e-4 retry (Job 313261) to see if higher LR prevents collapse
+  - Waiting for lr=2e-4 retry (Job 313696) to see if higher LR prevents collapse
 
 ---
 
 ### Run 1b: MAE-Only Pretraining (lr=2e-4) - RETRY WITH HIGHER LR
 | Field | Value |
 |-------|-------|
-| **Job ID** | 313261 |
-| **Status** | 🔄 Running |
-| **Submitted** | 2026-01-16 |
+| **Job ID** | 313696 |
+| **Status** | 🔄 Running (Pending Resources) |
+| **Submitted** | 2026-01-16 23:26 |
 | **Script** | `egs/audioset/run_mae_only_lr2e-4.sh` |
 | **Output Dir** | `egs/audioset/exp/mae-only-audioset-cav-mae-balNone-lr2e-4-epoch25-bs120-normTrue-mr-unstructured-0.75/` |
-| **Log File** | `egs/audioset/log/313261_mae_only_lr2e-4.txt` |
+| **Log File** | `egs/audioset/log/313696_mae_only_lr2e-4.txt` |
 
 **Hyperparameters**:
 - Learning rate: **2e-4** (2x previous)
@@ -67,6 +67,8 @@ This document tracks all experiment runs for the model merging baseline project.
 - Contrastive loss weight: 0.0 (disabled)
 
 **Hypothesis**: MAE-only training needs higher LR since it lacks the additional gradient signal from contrastive loss
+
+**Note**: Previous attempt (Job 313261) failed due to timm compatibility issue (`qk_scale` argument). Fixed in `src/models/cav_mae.py` on 2026-01-16 22:23.
 
 ---
 
@@ -104,6 +106,91 @@ This document tracks all experiment runs for the model merging baseline project.
 
 ---
 
+## Model Merging - Comprehensive Sweeps (2026-01-16)
+
+### New Implementation: Orthogonal Conflict-Aware Merge
+
+Added to `src/merge_models.py`:
+
+**Algorithm**:
+```
+For each parameter:
+  Δ_c = W_contrastive - W_base  (contrastive task vector)
+  Δ_m = W_mae - W_base          (MAE task vector)
+  s = cos(Δ_c, Δ_m)             (cosine similarity)
+
+  If s >= τ (aligned objectives):
+    W_merged = W_base + Δ_m + β·Δ_c
+  If s < τ (conflicting objectives):
+    Δ_c_⊥ = Δ_c - proj_{Δ_m}(Δ_c)  (orthogonal component)
+    W_merged = W_base + Δ_m + β·Δ_c_⊥
+```
+
+**CLI Arguments**: `--ortho_beta`, `--ortho_tau`, `--ortho_group`
+
+---
+
+### Run 5: Comprehensive Model Merging Sweeps
+| Field | Value |
+|-------|-------|
+| **Status** | ✅ Completed |
+| **Completed** | 2026-01-16 23:23 |
+| **Output Dir** | `egs/audioset/exp/merged-models/` |
+
+**Sweep Scripts Created**:
+| Script | Method | Combinations |
+|--------|--------|--------------|
+| `sweep_orthogonal.sh` | Conflict-aware orthogonal | β×τ = 5×5 = 25 models |
+| `sweep_weighted_full.sh` | Weighted averaging | α ∈ [0.0-1.0] = 11 models |
+| `sweep_task_arithmetic.sh` | Task arithmetic | λ ∈ {0.3-2.0} = 7 models |
+| `sweep_dare_ties.sh` | DARE-TIES | kr×λ = 4×3 = 12 models |
+
+**Total Merged Models Created: 55**
+
+**Directory Structure**:
+```
+exp/merged-models/
+├── orthogonal-sweep/     # 25 models (beta × tau combinations)
+│   ├── merged_orthogonal_beta0.25_tau0.0.pth
+│   ├── merged_orthogonal_beta0.25_tau0.1.pth
+│   ├── ... (25 total)
+├── weighted-sweep/       # 11 models (alpha 0.0 to 1.0)
+│   ├── merged_weighted_alpha0.0.pth
+│   ├── merged_weighted_alpha0.1.pth
+│   ├── ... (11 total)
+├── task-arithmetic-sweep/ # 7 models (lambda values)
+│   ├── merged_task_arith_lambda0.3.pth
+│   ├── ... (7 total)
+└── dare-ties-sweep/      # 12 models (keep_ratio × lambda)
+    ├── merged_dare_ties_kr0.1_lambda0.5.pth
+    ├── ... (12 total)
+```
+
+---
+
+### Run 6: Parallel Retrieval Evaluation (All 55+ Models)
+| Field | Value |
+|-------|-------|
+| **Job IDs** | 313698-313754 (57 jobs) |
+| **Status** | 🔄 Running (Queued) |
+| **Submitted** | 2026-01-16 23:26 |
+| **Script** | `egs/audioset/launch_all_retrieval_jobs.sh` |
+| **Output Dir** | `egs/audioset/exp/retrieval_results/` |
+
+**Jobs Submitted**:
+- 1 job for MAE-only (lr=1e-4)
+- 25 jobs for orthogonal sweep
+- 11 jobs for weighted sweep
+- 7 jobs for task arithmetic sweep
+- 12 jobs for DARE-TIES sweep
+- 1 job for original merged model
+
+**Scripts for Results**:
+- `launch_all_retrieval_jobs.sh`: Submit all evaluation jobs
+- `aggregate_retrieval_results.sh`: Aggregate results into summary CSV
+
+---
+
 ## Existing Models (Baseline)
 
 ### Joint Training (Pre-existing)
@@ -115,9 +202,9 @@ This document tracks all experiment runs for the model merging baseline project.
 
 ---
 
-## Model Merging - Completed
+## Model Merging - Original (Pre-Sweep)
 
-### Run 3: Model Merging
+### Run 3: Initial Model Merging
 | Field | Value |
 |-------|-------|
 | **Status** | ✅ Completed |
@@ -138,36 +225,48 @@ This document tracks all experiment runs for the model merging baseline project.
 
 ---
 
-### Run 4: VGGSound Retrieval Evaluation (All Models)
-| Field | Value |
-|-------|-------|
-| **Job ID** | 313681 (resubmitted, 313680 failed CUDA error on mlcbm004) |
-| **Status** | 🔄 Running |
-| **Submitted** | 2026-01-16 |
-| **Script** | `egs/audioset/run_retrieval_all.sh` |
-| **Output Dir** | `egs/audioset/exp/retrieval_results/` |
-| **Log File** | `egs/audioset/log/313681_retrieval_all.txt` |
+## Implemented Merging Methods
 
-**Models Being Evaluated**:
-1. Base (IN-initial.pth)
-2. MAE-only (lr=1e-4)
-3. Contrastive-only (lr=1e-4)
-4. Merged: Simple average
-5. Merged: Weighted α=0.3
-6. Merged: Weighted α=0.5
-7. Merged: Weighted α=0.7
-8. Merged: Task arithmetic λ=0.5
-9. Merged: Task arithmetic λ=1.0
-10. Merged: Task arithmetic λ=1.5
+**Code Location**: `src/merge_models.py`
+
+| Method | Description | CLI Flag |
+|--------|-------------|----------|
+| `simple` | (MAE + Contrastive) / 2 | `--method simple` |
+| `weighted` | α×MAE + (1-α)×Contrastive | `--method weighted --alpha 0.5` |
+| `task_arithmetic` | base + λ×(τ_mae + τ_con) | `--method task_arithmetic --lambda_scale 1.0` |
+| `layerwise` | Per-block α based on task-vector magnitudes | `--method layerwise` |
+| `dare_ties` | Sparsify + TIES sign consensus | `--method dare_ties --dare_keep_ratio 0.2` |
+| `fisher` | Fisher-weighted merge | `--method fisher` |
+| `orthogonal` | **NEW** Conflict-aware orthogonal | `--method orthogonal --ortho_beta 1.0 --ortho_tau 0.0` |
 
 ---
 
-## Pending Experiments
+## TODO / Next Steps
 
-### Finetuning (after retrieval evaluation)
-- **Script**: `egs/audioset/run_cavmae_ft.sh`
-- **Dataset**: AudioSet 20k balanced
-- **Evaluation**: 527-class classification
+### Immediate (When Retrieval Jobs Complete)
+- [ ] Run `./aggregate_retrieval_results.sh` to generate summary
+- [ ] Analyze results: identify top models by R@1
+- [ ] Compare orthogonal merge vs other methods
+
+### After MAE lr=2e-4 Training Completes (Job 313696)
+- [ ] Re-run all sweep scripts with new MAE model:
+  - `./sweep_orthogonal.sh`
+  - `./sweep_weighted_full.sh`
+  - `./sweep_task_arithmetic.sh`
+  - `./sweep_dare_ties.sh`
+- [ ] Launch retrieval evaluation for new merged models
+- [ ] Compare lr=1e-4 vs lr=2e-4 MAE models
+
+### Classification Finetuning (Top Models Only)
+- [ ] Select top 5-10 merged models based on retrieval R@1
+- [ ] Run classification finetuning on AudioSet-20K
+- [ ] Script: `egs/audioset/run_cavmae_ft.sh`
+
+### Fisher-Weighted Merge
+- [ ] Estimate Fisher diagonal for MAE-only checkpoint
+- [ ] Estimate Fisher diagonal for Contrastive-only checkpoint
+- [ ] Run Fisher-weighted merge
+- [ ] Script: `src/estimate_fisher.py`
 
 ---
 
@@ -178,14 +277,25 @@ This document tracks all experiment runs for the model merging baseline project.
 squeue -u kqr867
 
 # Watch specific job logs
-tail -f egs/audioset/log/312868_mae_only.txt
-tail -f egs/audioset/log/312869_contrastive_only.txt
+tail -f egs/audioset/log/313696_mae_only_lr2e-4.txt
+
+# Aggregate retrieval results (after jobs complete)
+cd egs/audioset && ./aggregate_retrieval_results.sh
 
 # Cancel a job
 scancel <JOB_ID>
 
 # Check job details
 scontrol show job <JOB_ID>
+
+# Run a single merge
+python src/merge_models.py --method orthogonal \
+    --model_mae ./exp/mae-only.../models/best_audio_model.pth \
+    --model_contrastive ./exp/contrastive-only.../models/best_audio_model.pth \
+    --model_base ./IN-initial.pth \
+    --ortho_beta 1.0 --ortho_tau 0.0 \
+    --use_contrastive_for_norms \
+    --output ./exp/merged-models/merged_ortho.pth
 ```
 
 ---
@@ -217,6 +327,14 @@ These models were merged WITHOUT the norm layer fix, so they inherit the broken 
 
 **Pattern**: More MAE weight = worse results, confirming the norm layer collapse issue.
 
+### Sweep Results (Pending)
+
+Results from 55 merged models will be available after Jobs 313698-313754 complete.
+
+Check with: `./aggregate_retrieval_results.sh`
+
+---
+
 ### MAE-only Issue Analysis
 
 **LayerNorm Observation**: norm_a/norm_v weights in MAE-only model are ~0 (1e-38), not trained because:
@@ -242,7 +360,7 @@ These models were merged WITHOUT the norm layer fix, so they inherit the broken 
 |-------|----------|-----------------|-------|
 | Joint (baseline) | TBD | TBD | Pre-existing |
 | MAE-only (lr=1e-4) | 3.40 | N/A | ❌ Broken - norm collapse |
-| MAE-only (lr=2e-4) | - | N/A | 🔄 Running - Higher LR retry |
+| MAE-only (lr=2e-4) | - | N/A | 🔄 Running (Job 313696) |
 | Contrastive-only | N/A | 68% | ✅ Working well |
 
 **Training Curves**: See `egs/audioset/training_curves_ablation.png`
@@ -253,6 +371,13 @@ These models were merged WITHOUT the norm layer fix, so they inherit the broken 
 
 ## Changelog
 
+- **2026-01-16 23:26**: Launched 57 parallel retrieval evaluation jobs (313698-313754) for all merged models
+- **2026-01-16 23:26**: Re-submitted MAE-only lr=2e-4 training (Job 313696) after timm fix
+- **2026-01-16 23:23**: Completed all merge sweeps - 55 total merged models created
+- **2026-01-16 23:14**: Created DARE-TIES sweep (12 models)
+- **2026-01-16 23:11**: Created orthogonal sweep (25 models), weighted sweep (11 models), task arithmetic sweep (7 models)
+- **2026-01-16 22:37**: Implemented orthogonal conflict-aware merge in `src/merge_models.py`
+- **2026-01-16 22:23**: Fixed timm compatibility in `src/models/cav_mae.py` (removed qk_scale from Attention)
 - **2026-01-16**: Discovered norm fix doesn't help - MAE norms=0, uniform scaling erased by L2 norm in retrieval
 - **2026-01-16**: Identified real issue: encoder weights learn different representations (reconstruction vs alignment)
 - **2026-01-16**: Merged model evaluation (Job 313690) shows pattern: more MAE weight = worse retrieval results
@@ -263,8 +388,7 @@ These models were merged WITHOUT the norm layer fix, so they inherit the broken 
 - **2026-01-16**: Completed model merging - created 7 merged variants in `exp/merged-models/`
 - **2026-01-16**: VGGSound retrieval - Contrastive-only R@1=16.0% A→V, 16.2% V→A
 - **2026-01-16**: Created unified retrieval script `src/run_retrieval.py`
-- **2026-01-16**: Fixed timm compatibility in `src/models/cav_mae.py` (removed qk_scale from Attention)
-- **2026-01-16**: Launched MAE-only lr=2e-4 (Job 313261) to test higher LR hypothesis
+- **2026-01-16**: Launched MAE-only lr=2e-4 (Job 313261) to test higher LR hypothesis - failed timm issue
 - **2026-01-16**: Created training curves plot `egs/audioset/training_curves_ablation.png`
 - **2026-01-16**: MAE-only (312886) completed - only 6% loss reduction, suggesting LR too low
 - **2026-01-16**: Contrastive-only (312887) completed - 68% eval acc, strong convergence
