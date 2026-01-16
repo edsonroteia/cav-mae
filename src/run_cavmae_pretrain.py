@@ -68,6 +68,11 @@ parser.add_argument('--tr_pos', help='if use trainable positional embedding', ty
 parser.add_argument("--masking_ratio", type=float, default=0.75, help="masking ratio")
 parser.add_argument("--mask_mode", type=str, default='unstructured', help="masking ratio", choices=['unstructured', 'time', 'freq', 'tf'])
 
+# wandb arguments
+parser.add_argument("--use_wandb", type=ast.literal_eval, default=False, help="whether to use wandb for logging")
+parser.add_argument("--wandb_project", type=str, default="cav-mae", help="wandb project name")
+parser.add_argument("--wandb_run_name", type=str, default=None, help="wandb run name (auto-generated if None)")
+
 args = parser.parse_args()
 
 im_res = 224
