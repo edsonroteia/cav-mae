@@ -12,6 +12,7 @@ import os
 import datetime
 sys.path.append(os.path.dirname(os.path.dirname(sys.path[0])))
 from utilities import *
+from utilities.wandb_utils import init_wandb, log_train_step, log_epoch_metrics, log_best_model, finish_wandb
 import time
 import torch
 from torch import nn
@@ -24,6 +25,10 @@ def train(audio_model, train_loader, test_loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print('running on ' + str(device))
     torch.set_grad_enabled(True)
+
+    # Initialize wandb
+    use_wandb = getattr(args, 'use_wandb', False)
+    wandb_run = init_wandb(args, model_name="cav-mae")
 
     batch_time, per_sample_time, data_time, per_sample_data_time, per_sample_dnn_time = AverageMeter(), AverageMeter(), AverageMeter(), AverageMeter(), AverageMeter()
     loss_av_meter, loss_a_meter, loss_v_meter, loss_c_meter = AverageMeter(), AverageMeter(), AverageMeter(), AverageMeter()
@@ -123,6 +128,18 @@ def train(audio_model, train_loader, test_loader, args):
                   'Train Contrastive Acc {c_acc:.3f}\t'.format(
                    epoch, i, len(train_loader), per_sample_time=per_sample_time, per_sample_data_time=per_sample_data_time,
                       per_sample_dnn_time=per_sample_dnn_time, loss_av_meter=loss_av_meter, loss_a_meter=loss_a_meter, loss_v_meter=loss_v_meter, loss_c_meter=loss_c_meter, c_acc=c_acc), flush=True)
+
+                # Log to wandb
+                log_train_step({
+                    "loss/total": loss_av_meter.val,
+                    "loss/mae_audio": loss_a_meter.val,
+                    "loss/mae_visual": loss_v_meter.val,
+                    "loss/contrastive": loss_c_meter.val,
+                    "train/c_acc": c_acc,
+                    "timing/per_sample": per_sample_time.avg,
+                    "lr": optimizer.param_groups[0]['lr']
+                }, global_step, use_wandb)
+
                 if np.isnan(loss_av_meter.avg):
                     print("training diverged...")
                     return
@@ -151,6 +168,27 @@ def train(audio_model, train_loader, test_loader, args):
         np.savetxt(exp_dir + '/result.csv', result, delimiter=',')
         print('validation finished')
 
+        # Log epoch metrics to wandb
+        log_epoch_metrics(
+            train_metrics={
+                "loss": loss_av_meter.avg,
+                "mae_audio": loss_a_meter.avg,
+                "mae_visual": loss_v_meter.avg,
+                "contrastive": loss_c_meter.avg
+            },
+            val_metrics={
+                "loss": eval_loss_av,
+                "mae": eval_loss_mae,
+                "mae_audio": eval_loss_mae_a,
+                "mae_visual": eval_loss_mae_v,
+                "contrastive": eval_loss_c,
+                "c_acc": eval_c_acc
+            },
+            epoch=epoch,
+            lr=optimizer.param_groups[0]['lr'],
+            use_wandb=use_wandb
+        )
+
         if eval_loss_av < best_loss:
             best_loss = eval_loss_av
             best_epoch = epoch
@@ -158,6 +196,7 @@ def train(audio_model, train_loader, test_loader, args):
         if best_epoch == epoch:
             torch.save(audio_model.state_dict(), "%s/models/best_audio_model.pth" % (exp_dir))
             torch.save(optimizer.state_dict(), "%s/models/best_optim_state.pth" % (exp_dir))
+            log_best_model("%s/models/best_audio_model.pth" % exp_dir, use_wandb)
 
         if args.save_model == True:
             torch.save(audio_model.state_dict(), "%s/models/audio_model.%d.pth" % (exp_dir, epoch))
@@ -185,6 +224,9 @@ def train(audio_model, train_loader, test_loader, args):
         loss_a_meter.reset()
         loss_v_meter.reset()
         loss_c_meter.reset()
+
+    # Finish wandb run
+    finish_wandb()
 
 def validate(audio_model, val_loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

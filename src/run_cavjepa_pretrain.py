@@ -74,6 +74,11 @@ parser.add_argument("--momentum_end", type=float, default=0.999, help="EMA momen
 parser.add_argument("--predictor_depth", type=int, default=4, help="predictor network depth")
 parser.add_argument("--predictor_dim", type=int, default=384, help="predictor network dimension")
 
+# wandb arguments
+parser.add_argument("--use_wandb", type=ast.literal_eval, default=False, help="whether to use wandb for logging")
+parser.add_argument("--wandb_project", type=str, default="cav-jepa", help="wandb project name")
+parser.add_argument("--wandb_run_name", type=str, default=None, help="wandb run name (auto-generated if None)")
+
 args = parser.parse_args()
 
 im_res = 224
