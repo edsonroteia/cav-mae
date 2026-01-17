@@ -330,10 +330,15 @@ python src/merge_models.py --method orthogonal \
 | Model | A→V R@1 | A→V R@5 | A→V R@10 | V→A R@1 | V→A R@5 | V→A R@10 | MR A→V |
 |-------|---------|---------|----------|---------|---------|----------|--------|
 | Base (IN-initial) | 0.06% | 3.3% | 7.5% | 0.12% | 3.3% | 7.2% | 699 |
-| **Contrastive-only** | **16.0%** | **35.7%** | **44.9%** | **16.2%** | **37.4%** | **46.1%** | **15** |
+| **Contrastive-only (Ours)** | **16.0%** | **35.7%** | **44.9%** | **16.2%** | **37.4%** | **46.1%** | **15** |
+| **Original Scale++** | 15.29% | 34.74% | 42.62% | 16.71% | 36.95% | 45.36% | 17 |
+| Original Scale+ | 11.46% | 27.40% | 36.10% | 14.12% | 31.64% | 40.00% | 30 |
 | MAE-only (lr=1e-4) | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
 
-**Key Finding**: Contrastive-only shows **267x improvement** in R@1 over base model (16.0% vs 0.06%)!
+**Key Findings**:
+- Contrastive-only shows **267x improvement** in R@1 over base model (16.0% vs 0.06%)
+- **Our Contrastive-only matches/exceeds Original Scale++** (16.0% vs 15.29% A→V R@1)
+- Scale++ > Scale+ (larger batch size helps contrastive learning)
 
 ### Merged Models Results (Original - Broken Norms)
 
@@ -406,8 +411,91 @@ These models were merged WITHOUT the norm layer fix, so they inherit the broken 
 
 ---
 
+## Supervised Fine-Tuning (SFT) Experiments
+
+### Run 7: SFT for Four Pretrained Models
+| Model | Job ID | Status | Pretrain Path | Exp Dir Pattern |
+|-------|--------|--------|---------------|-----------------|
+| **CAV-only (Contrastive-only)** | 313820 | 🔄 Running | `contrastive-only.../best_audio_model.pth` | `sft-cavonly-*` |
+| **CAV-merged (α=0.1)** | 313821 | 📋 Pending | `merged-models/weighted-sweep/merged_weighted_alpha0.1.pth` | `sft-cavmerged-*` |
+| **MAE-only (lr=1e-4)** | 313822 | 📋 Pending | `mae-only-lr1e-4.../best_audio_model.pth` | `sft-maeonly-*` |
+| **CAV-JEPA** | 313823 | 📋 Pending | `cavjepa-.../best_audio_model.pth` | `sft-cavjepa-*` |
+
+---
+
+### Run 8: Original CAV-MAE Models (Scale++ and Scale+) Evaluation
+
+Downloaded and evaluating original pretrained models from Yuan Gong et al. (ICLR 2023) for fair comparison.
+
+**Models Downloaded**:
+| Model | Source URL | File | Size | Batch Size | λ_c |
+|-------|-----------|------|------|------------|-----|
+| Scale++ | dropbox/l5t5geufdy3qvnv | `cav-mae-scale++.pth` | 729MB | 256 | 0.01 |
+| Scale+ | dropbox/xu8bfie6hz86oev | `cav-mae-scale+.pth` | 729MB | 108 | 0.01 |
+
+**Retrieval Evaluation**:
+| Model | Job ID | Status | Output |
+|-------|--------|--------|--------|
+| Scale++ | 313934 | ✅ Completed | `exp/retrieval_results/original_scalepp.csv` |
+| Scale+ | 313935 | ✅ Completed | `exp/retrieval_results/original_scalep.csv` |
+
+**Retrieval Results**:
+| Model | A→V R@1 | A→V R@5 | A→V R@10 | V→A R@1 | V→A R@5 | V→A R@10 | A→V MR |
+|-------|---------|---------|----------|---------|---------|----------|--------|
+| **Scale++** | 15.29% | 34.74% | 42.62% | 16.71% | 36.95% | 45.36% | 17 |
+| **Scale+** | 11.46% | 27.40% | 36.10% | 14.12% | 31.64% | 40.00% | 30 |
+
+**SFT Evaluation**:
+| Model | Job ID | Status | Exp Dir Pattern |
+|-------|--------|--------|-----------------|
+| Scale++ | 313936 | 📋 Pending | `sft-scalepp-original-*` |
+| Scale+ | 313937 | 📋 Pending | `sft-scalep-original-*` |
+
+**Scripts Created**:
+- `egs/audioset/run_retrieval_scalepp.sh`
+- `egs/audioset/run_retrieval_scalep.sh`
+- `egs/audioset/run_sft_scalepp.sh`
+- `egs/audioset/run_sft_scalep.sh`
+- `egs/audioset/launch_original_eval.sh` (launcher)
+
+**SFT Configuration** (all models):
+- Learning rate: 5e-5
+- Head LR multiplier: 100x
+- Epochs: 15
+- Batch size: 36
+- Weight averaging: epochs 3-15
+- Loss: BCE (multi-label classification)
+- Metric: mAP
+- Data augmentation: FreqM=48, TimeM=192, Mixup=0.5
+
+**Scripts Created**:
+- `egs/audioset/run_sft_cavonly.sh`
+- `egs/audioset/run_sft_cavmerged.sh`
+- `egs/audioset/run_sft_maeonly.sh`
+- `egs/audioset/run_sft_cavjepa.sh`
+- `egs/audioset/launch_all_sft_jobs.sh` (launcher)
+- `src/run_cavjepa_ft.py` (CAV-JEPA fine-tuning entry point)
+- `src/models/cav_jepa.py` (CAVJEPAFT model class)
+
+**Note**: MAE-only model uses lr=1e-4 checkpoint (has collapsed LayerNorm issue). When lr=2e-4 training (Job 313762) completes, re-run with that checkpoint for comparison.
+
+---
+
 ## Changelog
 
+- **2026-01-17 16:00**: Added Original CAV-MAE (Scale++ and Scale+) evaluation:
+  - Downloaded models from Dropbox (729MB each, verified complete)
+  - Retrieval completed: Scale++ R@1=15.29% A→V, Scale+ R@1=11.46% A→V
+  - **Key finding**: Our Contrastive-only (16.0%) matches/exceeds Original Scale++ (15.29%)
+  - SFT jobs pending (313936, 313937) - waiting for GPU resources
+  - Created scripts: `run_retrieval_scalepp.sh`, `run_sft_scalepp.sh`, `launch_original_eval.sh`
+- **2026-01-17 08:00**: Launched 4 SFT experiments for pretrained models:
+  - CAV-only (Job 313820) - Running
+  - CAV-merged α=0.1 (Job 313821) - Pending
+  - MAE-only lr=1e-4 (Job 313822) - Pending
+  - CAV-JEPA (Job 313823) - Pending
+  - Created `src/run_cavjepa_ft.py` for JEPA fine-tuning
+  - Added `CAVJEPAFT` model class to src/models/
 - **2026-01-17 07:00**: Retrieval evaluation jobs ALL COMPLETED (128 results):
   - Jobs 313763-313819 completed successfully
   - Aggregated results: `all_results_summary.csv` generated
