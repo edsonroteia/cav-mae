@@ -52,12 +52,13 @@ This document tracks all experiment runs for the model merging baseline project.
 | Field | Value |
 |-------|-------|
 | **Job ID** | 313762 (relaunched from 313696) |
-| **Status** | 🔄 Running |
+| **Status** | 🔄 Running (~49 min elapsed) |
 | **Submitted** | 2026-01-17 06:41 |
 | **Failed Attempt** | 313696 - Failed due to missing `wandb` package |
 | **Script** | `egs/audioset/run_mae_only_lr2e-4.sh` |
 | **Output Dir** | `egs/audioset/exp/mae-only-audioset-cav-mae-balNone-lr2e-4-epoch25-bs120-normTrue-mr-unstructured-0.75/` |
 | **Log File** | `egs/audioset/log/313762_mae_only_lr2e-4.txt` |
+| **Node** | mlcbm004 |
 
 **Hyperparameters**:
 - Learning rate: **2e-4** (2x previous)
@@ -176,8 +177,9 @@ exp/merged-models/
 |-------|-------|
 | **Job IDs** | 313763-313819 (57 jobs, relaunched) |
 | **Failed Attempt** | 313698-313754 - Failed due to relative path issues in script |
-| **Status** | 🔄 Running (4 active, 53 queued) |
+| **Status** | ✅ Completed |
 | **Submitted** | 2026-01-17 06:41 |
+| **Completed** | 2026-01-17 07:00 |
 | **Script** | `egs/audioset/launch_all_retrieval_jobs.sh` (fixed with absolute paths) |
 | **Output Dir** | `egs/audioset/exp/retrieval_results/` |
 
@@ -195,13 +197,16 @@ exp/merged-models/
   - `RESULTS_BASE`: `./exp/retrieval_results/` → `/weka/kuehne/kqr867/code/cav-mae/egs/audioset/exp/retrieval_results/`
   - Base model paths: `./IN-initial.pth` and `./exp/mae-only.../` paths updated to absolute
 
-**Results Status**:
-- 13 orthogonal sweep jobs completed (results in `exp/retrieval_results/orthogonal-sweep/`)
-- Weighted, task arithmetic, and DARE-TIES sweeps running sequentially
+**Results Status**: ✅ ALL COMPLETED
+- 25 orthogonal sweep jobs completed
+- 11 weighted sweep jobs completed
+- 7 task arithmetic sweep jobs completed
+- 12 DARE-TIES sweep jobs completed
+- Total: 128 evaluation results (55 merged models × 2 directions + baselines × 2 directions)
 
-**Scripts for Results**:
-- `launch_all_retrieval_jobs.sh`: Submit all evaluation jobs
-- `aggregate_retrieval_results.sh`: Aggregate results into summary CSV
+**Aggregation**:
+- Ran `aggregate_retrieval_results.sh` - created `all_results_summary.csv` with all results
+- Script location: `egs/audioset/aggregate_retrieval_results.sh`
 
 ---
 
@@ -257,12 +262,16 @@ exp/merged-models/
 
 ## TODO / Next Steps
 
-### Immediate (When Retrieval Jobs Complete)
-- [ ] Run `./aggregate_retrieval_results.sh` to generate summary
-- [ ] Analyze results: identify top models by R@1
-- [ ] Compare orthogonal merge vs other methods
+### Immediate (✅ Retrieval Jobs Complete)
+- [x] Run `./aggregate_retrieval_results.sh` to generate summary
+- [x] Analyze results: identify top models by R@1
+- [x] Compare orthogonal merge vs other methods
+- [ ] **Key Insight**: Orthogonal merge and DARE-TIES both perform WORSE than simple weighted averaging
+  - Orthogonal sweep (25 models): All R@1 < 0.001 (basically non-functional)
+  - DARE-TIES sweep (12 models): All R@1 < 0.015 (non-functional)  - **Conclusion**: Weighted average with α=0.0-0.3 is optimal for merging MAE + Contrastive models
+  - Contrastive-weighted models outperform complex merging strategies
 
-### After MAE lr=2e-4 Training Completes (Job 313696)
+### Next Steps (After MAE lr=2e-4 Training Completes - Job 313762)
 - [ ] Re-run all sweep scripts with new MAE model:
   - `./sweep_orthogonal.sh`
   - `./sweep_weighted_full.sh`
@@ -341,11 +350,25 @@ These models were merged WITHOUT the norm layer fix, so they inherit the broken 
 
 **Pattern**: More MAE weight = worse results, confirming the norm layer collapse issue.
 
-### Sweep Results (Pending)
+### Sweep Results (✅ Completed)
 
-Results from 55 merged models will be available after Jobs 313698-313754 complete.
+**Complete Results Available**: `exp/retrieval_results/all_results_summary.csv` (128 rows)
 
-Check with: `./aggregate_retrieval_results.sh`
+**Top 10 Models by R@1 (Audio→Visual)**:
+| Rank | Model | Method | R@1 | R@5 | R@10 | MR |
+|------|-------|--------|-----|-----|------|-----|
+| 1 | merged_weighted_alpha0.0 | Weighted | 16.0% | 35.7% | 44.9% | 15 |
+| 2 | contrastive_only_lr1e-4 | Baseline | 16.0% | 35.7% | 44.9% | 15 |
+| 3 | merged_weighted_alpha0.1 | Weighted | 13.7% | 33.0% | 43.0% | 17 |
+| 4 | merged_weighted_alpha0.2 | Weighted | 9.5% | 26.2% | 34.6% | 28 |
+| 5 | merged_weighted_alpha0.3 | Weighted | 4.9% | 16.0% | 22.6% | 65 |
+| 6 | merged_weighted_0.3 | Weighted (old) | 4.9% | 16.0% | 22.6% | 65 |
+| 7 | merged_weighted_alpha0.4 | Weighted | 2.2% | 6.7% | 11.4% | 151 |
+| 8 | merged_weighted_alpha0.5 | Weighted | 1.1% | 2.8% | 4.8% | 269 |
+| 9 | merged_weighted_0.5 | Weighted (old) | 1.1% | 2.8% | 4.8% | 269 |
+| 10 | merged_task_arith_0.5 | Task Arith | 1.1% | 2.8% | 4.8% | 269 |
+
+**Key Finding**: Best models are weighted toward contrastive (α=0.0-0.3), confirming hypothesis that MAE-only training learns different features unsuitable for retrieval when merged equally.
 
 ---
 
@@ -385,6 +408,13 @@ Check with: `./aggregate_retrieval_results.sh`
 
 ## Changelog
 
+- **2026-01-17 07:00**: Retrieval evaluation jobs ALL COMPLETED (128 results):
+  - Jobs 313763-313819 completed successfully
+  - Aggregated results: `all_results_summary.csv` generated
+  - **Key Finding**: Weighted merging with α=0.0-0.3 (contrastive-heavy) optimal; orthogonal and DARE-TIES merges non-functional
+  - Top model: merged_weighted_alpha0.0 matches contrastive-only baseline (R@1=16.0% A→V, 16.2% V→A)
+  - Orthogonal sweep (25 models): All R@1 < 0.001 (worse than weighted averaging)
+  - DARE-TIES sweep (12 models): All R@1 < 0.015 (worse than weighted averaging)
 - **2026-01-17 06:41**: Fixed and relaunched all jobs:
   - Job 313696 (MAE training): Failed due to missing `wandb` - installed and relaunched as Job 313762
   - Jobs 313698-313754 (retrieval): Failed due to relative paths - fixed with absolute paths and relaunched as Jobs 313763-313819
