@@ -425,12 +425,25 @@ These models were merged WITHOUT the norm layer fix, so they inherit the broken 
 ## Supervised Fine-Tuning (SFT) Experiments
 
 ### Run 7: SFT for Four Pretrained Models
-| Model | Job ID | Status | Pretrain Path | Exp Dir Pattern |
-|-------|--------|--------|---------------|-----------------|
-| **CAV-only (Contrastive-only)** | 313820 | 🔄 Running | `contrastive-only.../best_audio_model.pth` | `sft-cavonly-*` |
-| **CAV-merged (α=0.1)** | 313821 | 📋 Pending | `merged-models/weighted-sweep/merged_weighted_alpha0.1.pth` | `sft-cavmerged-*` |
-| **MAE-only (lr=1e-4)** | 313822 | 📋 Pending | `mae-only-lr1e-4.../best_audio_model.pth` | `sft-maeonly-*` |
-| **CAV-JEPA** | 313823 | 📋 Pending | `cavjepa-.../best_audio_model.pth` | `sft-cavjepa-*` |
+| Model | Job ID | Status | Multi-frame mAP | Pretrain Path |
+|-------|--------|--------|-----------------|---------------|
+| **CAV-merged (α=0.1)** | 313821 | ✅ Completed | **47.14%** 🏆 | `merged-models/weighted-sweep/merged_weighted_alpha0.1.pth` |
+| **MAE-only (lr=1e-4)** | 313822 | ✅ Completed | 44.32% | `mae-only-lr1e-4.../best_audio_model.pth` |
+| **CAV-only (Contrastive-only)** | 313820 | ✅ Completed | 43.27% | `contrastive-only.../best_audio_model.pth` |
+| **CAV-JEPA** | 313823 | ✅ Completed | 23.93% ❌ | `cavjepa-.../best_audio_model.pth` |
+
+**SFT Results Analysis**:
+- **MAE helps classification**: Merged α=0.1 (47.14%) beats pure Contrastive (43.27%) by +3.87%
+- **MAE-only recovers via SFT**: Despite collapsed norms during pretraining, achieves 44.32% mAP
+- **CAV-JEPA underperforms**: Only 23.93% suggests bug in fine-tuning implementation - needs investigation
+
+**Retrieval vs Classification Tradeoff**:
+| Model | Retrieval R@1 (Avg) | Classification mAP |
+|-------|---------------------|-------------------|
+| Contrastive-only | **16.1%** | 43.27% |
+| Merged α=0.1 | 14.4% | **47.14%** |
+
+**Insight**: MAE hurts retrieval but helps classification - different objectives optimize for different downstream tasks
 
 ---
 
@@ -494,6 +507,12 @@ Downloaded and evaluating original pretrained models from Yuan Gong et al. (ICLR
 
 ## Changelog
 
+- **2026-01-17 16:30**: SFT experiments completed (Jobs 313820-313823):
+  - **CAV-merged α=0.1: 47.14% mAP** (best) - MAE helps classification!
+  - MAE-only: 44.32% mAP - recovers despite norm collapse
+  - CAV-only: 43.27% mAP
+  - CAV-JEPA: 23.93% mAP ❌ - needs investigation
+  - **Key insight**: MAE hurts retrieval but helps classification (+3.87% mAP)
 - **2026-01-17 16:15**: Updated comprehensive retrieval comparison table:
   - Added Merged α=0.1 V→A results (R@1=14.99%, already in all_results_summary.csv)
   - Created ranked comparison by average R@1: Contrastive-only (16.1%) ≈ Scale++ (16.0%) > Merged α=0.1 (14.4%) > Scale+ (12.8%)
