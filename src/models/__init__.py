@@ -7,3 +7,4 @@
 
 from .cav_mae import CAVMAE, CAVMAEFT
 from .audio_mdl import CAVMAEFTAudio
+from .cav_jepa import CAVJEPA, CAVJEPAFT
