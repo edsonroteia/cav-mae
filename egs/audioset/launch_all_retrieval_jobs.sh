@@ -14,9 +14,9 @@ cd /weka/kuehne/kqr867/code/cav-mae/egs/audioset
 mkdir -p log
 mkdir -p exp/retrieval_results
 
-# Base paths
-MERGED_MODELS_BASE=./exp/merged-models
-RESULTS_BASE=./exp/retrieval_results
+# Base paths (absolute paths for sbatch jobs)
+MERGED_MODELS_BASE=/weka/kuehne/kqr867/code/cav-mae/egs/audioset/exp/merged-models
+RESULTS_BASE=/weka/kuehne/kqr867/code/cav-mae/egs/audioset/exp/retrieval_results
 
 # VGGSound retrieval data
 DATA_JSON=/weka/kuehne/kqr867/code/cav-mae/datafiles/vgg_test_5_per_class_for_retrieval.json
@@ -87,19 +87,19 @@ echo "--- Base Models ---"
 
 # Base model (IN-initial)
 submit_retrieval_job \
-    "./IN-initial.pth" \
+    "/weka/kuehne/kqr867/code/cav-mae/egs/audioset/IN-initial.pth" \
     "${RESULTS_BASE}/base_IN_initial.csv" \
     "base"
 
 # MAE-only (lr=1e-4)
 submit_retrieval_job \
-    "./exp/mae-only-audioset-cav-mae-balNone-lr1e-4-epoch25-bs120-normTrue-mr-unstructured-0.75/models/best_audio_model.pth" \
+    "/weka/kuehne/kqr867/code/cav-mae/egs/audioset/exp/mae-only-audioset-cav-mae-balNone-lr1e-4-epoch25-bs120-normTrue-mr-unstructured-0.75/models/best_audio_model.pth" \
     "${RESULTS_BASE}/mae_only_lr1e-4.csv" \
     "mae-1e4"
 
 # Contrastive-only (lr=1e-4)
 submit_retrieval_job \
-    "./exp/contrastive-only-audioset-cav-mae-balNone-lr1e-4-epoch25-bs120-mr-unstructured-0.75/models/best_audio_model.pth" \
+    "/weka/kuehne/kqr867/code/cav-mae/egs/audioset/exp/contrastive-only-audioset-cav-mae-balNone-lr1e-4-epoch25-bs120-mr-unstructured-0.75/models/best_audio_model.pth" \
     "${RESULTS_BASE}/contrastive_only_lr1e-4.csv" \
     "con-1e4"
 

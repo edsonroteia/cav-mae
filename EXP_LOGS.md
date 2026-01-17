@@ -51,12 +51,13 @@ This document tracks all experiment runs for the model merging baseline project.
 ### Run 1b: MAE-Only Pretraining (lr=2e-4) - RETRY WITH HIGHER LR
 | Field | Value |
 |-------|-------|
-| **Job ID** | 313696 |
-| **Status** | 🔄 Running (Pending Resources) |
-| **Submitted** | 2026-01-16 23:26 |
+| **Job ID** | 313762 (relaunched from 313696) |
+| **Status** | 🔄 Running |
+| **Submitted** | 2026-01-17 06:41 |
+| **Failed Attempt** | 313696 - Failed due to missing `wandb` package |
 | **Script** | `egs/audioset/run_mae_only_lr2e-4.sh` |
 | **Output Dir** | `egs/audioset/exp/mae-only-audioset-cav-mae-balNone-lr2e-4-epoch25-bs120-normTrue-mr-unstructured-0.75/` |
-| **Log File** | `egs/audioset/log/313696_mae_only_lr2e-4.txt` |
+| **Log File** | `egs/audioset/log/313762_mae_only_lr2e-4.txt` |
 
 **Hyperparameters**:
 - Learning rate: **2e-4** (2x previous)
@@ -68,7 +69,9 @@ This document tracks all experiment runs for the model merging baseline project.
 
 **Hypothesis**: MAE-only training needs higher LR since it lacks the additional gradient signal from contrastive loss
 
-**Note**: Previous attempt (Job 313261) failed due to timm compatibility issue (`qk_scale` argument). Fixed in `src/models/cav_mae.py` on 2026-01-16 22:23.
+**Fixes Applied**:
+- Installed `wandb` package in cav-mae environment: `uv pip install wandb`
+- **Note**: Previous attempt (Job 313261) failed due to timm compatibility issue (`qk_scale` argument). Fixed in `src/models/cav_mae.py` on 2026-01-16 22:23.
 
 ---
 
@@ -171,19 +174,30 @@ exp/merged-models/
 ### Run 6: Parallel Retrieval Evaluation (All 55+ Models)
 | Field | Value |
 |-------|-------|
-| **Job IDs** | 313698-313754 (57 jobs) |
-| **Status** | 🔄 Running (Queued) |
-| **Submitted** | 2026-01-16 23:26 |
-| **Script** | `egs/audioset/launch_all_retrieval_jobs.sh` |
+| **Job IDs** | 313763-313819 (57 jobs, relaunched) |
+| **Failed Attempt** | 313698-313754 - Failed due to relative path issues in script |
+| **Status** | 🔄 Running (4 active, 53 queued) |
+| **Submitted** | 2026-01-17 06:41 |
+| **Script** | `egs/audioset/launch_all_retrieval_jobs.sh` (fixed with absolute paths) |
 | **Output Dir** | `egs/audioset/exp/retrieval_results/` |
 
 **Jobs Submitted**:
-- 1 job for MAE-only (lr=1e-4)
-- 25 jobs for orthogonal sweep
-- 11 jobs for weighted sweep
-- 7 jobs for task arithmetic sweep
-- 12 jobs for DARE-TIES sweep
-- 1 job for original merged model
+- 1 job for MAE-only (lr=1e-4) - Job 313763
+- 25 jobs for orthogonal sweep - Jobs 313764-313788
+- 11 jobs for weighted sweep - Jobs 313789-313799
+- 7 jobs for task arithmetic sweep - Jobs 313800-313806
+- 12 jobs for DARE-TIES sweep - Jobs 313807-313818
+- 1 job for original merged model - Job 313819
+
+**Fixes Applied**:
+- Converted relative paths to absolute paths in `launch_all_retrieval_jobs.sh`:
+  - `MERGED_MODELS_BASE`: `./exp/merged-models/` → `/weka/kuehne/kqr867/code/cav-mae/egs/audioset/exp/merged-models/`
+  - `RESULTS_BASE`: `./exp/retrieval_results/` → `/weka/kuehne/kqr867/code/cav-mae/egs/audioset/exp/retrieval_results/`
+  - Base model paths: `./IN-initial.pth` and `./exp/mae-only.../` paths updated to absolute
+
+**Results Status**:
+- 13 orthogonal sweep jobs completed (results in `exp/retrieval_results/orthogonal-sweep/`)
+- Weighted, task arithmetic, and DARE-TIES sweeps running sequentially
 
 **Scripts for Results**:
 - `launch_all_retrieval_jobs.sh`: Submit all evaluation jobs
@@ -371,6 +385,10 @@ Check with: `./aggregate_retrieval_results.sh`
 
 ## Changelog
 
+- **2026-01-17 06:41**: Fixed and relaunched all jobs:
+  - Job 313696 (MAE training): Failed due to missing `wandb` - installed and relaunched as Job 313762
+  - Jobs 313698-313754 (retrieval): Failed due to relative paths - fixed with absolute paths and relaunched as Jobs 313763-313819
+  - Results already coming in: 13 orthogonal sweep jobs completed
 - **2026-01-16 23:26**: Launched 57 parallel retrieval evaluation jobs (313698-313754) for all merged models
 - **2026-01-16 23:26**: Re-submitted MAE-only lr=2e-4 training (Job 313696) after timm fix
 - **2026-01-16 23:23**: Completed all merge sweeps - 55 total merged models created
