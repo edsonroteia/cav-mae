@@ -332,13 +332,24 @@ python src/merge_models.py --method orthogonal \
 | Base (IN-initial) | 0.06% | 3.3% | 7.5% | 0.12% | 3.3% | 7.2% | 699 |
 | **Contrastive-only (Ours)** | **16.0%** | **35.7%** | **44.9%** | **16.2%** | **37.4%** | **46.1%** | **15** |
 | **Original Scale++** | 15.29% | 34.74% | 42.62% | 16.71% | 36.95% | 45.36% | 17 |
+| Merged α=0.1 (Ours) | 13.70% | 33.04% | 42.97% | 14.99% | 34.52% | 44.21% | 17 |
 | Original Scale+ | 11.46% | 27.40% | 36.10% | 14.12% | 31.64% | 40.00% | 30 |
 | MAE-only (lr=1e-4) | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
 
+**Ranked Comparison (by Avg R@1)**:
+| Rank | Model | A→V R@1 | V→A R@1 | Avg R@1 |
+|------|-------|---------|---------|---------|
+| 1 | **Contrastive-only (Ours)** | 16.0% | 16.2% | **16.1%** |
+| 2 | **Original Scale++** | 15.3% | 16.7% | **16.0%** |
+| 3 | Merged α=0.1 (Ours) | 13.7% | 15.0% | 14.4% |
+| 4 | Original Scale+ | 11.5% | 14.1% | 12.8% |
+
 **Key Findings**:
 - Contrastive-only shows **267x improvement** in R@1 over base model (16.0% vs 0.06%)
-- **Our Contrastive-only matches/exceeds Original Scale++** (16.0% vs 15.29% A→V R@1)
-- Scale++ > Scale+ (larger batch size helps contrastive learning)
+- **Our Contrastive-only matches/exceeds Original Scale++** (16.0% vs 15.29% A→V R@1, tied at ~16% avg)
+- Our Merged α=0.1 slots between Scale++ and Scale+ (14.4% avg vs 16.0% and 12.8%)
+- Scale++ > Scale+ (larger batch size 256 vs 108 helps contrastive learning)
+- **Pure contrastive training matches joint MAE+contrastive** - MAE doesn't help retrieval
 
 ### Merged Models Results (Original - Broken Norms)
 
@@ -483,6 +494,10 @@ Downloaded and evaluating original pretrained models from Yuan Gong et al. (ICLR
 
 ## Changelog
 
+- **2026-01-17 16:15**: Updated comprehensive retrieval comparison table:
+  - Added Merged α=0.1 V→A results (R@1=14.99%, already in all_results_summary.csv)
+  - Created ranked comparison by average R@1: Contrastive-only (16.1%) ≈ Scale++ (16.0%) > Merged α=0.1 (14.4%) > Scale+ (12.8%)
+  - **Insight**: Pure contrastive training matches joint MAE+contrastive for retrieval
 - **2026-01-17 16:00**: Added Original CAV-MAE (Scale++ and Scale+) evaluation:
   - Downloaded models from Dropbox (729MB each, verified complete)
   - Retrieval completed: Scale++ R@1=15.29% A→V, Scale+ R@1=11.46% A→V
