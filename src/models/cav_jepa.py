@@ -2,9 +2,16 @@
 # @Time    : 1/15/26
 # @Author  : Based on CAV-MAE by Yuan Gong (MIT)
 # @File    : cav_jepa.py
-# @Description: CAV-JEPA - Replaces MAE objective with JEPA while keeping contrastive learning
+# @Description: CAV-JEPA v2 - Improved JEPA with proper initialization and masking
+#
+# Key improvements over v1:
+# - Random initialization option (init_mode='random') to avoid MAE pretrain bias
+# - Learnable mask tokens in predictor (instead of zeros)
+# - Target representation normalization (collapse prevention)
+# - Depth-scaled initialization (following I-JEPA)
 
 import copy
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -85,18 +92,28 @@ class CAVJEPA(nn.Module):
     - Target encoder (EMA of context encoder) instead of decoder
     - Lightweight predictor instead of heavy decoder
     - Loss in latent space instead of pixel space
+
+    v2 Improvements:
+    - init_mode='random': Fresh random initialization (avoids MAE bias)
+    - init_mode='mae': Load from MAE checkpoint (original behavior)
+    - Learnable mask tokens in predictor
+    - Target representation normalization
+    - Depth-scaled initialization for better training dynamics
     """
 
     def __init__(self, img_size=224, audio_length=1024, patch_size=16, in_chans=3,
                  embed_dim=768, modality_specific_depth=11, num_heads=12,
                  predictor_embed_dim=384, predictor_depth=4, predictor_num_heads=6,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, tr_pos=False,
-                 momentum_start=0.996, momentum_end=0.999):
+                 momentum_start=0.996, momentum_end=0.999,
+                 init_mode='mae', normalize_targets=True, init_std=0.02):
         super().__init__()
-        print('A CAV-JEPA Model')
+        print('A CAV-JEPA Model (v2)')
+        print('Init mode:', init_mode)
         print('Predictor: depth={}, dim={}'.format(predictor_depth, predictor_embed_dim))
         print('Momentum: {} -> {}'.format(momentum_start, momentum_end))
         print('Learnable Positional Embedding:', tr_pos)
+        print('Normalize targets:', normalize_targets)
 
         # Store config
         self.embed_dim = embed_dim
@@ -104,6 +121,10 @@ class CAVJEPA(nn.Module):
         self.momentum = momentum_start
         self.momentum_start = momentum_start
         self.momentum_end = momentum_end
+        self.init_mode = init_mode
+        self.normalize_targets = normalize_targets
+        self.init_std = init_std
+        self.modality_specific_depth = modality_specific_depth
 
         # ========== Context Encoder (receives masked input) ==========
         self.patch_embed_a = PatchEmbed(img_size, patch_size, 1, embed_dim)
@@ -171,6 +192,11 @@ class CAVJEPA(nn.Module):
         # ========== Predictor (lightweight, predicts target representations) ==========
         self.predictor_embed = nn.Linear(embed_dim, predictor_embed_dim, bias=True)
 
+        # Learnable mask tokens (key I-JEPA component)
+        # These replace zeros at masked positions - provides learnable queries for prediction
+        self.mask_token_a = nn.Parameter(torch.zeros(1, 1, predictor_embed_dim))
+        self.mask_token_v = nn.Parameter(torch.zeros(1, 1, predictor_embed_dim))
+
         self.predictor_pos_embed_a = nn.Parameter(
             torch.zeros(1, self.patch_embed_a.num_patches, predictor_embed_dim), requires_grad=False)
         self.predictor_pos_embed_v = nn.Parameter(
@@ -180,6 +206,7 @@ class CAVJEPA(nn.Module):
             PredictorBlock(predictor_embed_dim, predictor_num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer)
             for _ in range(predictor_depth)
         ])
+        self.predictor_depth = predictor_depth  # Store for depth-scaled init
 
         self.predictor_norm = norm_layer(predictor_embed_dim)
 
@@ -197,7 +224,11 @@ class CAVJEPA(nn.Module):
         print('Visual Positional Embedding Shape:', self.pos_embed_v.shape)
 
     def initialize_weights(self):
-        """Initialize weights with sin-cos positional embeddings"""
+        """Initialize weights based on init_mode.
+
+        init_mode='mae': Xavier uniform (compatible with MAE checkpoint loading)
+        init_mode='random': Truncated normal with depth-scaled rescaling (I-JEPA style)
+        """
         # Context encoder positional embeddings
         pos_embed_a = get_2d_sincos_pos_embed(
             self.pos_embed_a.shape[-1], 8, int(self.patch_embed_a.num_patches / 8), cls_token=False)
@@ -231,20 +262,73 @@ class CAVJEPA(nn.Module):
         torch.nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
 
         # Initialize modality tokens
-        torch.nn.init.normal_(self.modality_a, std=.02)
-        torch.nn.init.normal_(self.modality_v, std=.02)
+        trunc_normal_(self.modality_a, std=self.init_std)
+        trunc_normal_(self.modality_v, std=self.init_std)
+
+        # Initialize mask tokens (critical for predictor)
+        trunc_normal_(self.mask_token_a, std=self.init_std)
+        trunc_normal_(self.mask_token_v, std=self.init_std)
 
         # Initialize all linear layers and layer norms
         self.apply(self._init_weights)
 
+        # Apply depth-scaled initialization for encoder and predictor blocks (I-JEPA style)
+        if self.init_mode == 'random':
+            self._apply_depth_scaled_init()
+
+    def _apply_depth_scaled_init(self):
+        """Apply depth-scaled rescaling to attention and MLP layers.
+
+        Following I-JEPA: rescale by 1/sqrt(2*layer_id) for better gradient flow.
+        This helps with training stability when starting from random init.
+        """
+        def rescale(param, layer_id):
+            param.data.div_(math.sqrt(2.0 * layer_id))
+
+        # Rescale audio encoder blocks
+        for layer_id, blk in enumerate(self.blocks_a):
+            rescale(blk.attn.proj.weight, layer_id + 1)
+            rescale(blk.mlp.fc2.weight, layer_id + 1)
+
+        # Rescale video encoder blocks
+        for layer_id, blk in enumerate(self.blocks_v):
+            rescale(blk.attn.proj.weight, layer_id + 1)
+            rescale(blk.mlp.fc2.weight, layer_id + 1)
+
+        # Rescale unified blocks (continue layer counting)
+        base_layer = self.modality_specific_depth
+        for layer_id, blk in enumerate(self.blocks_u):
+            rescale(blk.attn.proj.weight, base_layer + layer_id + 1)
+            rescale(blk.mlp.fc2.weight, base_layer + layer_id + 1)
+
+        # Rescale predictor blocks
+        for layer_id, blk in enumerate(self.predictor_blocks):
+            rescale(blk.attn.proj.weight, layer_id + 1)
+            rescale(blk.mlp.fc2.weight, layer_id + 1)
+
+        print('Applied depth-scaled initialization (I-JEPA style)')
+
     def _init_weights(self, m):
+        """Initialize weights based on init_mode."""
         if isinstance(m, nn.Linear):
-            torch.nn.init.xavier_uniform_(m.weight)
+            if self.init_mode == 'random':
+                # I-JEPA style: truncated normal
+                trunc_normal_(m.weight, std=self.init_std)
+            else:
+                # Original style: xavier uniform (compatible with MAE weights)
+                torch.nn.init.xavier_uniform_(m.weight)
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
+        elif isinstance(m, nn.Conv2d):
+            if self.init_mode == 'random':
+                trunc_normal_(m.weight, std=self.init_std)
+            else:
+                torch.nn.init.xavier_uniform_(m.weight.view([m.weight.shape[0], -1]))
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
 
     def _init_target_encoder(self):
         """Initialize target encoder as copy of context encoder (no gradients)"""
@@ -383,7 +467,12 @@ class CAVJEPA(nn.Module):
 
     @torch.no_grad()
     def forward_target_encoder(self, a, v):
-        """Forward pass through target encoder (no masking, no gradients)"""
+        """Forward pass through target encoder (no masking, no gradients)
+
+        Returns normalized target representations when normalize_targets=True.
+        Normalization prevents representation collapse by focusing learning on
+        representation direction rather than magnitude.
+        """
         # Embed patches
         a = a.unsqueeze(1).transpose(2, 3)
         a = self.target_patch_embed_a(a)
@@ -409,10 +498,20 @@ class CAVJEPA(nn.Module):
             v = blk(v, 'v')
         v = self.target_norm_v(v)
 
+        # Apply target normalization to prevent collapse (I-JEPA key component)
+        # This normalizes each target representation to have zero mean and unit variance
+        if self.normalize_targets:
+            a = F.layer_norm(a, (a.size(-1),))
+            v = F.layer_norm(v, (v.size(-1),))
+
         return a, v
 
     def forward_predictor(self, a_ctx, v_ctx, mask_a, mask_v, ids_restore_a, ids_restore_v):
-        """Forward pass through predictor to predict masked patch representations"""
+        """Forward pass through predictor to predict masked patch representations.
+
+        Uses learnable mask tokens (I-JEPA style) instead of zeros for masked positions.
+        This provides better gradient signal for masked position predictions.
+        """
         N = a_ctx.shape[0]
 
         # Project context features to predictor dimension
@@ -423,27 +522,20 @@ class CAVJEPA(nn.Module):
         num_mask_a = int(mask_a[0].sum())
         num_mask_v = int(mask_v[0].sum())
 
-        # Create mask tokens (learnable queries for masked positions)
-        # We need to create tokens for the masked positions
-        # First, create full sequence with context features at visible positions
-
-        # Audio: expand to full sequence
-        # Place context features at their original positions (visible positions)
+        # Calculate visible patches
         visible_a = self.patch_embed_a.num_patches - num_mask_a
-        # ids_restore tells us where each token should go
-        # IMPORTANT: dtype must match a_ctx to avoid scatter_ dtype mismatch
-        a_expanded = torch.zeros(N, self.patch_embed_a.num_patches, self.predictor_embed_dim,
-                                 device=a_ctx.device, dtype=a_ctx.dtype)
+        visible_v = self.patch_embed_v.num_patches - num_mask_v
 
-        # Create index for scattering context features back
-        # a_ctx has shape [N, visible_a, D], we need to place them at correct positions
+        # Create full sequences initialized with LEARNABLE MASK TOKENS (not zeros!)
+        # This is a key I-JEPA improvement - mask tokens provide learnable queries
+        a_expanded = self.mask_token_a.expand(N, self.patch_embed_a.num_patches, -1).clone()
+        v_expanded = self.mask_token_v.expand(N, self.patch_embed_v.num_patches, -1).clone()
+
+        # Scatter context features at visible positions
+        # ids_restore tells us where each token should go
         ids_keep_a = torch.argsort(ids_restore_a, dim=1)[:, :visible_a]
         a_expanded.scatter_(1, ids_keep_a.unsqueeze(-1).expand(-1, -1, self.predictor_embed_dim), a_ctx)
 
-        # Visual: same process
-        visible_v = self.patch_embed_v.num_patches - num_mask_v
-        v_expanded = torch.zeros(N, self.patch_embed_v.num_patches, self.predictor_embed_dim,
-                                 device=v_ctx.device, dtype=v_ctx.dtype)
         ids_keep_v = torch.argsort(ids_restore_v, dim=1)[:, :visible_v]
         v_expanded.scatter_(1, ids_keep_v.unsqueeze(-1).expand(-1, -1, self.predictor_embed_dim), v_ctx)
 

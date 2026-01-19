@@ -63,23 +63,32 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 
 ---
 
-### Run 3: CAV-JEPA v1 Baseline - E1a (MAE Init, 25 Epochs)
+### Run 3: E3a - Target Normalization Ablation (No Target Norm)
+| Field | Value |
+|-------|-------|
+| **Job ID** | 314583 |
+| **Status** | 🔄 Running |
+| **Started** | 2026-01-20 |
+| **Script** | `egs/audioset/run_cavjepa_ablations.sh E3a` |
+| **Output Dir** | `egs/audioset/exp/ablation-E3a-random_init-no_target_norm` |
+| **Log File** | `egs/audioset/log/314583_cavjepa_ablation.txt` |
+
+**Configuration**:
+- Init mode: `random`
+- Epochs: 100
+- Scheduler: v2 (warmup + cosine)
+- **normalize_targets: False** (ablation)
+
+**Purpose**: Ablate target normalization to understand its contribution to training stability and performance.
+
+---
+
+### (Cancelled) Run: E1a (MAE Init, 25 Epochs)
 | Field | Value |
 |-------|-------|
 | **Job ID** | 314548 |
-| **Status** | 🔄 Running |
-| **Started** | 2026-01-19 |
-| **Script** | `egs/audioset/run_cavjepa_ablations.sh E1a` |
-| **Output Dir** | `egs/audioset/exp/ablation-E1a-mae_init-25ep-v1sched` |
-| **Log File** | `egs/audioset/log/314548_cavjepa_ablation.txt` |
-
-**Configuration** (Original v1):
-- Init mode: `mae` (from `cav_jepa_from_mae_init.pth`)
-- Epochs: 25
-- Scheduler: v1 (MultiStepLR)
-- No warmup, no WD schedule
-
-**Purpose**: Baseline for comparison with v2 improvements.
+| **Status** | ❌ Cancelled |
+| **Reason** | Redundant - same config as Job 312964 |
 
 ---
 
@@ -205,14 +214,44 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 ### Phase 4: V2 Ablation Study (In Progress)
 | Experiment | Config | Status | Job ID |
 |------------|--------|--------|--------|
-| E1a | MAE init, 25 ep, v1 sched | 🔄 Running | 314548 |
+| E1a | MAE init, 25 ep, v1 sched | ❌ Cancelled | 314548 |
 | E1b | MAE init, 100 ep, v2 sched | Pending | - |
 | **E1c** | **Random init, 100 ep, v2 sched** | 🔄 Running | 314545 |
 | E1d | Random init, 300 ep, v2 sched | Pending | - |
 | E2a | Random init, v1 scheduler | Pending | - |
 | E2b | Random init, v2 scheduler | Pending | - |
-| E3a | Random init, no target norm | Pending | - |
+| **E3a** | **Random init, no target norm** | 🔄 Running | 314583 |
 | E3b | Random init, with target norm | Pending | - |
+
+### Phase 5: SOTA-Focused Experiments (New)
+
+**Goal**: Exceed contrastive-only R@1 (>16%) and achieve SOTA on downstream tasks.
+
+**Baseline Results** (from Job 312964):
+- CAV-JEPA v1 (MAE init): R@1 = 12.5%
+- Contrastive-only: R@1 = 16.0%
+
+#### Why Current Results Underperform
+1. JEPA objective doesn't directly optimize audio-visual alignment
+2. MAE pretrain initialization biases representations
+3. Random masking may not capture semantic-level targets
+
+#### SOTA Experiment Plan
+
+| ID | Experiment | Hypothesis | Config Change | Priority |
+|----|------------|------------|---------------|----------|
+| **A1** | Higher contrastive weight | Stronger alignment signal → better retrieval | `contrast_loss_weight=0.1` (10x) | 🔴 High |
+| **B1** | Multiblock masking | Semantic-level prediction | `use_multiblock_masking=True` | 🟡 Pending integration |
+| **C1** | Deeper predictor | More prediction capacity | `predictor_depth=6` | 🟢 Medium |
+| A2 | Contrastive weight sweep | Find optimal ratio | Sweep: 0.01, 0.05, 0.1, 0.5 | Medium |
+| D1 | Higher momentum | More stable targets | `momentum_start=0.999, end=0.9999` | Medium |
+| B3 | Cross-modal masking | Predict audio from visual | Novel approach | Low |
+| E3 | VICReg regularization | Prevent collapse | Add variance/covariance terms | Low |
+
+**Next Steps**:
+1. ✅ E3a launched (target norm ablation)
+2. Launch A1 (high contrastive weight) - most likely to improve retrieval
+3. After E1c completes, evaluate and decide on C1
 
 ### Phase 5: Downstream Evaluation (Pending)
 - [ ] VGGSound retrieval comparison (v1 vs v2)
@@ -255,6 +294,11 @@ source activate_env.sh
 
 ## Changelog
 
+- **2026-01-20**: Cancelled redundant E1a (Job 314548) - same config as Job 312964
+- **2026-01-20**: Launched E3a (Job 314583) - target normalization ablation
+- **2026-01-20**: Added SOTA-focused experiments to ablation script: A1 (high contrastive), B1 (multiblock masking), C1 (deeper predictor)
+- **2026-01-20**: Added multiblock masking integration check (NotImplementedError until fully integrated)
+- **2026-01-20**: Updated EXP_LOGS.md with new SOTA experiment plan (Phase 5)
 - **2026-01-19**: Launched v2 ablation experiments: E1c (Job 314545) random init 100ep, E1a (Job 314548) MAE baseline 25ep
 - **2026-01-19**: Implemented CAV-JEPA v2 with I-JEPA improvements: random init, learnable mask tokens, target norm, warmup+cosine scheduler, WD schedule
 - **2026-01-19**: Created new files: `src/schedulers.py`, `src/masks/multiblock.py`, `src/masks/utils.py`

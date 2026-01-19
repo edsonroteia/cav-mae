@@ -2,7 +2,7 @@
 # @Time    : 1/15/26
 # @Author  : Based on traintest_cavmae.py by Yuan Gong (MIT)
 # @File    : traintest_cavjepa.py
-# @Description: Training loop for CAV-JEPA with EMA updates
+# @Description: Training loop for CAV-JEPA v2 with improved schedulers and masking
 
 import sys
 import os
@@ -17,6 +17,15 @@ import numpy as np
 import pickle
 from torch.cuda.amp import autocast, GradScaler
 
+# Import v2 schedulers
+from schedulers import (
+    WarmupCosineSchedule,
+    CosineWDSchedule,
+    LinearMomentumSchedule,
+    get_param_groups_with_wd_exclusion,
+    update_weight_decay
+)
+
 
 def train(audio_model, train_loader, test_loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -26,6 +35,15 @@ def train(audio_model, train_loader, test_loader, args):
     # Initialize wandb
     use_wandb = getattr(args, 'use_wandb', False)
     wandb_run = init_wandb(args, model_name="cav-jepa")
+
+    # Check for multiblock masking (requires further integration)
+    use_multiblock = getattr(args, 'use_multiblock_masking', False)
+    if use_multiblock:
+        raise NotImplementedError(
+            "Multiblock masking is not yet fully integrated into the training loop. "
+            "The multiblock mask module exists at src/masks/multiblock.py but needs "
+            "to be wired into the CAVJEPA forward pass. Use random masking for now."
+        )
 
     # Meters for tracking
     batch_time = AverageMeter()
@@ -73,20 +91,59 @@ def train(audio_model, train_loader, test_loader, args):
     print('Total trainable parameter number is : {:.3f} million'.format(
         sum(p.numel() for p in trainables) / 1e6))
 
-    optimizer = torch.optim.Adam(trainables, args.lr, weight_decay=5e-7, betas=(0.95, 0.999))
+    # Check if using v2 scheduler
+    use_v2_scheduler = getattr(args, 'use_v2_scheduler', False)
 
-    # Learning rate scheduler
-    if args.lr_adapt:
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='max', factor=0.5, patience=args.lr_patience, verbose=True)
-        print('Using adaptive learning rate scheduler.')
-    else:
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(
+    if use_v2_scheduler:
+        # V2: Use warmup + cosine schedule with WD schedule (I-JEPA style)
+        start_wd = getattr(args, 'start_wd', 0.04)
+        final_wd = getattr(args, 'final_wd', 0.4)
+        start_lr = getattr(args, 'start_lr', 1e-4)
+        ref_lr = getattr(args, 'ref_lr', args.lr)  # peak LR
+        final_lr = getattr(args, 'final_lr', 1e-6)
+        warmup_epochs = getattr(args, 'warmup_epochs', 15)
+
+        # Create param groups with WD exclusion
+        param_groups = get_param_groups_with_wd_exclusion(
+            audio_model.module if hasattr(audio_model, 'module') else audio_model,
+            weight_decay=start_wd
+        )
+        optimizer = torch.optim.AdamW(param_groups, lr=start_lr, betas=(0.9, 0.999))
+
+        warmup_steps = warmup_epochs * len(train_loader)
+        scheduler = WarmupCosineSchedule(
             optimizer,
-            list(range(args.lrscheduler_start, 1000, args.lrscheduler_step)),
-            gamma=args.lrscheduler_decay)
-        print('Learning rate scheduler starts at {:d} epoch with decay rate {:.3f} every {:d} epochs'.format(
-            args.lrscheduler_start, args.lrscheduler_decay, args.lrscheduler_step))
+            warmup_steps=warmup_steps,
+            start_lr=start_lr,
+            ref_lr=ref_lr,
+            total_steps=total_steps,
+            final_lr=final_lr
+        )
+
+        # Weight decay schedule
+        wd_schedule = CosineWDSchedule(start_wd, final_wd, total_steps)
+
+        print('Using V2 scheduler (warmup + cosine):')
+        print(f'  LR: {start_lr} -> {ref_lr} -> {final_lr}')
+        print(f'  WD: {start_wd} -> {final_wd}')
+        print(f'  Warmup epochs: {warmup_epochs}')
+    else:
+        # Original scheduler
+        optimizer = torch.optim.Adam(trainables, args.lr, weight_decay=5e-7, betas=(0.95, 0.999))
+        wd_schedule = None
+
+        # Learning rate scheduler
+        if args.lr_adapt:
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode='max', factor=0.5, patience=args.lr_patience, verbose=True)
+            print('Using adaptive learning rate scheduler.')
+        else:
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                optimizer,
+                list(range(args.lrscheduler_start, 1000, args.lrscheduler_step)),
+                gamma=args.lrscheduler_decay)
+            print('Learning rate scheduler starts at {:d} epoch with decay rate {:.3f} every {:d} epochs'.format(
+                args.lrscheduler_start, args.lrscheduler_decay, args.lrscheduler_step))
 
     print('Training with {:s}, learning rate scheduler: {:s}'.format(str(args.dataset), str(scheduler)))
 
@@ -145,6 +202,13 @@ def train(audio_model, train_loader, test_loader, args):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
+
+            # Step-based scheduler update (for v2 scheduler)
+            if use_v2_scheduler:
+                scheduler.step()
+                # Update weight decay
+                if wd_schedule is not None:
+                    current_wd = update_weight_decay(optimizer, wd_schedule, global_step)
 
             # EMA update of target encoder (after optimizer step)
             if hasattr(audio_model, 'module'):
@@ -269,10 +333,12 @@ def train(audio_model, train_loader, test_loader, args):
         if args.save_model:
             torch.save(audio_model.state_dict(), "%s/models/audio_model.%d.pth" % (exp_dir, epoch))
 
-        if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-            scheduler.step(-eval_loss)
-        else:
-            scheduler.step()
+        # Epoch-based scheduler update (only for non-v2 scheduler)
+        if not use_v2_scheduler:
+            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                scheduler.step(-eval_loss)
+            else:
+                scheduler.step()
 
         print('Epoch-{0} lr: {1}'.format(epoch, optimizer.param_groups[0]['lr']))
 

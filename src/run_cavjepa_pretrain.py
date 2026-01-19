@@ -74,6 +74,25 @@ parser.add_argument("--momentum_end", type=float, default=0.999, help="EMA momen
 parser.add_argument("--predictor_depth", type=int, default=4, help="predictor network depth")
 parser.add_argument("--predictor_dim", type=int, default=384, help="predictor network dimension")
 
+# CAV-JEPA v2 arguments
+parser.add_argument("--init_mode", type=str, default='mae', choices=['mae', 'random'],
+                    help="initialization mode: 'mae' (load MAE weights) or 'random' (fresh init)")
+parser.add_argument("--normalize_targets", type=ast.literal_eval, default=True,
+                    help="apply LayerNorm to target representations (prevents collapse)")
+parser.add_argument("--use_multiblock_masking", type=ast.literal_eval, default=False,
+                    help="use multiblock masking strategy for semantic-level prediction")
+parser.add_argument("--init_std", type=float, default=0.02, help="std for truncated normal init")
+
+# V2 scheduler arguments
+parser.add_argument("--use_v2_scheduler", type=ast.literal_eval, default=False,
+                    help="use warmup + cosine LR with WD schedule (I-JEPA style)")
+parser.add_argument("--warmup_epochs", type=int, default=15, help="warmup epochs for v2 scheduler")
+parser.add_argument("--start_lr", type=float, default=1e-4, help="initial LR during warmup")
+parser.add_argument("--ref_lr", type=float, default=1e-3, help="peak LR after warmup")
+parser.add_argument("--final_lr", type=float, default=1e-6, help="final LR at end of training")
+parser.add_argument("--start_wd", type=float, default=0.04, help="initial weight decay")
+parser.add_argument("--final_wd", type=float, default=0.4, help="final weight decay")
+
 # wandb arguments
 parser.add_argument("--use_wandb", type=ast.literal_eval, default=False, help="whether to use wandb for logging")
 parser.add_argument("--wandb_project", type=str, default="cav-jepa", help="wandb project name")
@@ -147,6 +166,8 @@ if args.data_eval is not None:
 # Model creation
 if args.model == 'cav-jepa':
     print('Pretraining CAV-JEPA model with 11 modality-specific layers and 1 modality-sharing layer')
+    print(f'  Init mode: {args.init_mode}')
+    print(f'  Normalize targets: {args.normalize_targets}')
     audio_model = models.CAVJEPA(
         audio_length=args.target_length,
         modality_specific_depth=11,
@@ -154,14 +175,19 @@ if args.model == 'cav-jepa':
         predictor_depth=args.predictor_depth,
         predictor_embed_dim=args.predictor_dim,
         momentum_start=args.momentum_start,
-        momentum_end=args.momentum_end
+        momentum_end=args.momentum_end,
+        # V2 parameters
+        init_mode=args.init_mode,
+        normalize_targets=args.normalize_targets,
+        init_std=args.init_std
     )
 else:
     raise ValueError('Model not supported: {}'.format(args.model))
 
 # Load pretrained weights (e.g., adapted I-JEPA/V-JEPA checkpoint)
 # IMPORTANT: Load weights BEFORE wrapping with DataParallel to avoid key mismatch
-if args.pretrain_path != 'None':
+# Note: For init_mode='random', we skip loading pretrained weights
+if args.pretrain_path != 'None' and args.init_mode == 'mae':
     mdl_weight = torch.load(args.pretrain_path, map_location=torch.device('cpu'))
     # Handle checkpoints that may have 'module.' prefix
     from collections import OrderedDict
@@ -178,6 +204,9 @@ if args.pretrain_path != 'None':
     print('Unexpected keys:', len(unexpected))
     if unexpected:
         print('  Sample unexpected:', unexpected[:5])
+elif args.init_mode == 'random':
+    print('Using random initialization (no pretrained weights)')
+    print('  Depth-scaled initialization applied for better gradient flow')
 
 # Wrap with DataParallel for multi-GPU training
 if not isinstance(audio_model, torch.nn.DataParallel):
