@@ -32,6 +32,57 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 
 ## Active Experiments
 
+### Run 2: CAV-JEPA v2 Ablation - E1c (Random Init, 100 Epochs)
+| Field | Value |
+|-------|-------|
+| **Job ID** | 314545 |
+| **Status** | 🔄 Running |
+| **Started** | 2026-01-19 |
+| **Script** | `egs/audioset/run_cavjepa_ablations.sh E1c` |
+| **Output Dir** | `egs/audioset/exp/ablation-E1c-random_init-100ep-v2sched` |
+| **Log File** | `egs/audioset/log/314545_cavjepa_ablation.txt` |
+
+**Key v2 Improvements Applied**:
+- ✅ Random initialization (no MAE pretrain bias)
+- ✅ Depth-scaled weight rescaling (I-JEPA style)
+- ✅ Learnable mask tokens in predictor
+- ✅ Target representation normalization
+- ✅ Warmup + cosine LR scheduler
+- ✅ Weight decay schedule (0.04 → 0.4)
+
+**Training Configuration**:
+- Init mode: `random`
+- Epochs: 100
+- Warmup epochs: 15
+- LR schedule: 1e-4 → 1e-3 → 1e-6
+- WD schedule: 0.04 → 0.4
+- Batch size: 120
+- GPUs: 4 x H100
+
+**Hypothesis**: Random init with proper I-JEPA-style training should outperform MAE-init by avoiding pretrain bias and allowing JEPA-specific representation learning.
+
+---
+
+### Run 3: CAV-JEPA v1 Baseline - E1a (MAE Init, 25 Epochs)
+| Field | Value |
+|-------|-------|
+| **Job ID** | 314548 |
+| **Status** | 🔄 Running |
+| **Started** | 2026-01-19 |
+| **Script** | `egs/audioset/run_cavjepa_ablations.sh E1a` |
+| **Output Dir** | `egs/audioset/exp/ablation-E1a-mae_init-25ep-v1sched` |
+| **Log File** | `egs/audioset/log/314548_cavjepa_ablation.txt` |
+
+**Configuration** (Original v1):
+- Init mode: `mae` (from `cav_jepa_from_mae_init.pth`)
+- Epochs: 25
+- Scheduler: v1 (MultiStepLR)
+- No warmup, no WD schedule
+
+**Purpose**: Baseline for comparison with v2 improvements.
+
+---
+
 ### Run 1: CAV-JEPA Initial Training (ImageMAE Init)
 | Field | Value |
 |-------|-------|
@@ -137,15 +188,37 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 - [x] Create entry point `src/run_cavjepa_pretrain.py`
 - [x] Create training script `egs/audioset/run_cavjepa_pretrain.sh`
 
-### Phase 2: Initial Training (In Progress)
-- [x] ImageMAE-based initialization training (Job 312964) - RUNNING
-- [ ] Evaluate on downstream tasks (VGGSound, AudioSet)
+### Phase 2: Initial Training ✅
+- [x] ImageMAE-based initialization training (Job 312964) - Completed
+- [x] VGGSound retrieval evaluation (R@1=12.5%)
 
-### Phase 3: Ablations
-- [ ] I-JEPA initialization (if ViT-B checkpoints become available)
-- [ ] V-JEPA initialization
-- [ ] Predictor depth sweep (2, 4, 6 blocks)
-- [ ] Momentum schedule sweep (0.99-0.999, 0.996-0.9999)
+### Phase 3: CAV-JEPA v2 Implementation ✅
+- [x] Random initialization mode (`init_mode='random'`)
+- [x] Depth-scaled weight rescaling (I-JEPA style)
+- [x] Learnable mask tokens in predictor
+- [x] Target representation normalization
+- [x] Warmup + cosine LR scheduler (`src/schedulers.py`)
+- [x] Weight decay schedule (cosine 0.04 → 0.4)
+- [x] Multiblock masking module (`src/masks/`)
+- [x] V2 training scripts (`run_cavjepa_v2_pretrain.sh`, `run_cavjepa_ablations.sh`)
+
+### Phase 4: V2 Ablation Study (In Progress)
+| Experiment | Config | Status | Job ID |
+|------------|--------|--------|--------|
+| E1a | MAE init, 25 ep, v1 sched | 🔄 Running | 314548 |
+| E1b | MAE init, 100 ep, v2 sched | Pending | - |
+| **E1c** | **Random init, 100 ep, v2 sched** | 🔄 Running | 314545 |
+| E1d | Random init, 300 ep, v2 sched | Pending | - |
+| E2a | Random init, v1 scheduler | Pending | - |
+| E2b | Random init, v2 scheduler | Pending | - |
+| E3a | Random init, no target norm | Pending | - |
+| E3b | Random init, with target norm | Pending | - |
+
+### Phase 5: Downstream Evaluation (Pending)
+- [ ] VGGSound retrieval comparison (v1 vs v2)
+- [ ] AudioSet-20K fine-tuning (linear probe)
+- [ ] AudioSet-20K fine-tuning (end-to-end)
+- [ ] Cross-dataset transfer (ESC-50)
 
 ---
 
@@ -182,6 +255,10 @@ source activate_env.sh
 
 ## Changelog
 
+- **2026-01-19**: Launched v2 ablation experiments: E1c (Job 314545) random init 100ep, E1a (Job 314548) MAE baseline 25ep
+- **2026-01-19**: Implemented CAV-JEPA v2 with I-JEPA improvements: random init, learnable mask tokens, target norm, warmup+cosine scheduler, WD schedule
+- **2026-01-19**: Created new files: `src/schedulers.py`, `src/masks/multiblock.py`, `src/masks/utils.py`
+- **2026-01-19**: Created ablation scripts: `run_cavjepa_v2_pretrain.sh`, `run_cavjepa_ablations.sh`
 - **2026-01-16**: VGGSound retrieval evaluation - CAV-JEPA R@1=12.5%, Contrastive-only R@1=16.0%
 - **2026-01-16**: CAV-JEPA training progress (epoch 20/25): Total Loss 0.245, Contrastive Acc ~77%
 - **2026-01-16**: CAV-JEPA training progress analysis (epoch 13/25): JEPA audio -49%, contrastive acc 69%
