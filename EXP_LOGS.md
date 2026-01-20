@@ -35,12 +35,13 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 ### Run 2: CAV-JEPA v2 Ablation - E1c (Random Init, 100 Epochs)
 | Field | Value |
 |-------|-------|
-| **Job ID** | 314640 (prev: 314545 cancelled - dtype bug) |
-| **Status** | 🔄 Pending |
+| **Job ID** | 314648 (prev: 314640 cancelled - ran on CPU due to node issue, 314545 cancelled - dtype bug) |
+| **Status** | 🔄 Pending (scheduled ~13:35 on mlcbm010) |
 | **Started** | 2026-01-20 |
 | **Script** | `egs/audioset/run_cavjepa_ablations.sh E1c` |
 | **Output Dir** | `egs/audioset/exp/ablation-E1c-random_init-100ep-v2sched` |
-| **Log File** | `egs/audioset/log/314640_cavjepa_ablation.txt` |
+| **Log File** | `egs/audioset/log/314648_cavjepa_ablation.txt` |
+| **Node Exclusion** | mlcbm005 (CUDA issue) |
 
 **Key v2 Improvements Applied**:
 - ✅ Random initialization (no MAE pretrain bias)
@@ -66,12 +67,13 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 ### Run 3: E3a - Target Normalization Ablation (No Target Norm)
 | Field | Value |
 |-------|-------|
-| **Job ID** | 314641 (prev: 314583 failed - dtype bug) |
+| **Job ID** | 314649 (prev: 314641 cancelled - node issue, 314583 failed - dtype bug) |
 | **Status** | 🔄 Pending |
 | **Started** | 2026-01-20 |
 | **Script** | `egs/audioset/run_cavjepa_ablations.sh E3a` |
 | **Output Dir** | `egs/audioset/exp/ablation-E3a-random_init-no_target_norm` |
-| **Log File** | `egs/audioset/log/314641_cavjepa_ablation.txt` |
+| **Log File** | `egs/audioset/log/314649_cavjepa_ablation.txt` |
+| **Node Exclusion** | mlcbm005 (CUDA issue) |
 
 **Configuration**:
 - Init mode: `random`
@@ -216,11 +218,11 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 |------------|--------|--------|--------|
 | E1a | MAE init, 25 ep, v1 sched | ❌ Cancelled | 314548 |
 | E1b | MAE init, 100 ep, v2 sched | Pending | - |
-| **E1c** | **Random init, 100 ep, v2 sched** | 🔄 Pending | 314640 |
+| **E1c** | **Random init, 100 ep, v2 sched** | 🔄 Pending | 314648 |
 | E1d | Random init, 300 ep, v2 sched | Pending | - |
 | E2a | Random init, v1 scheduler | Pending | - |
 | E2b | Random init, v2 scheduler | Pending | - |
-| **E3a** | **Random init, no target norm** | 🔄 Pending | 314641 |
+| **E3a** | **Random init, no target norm** | 🔄 Pending | 314649 |
 | E3b | Random init, with target norm | Pending | - |
 
 ### Phase 5: SOTA-Focused Experiments (New)
@@ -294,6 +296,10 @@ source activate_env.sh
 
 ## Changelog
 
+- **2026-01-20**: Cancelled Jobs 314640/314641 - mlcbm005 had CUDA detection issue (torch.cuda.is_available()=False)
+- **2026-01-20**: Added `--exclude=mlcbm005` to ablation script to avoid problematic node
+- **2026-01-20**: Re-submitted E1c (Job 314648) and E3a (Job 314649) with node exclusion
+- **2026-01-20**: Created debug scripts to verify GPU functionality before full runs
 - **2026-01-20**: Fixed dtype mismatch bug in forward_predictor (mask tokens need same dtype as context under autocast)
 - **2026-01-20**: Re-submitted E1c (Job 314640) and E3a (Job 314641) with fix
 - **2026-01-20**: Cancelled E1c (Job 314545) - stuck due to dtype bug
