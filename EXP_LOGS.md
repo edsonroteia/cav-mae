@@ -255,8 +255,20 @@ exp/merged-models/
 | `task_arithmetic` | base + λ×(τ_mae + τ_con) | `--method task_arithmetic --lambda_scale 1.0` |
 | `layerwise` | Per-block α based on task-vector magnitudes | `--method layerwise` |
 | `dare_ties` | Sparsify + TIES sign consensus | `--method dare_ties --dare_keep_ratio 0.2` |
-| `fisher` | Fisher-weighted merge | `--method fisher` |
-| `orthogonal` | **NEW** Conflict-aware orthogonal | `--method orthogonal --ortho_beta 1.0 --ortho_tau 0.0` |
+| `fisher` | Fisher-weighted merge | `--method fisher --fisher_mae <path> --fisher_contrastive <path>` |
+| `orthogonal` | Conflict-aware orthogonal | `--method orthogonal --ortho_beta 1.0 --ortho_tau 0.0` |
+
+### Merging Methods Evaluation Status
+
+| Method | Evaluated | Result |
+|--------|-----------|--------|
+| `simple` | ✅ | Works |
+| `weighted` | ✅ | **Best** - α=0.0-0.3 optimal |
+| `task_arithmetic` | ✅ | Works, weighted better |
+| `layerwise` | 🔄 Running (Job 314665) | Per-block α from task-vector magnitudes |
+| `dare_ties` | ✅ | ❌ Non-functional (R@1 < 0.015) |
+| `fisher` | 🔄 Running (Jobs 314662-314665) | Fisher-weighted merge |
+| `orthogonal` | ✅ | ❌ Non-functional (R@1 < 0.001) |
 
 ---
 
@@ -286,10 +298,15 @@ exp/merged-models/
 - [ ] Script: `egs/audioset/run_cavmae_ft.sh`
 
 ### Fisher-Weighted Merge
-- [ ] Estimate Fisher diagonal for MAE-only checkpoint
-- [ ] Estimate Fisher diagonal for Contrastive-only checkpoint
-- [ ] Run Fisher-weighted merge
-- [ ] Script: `src/estimate_fisher.py`
+- [x] Estimate Fisher diagonal for MAE-only checkpoint - Job 314662 🔄 Running
+- [x] Estimate Fisher diagonal for Contrastive-only checkpoint - Job 314663 🔄 Running
+- [x] Run Fisher-weighted merge - Job 314664 (pending Fisher estimation)
+- [x] Script: `src/estimate_fisher.py`
+
+### Layerwise Merge (NEW)
+- [x] Implemented per-block alpha merge based on task-vector magnitudes
+- [x] Created 2 models: `merged_layerwise_block.pth`, `merged_layerwise_param.pth`
+- [x] Retrieval evaluation pending - Job 314665
 
 ---
 
@@ -505,8 +522,89 @@ Downloaded and evaluating original pretrained models from Yuan Gong et al. (ICLR
 
 ---
 
+## Run 9: Layerwise and Fisher Merge Experiments (2026-01-20)
+
+### Overview
+Evaluating two previously implemented but untested merging methods:
+1. **Layerwise merge**: Per-block α based on task-vector magnitudes
+2. **Fisher-weighted merge**: Uses Fisher information diagonal for importance weighting
+
+### Layerwise Merge
+| Field | Value |
+|-------|-------|
+| **Job ID** | 314655 (merge), 314665 (retrieval eval) |
+| **Status** | ✅ Merge completed, 🔄 Retrieval pending |
+| **Output Dir** | `egs/audioset/exp/merged-models/layerwise-sweep/` |
+
+**Algorithm**:
+```
+For each block/parameter group g:
+  α_g = ||τ_mae|| / (||τ_mae|| + ||τ_con||)
+  merged = base + α_g·τ_mae + (1-α_g)·τ_con
+```
+
+**Models Created**:
+| Model | Grouping | Description |
+|-------|----------|-------------|
+| `merged_layerwise_block.pth` | Per-block | α computed per transformer block |
+| `merged_layerwise_param.pth` | Per-parameter | α computed per individual parameter |
+
+### Fisher-Weighted Merge
+| Field | Value |
+|-------|-------|
+| **Job IDs** | 314662 (Fisher MAE), 314663 (Fisher Con), 314664 (merge), 314665 (eval) |
+| **Status** | 🔄 Fisher estimation running |
+| **Output Dir** | `egs/audioset/exp/merged-models/fisher-sweep/` |
+
+**Algorithm**:
+```
+merged = (F_mae·W_mae + F_con·W_con) / (F_mae + F_con)
+With base model: merged = base + (F_mae·τ_mae + F_con·τ_con) / (F_mae + F_con)
+```
+
+**Fisher Estimation**:
+- Using 100 batches from AudioSet eval set
+- MAE model: `mae_loss_weight=1.0, contrast_loss_weight=0.0`
+- Contrastive model: `mae_loss_weight=0.0, contrast_loss_weight=1.0`
+- Output: `exp/fisher-estimates/fisher_mae.pth`, `exp/fisher-estimates/fisher_contrastive.pth`
+
+**Models to Create**:
+| Model | Method | Description |
+|-------|--------|-------------|
+| `merged_fisher_direct.pth` | Direct weighting | F-weighted average of model weights |
+| `merged_fisher_taskvec.pth` | Task vector weighting | F-weighted average of task vectors from base |
+
+### Job Pipeline
+| Phase | Job | ID | Status | Depends On |
+|-------|-----|-----|--------|------------|
+| **1a** | Layerwise merge | 314655 | ✅ Completed | - |
+| **1b** | Fisher MAE estimation | 314662 | 🔄 Running | - |
+| **1c** | Fisher Contrastive estimation | 314663 | 🔄 Running | - |
+| **2** | Fisher merge | 314664 | ⏳ Pending | 314662, 314663 |
+| **3** | Retrieval evaluation (all 4 models) | 314665 | ⏳ Pending | 314664 |
+
+### Scripts Created
+- `egs/audioset/sweep_layerwise.sh` - Layerwise merge sweep
+- `egs/audioset/run_estimate_fisher_mae.sh` - Fisher estimation for MAE model
+- `egs/audioset/run_estimate_fisher_contrastive.sh` - Fisher estimation for Contrastive model
+- `egs/audioset/sweep_fisher.sh` - Fisher merge sweep
+- `egs/audioset/run_retrieval_layerwise_fisher.sh` - Retrieval evaluation for new models
+- `egs/audioset/launch_layerwise_fisher_experiments.sh` - Master launcher
+
+### Fix Applied
+- Fixed `src/models/__init__.py`: Made `cav_jepa` import conditional (only exists on cav-mae-jepa branch)
+
+---
+
 ## Changelog
 
+- **2026-01-20 12:30**: Launched Layerwise and Fisher merge experiments:
+  - Layerwise merge completed (Job 314655): Created 2 models (`merged_layerwise_block.pth`, `merged_layerwise_param.pth`)
+  - Fisher estimation running (Jobs 314662, 314663): Estimating Fisher diagonals for MAE and Contrastive models
+  - Fisher merge pending (Job 314664): Will create 2 models after estimation completes
+  - Retrieval evaluation pending (Job 314665): Will evaluate all 4 new models
+  - Fixed `src/models/__init__.py` - cav_jepa import was failing on merge branch
+  - Created 6 new scripts for layerwise/Fisher experiments
 - **2026-01-17 16:30**: SFT experiments completed (Jobs 313820-313823):
   - **CAV-merged α=0.1: 47.14% mAP** (best) - MAE helps classification!
   - MAE-only: 44.32% mAP - recovers despite norm collapse

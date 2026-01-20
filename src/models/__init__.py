@@ -7,4 +7,10 @@
 
 from .cav_mae import CAVMAE, CAVMAEFT
 from .audio_mdl import CAVMAEFTAudio
-from .cav_jepa import CAVJEPA, CAVJEPAFT
+
+# CAV-JEPA imports are optional (only available on cav-mae-jepa branch)
+try:
+    from .cav_jepa import CAVJEPA, CAVJEPAFT
+except ImportError:
+    CAVJEPA = None
+    CAVJEPAFT = None
