@@ -528,8 +528,9 @@ class CAVJEPA(nn.Module):
 
         # Create full sequences initialized with LEARNABLE MASK TOKENS (not zeros!)
         # This is a key I-JEPA improvement - mask tokens provide learnable queries
-        a_expanded = self.mask_token_a.expand(N, self.patch_embed_a.num_patches, -1).clone()
-        v_expanded = self.mask_token_v.expand(N, self.patch_embed_v.num_patches, -1).clone()
+        # Note: Cast to same dtype as context to handle autocast (float16/bfloat16)
+        a_expanded = self.mask_token_a.expand(N, self.patch_embed_a.num_patches, -1).clone().to(a_ctx.dtype)
+        v_expanded = self.mask_token_v.expand(N, self.patch_embed_v.num_patches, -1).clone().to(v_ctx.dtype)
 
         # Scatter context features at visible positions
         # ids_restore tells us where each token should go
