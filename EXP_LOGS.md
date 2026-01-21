@@ -553,7 +553,7 @@ For each block/parameter group g:
 | Field | Value |
 |-------|-------|
 | **Job IDs** | 314662 (Fisher MAE), 314663 (Fisher Con), 314664 (merge), 314665 (eval) |
-| **Status** | 🔄 Fisher estimation running |
+| **Status** | ✅ Fisher merge completed |
 | **Output Dir** | `egs/audioset/exp/merged-models/fisher-sweep/` |
 
 **Algorithm**:
@@ -568,20 +568,54 @@ With base model: merged = base + (F_mae·τ_mae + F_con·τ_con) / (F_mae + F_co
 - Contrastive model: `mae_loss_weight=0.0, contrast_loss_weight=1.0`
 - Output: `exp/fisher-estimates/fisher_mae.pth`, `exp/fisher-estimates/fisher_contrastive.pth`
 
-**Models to Create**:
+**Models Created**:
 | Model | Method | Description |
 |-------|--------|-------------|
 | `merged_fisher_direct.pth` | Direct weighting | F-weighted average of model weights |
 | `merged_fisher_taskvec.pth` | Task vector weighting | F-weighted average of task vectors from base |
 
+### Fisher Task-Vec SFT Experiment
+| Field | Value |
+|-------|-------|
+| **Job ID** | 314888 (relaunched from failed 314746) |
+| **Status** | 🔄 Running |
+| **Submitted** | 2026-01-21 15:44 |
+| **Node** | mlcbm009 |
+| **Script** | `egs/audioset/run_sft_fisher_taskvec.sh` |
+| **Output Dir** | `exp/sft-fisher-taskvec-5e-5-bs36-epoch15-20260121_154437/` |
+| **Log File** | `egs/audioset/log/314888_sft_fisher_taskvec.txt` |
+| **Pretrain Path** | `exp/merged-models/fisher-sweep/merged_fisher_taskvec.pth` |
+
+**Failed Attempt (Job 314746)**:
+- **Failure Mode**: Ran on CPU instead of GPU
+- **Root Cause**: Node mlcbm005 has broken CUDA detection (`torch.cuda.is_available()` returns False)
+- **Epoch Time**: ~5000s (vs ~230s expected on GPU)
+- **Fix Applied**: Added `#SBATCH --exclude=mlcbm005,mlcbm012` to script
+
+**SFT Configuration**:
+- Learning rate: 5e-5
+- Head LR multiplier: 100x
+- Epochs: 15
+- Batch size: 36
+- Weight averaging: epochs 3-15
+- Loss: BCE (multi-label classification)
+- Metric: mAP
+- GPUs: 4 x H100
+
+**Expected Result**: mAP number to compare with:
+- Merged α=0.1: 47.14% mAP (current best)
+- MAE-only: 44.32% mAP
+- Contrastive-only: 43.27% mAP
+
 ### Job Pipeline
 | Phase | Job | ID | Status | Depends On |
 |-------|-----|-----|--------|------------|
 | **1a** | Layerwise merge | 314655 | ✅ Completed | - |
-| **1b** | Fisher MAE estimation | 314662 | 🔄 Running | - |
-| **1c** | Fisher Contrastive estimation | 314663 | 🔄 Running | - |
-| **2** | Fisher merge | 314664 | ⏳ Pending | 314662, 314663 |
-| **3** | Retrieval evaluation (all 4 models) | 314665 | ⏳ Pending | 314664 |
+| **1b** | Fisher MAE estimation | 314662 | ✅ Completed | - |
+| **1c** | Fisher Contrastive estimation | 314663 | ✅ Completed | - |
+| **2** | Fisher merge | 314664 | ✅ Completed | 314662, 314663 |
+| **3** | Retrieval evaluation (all 4 models) | 314665 | ✅ Completed | 314664 |
+| **4** | Fisher Task-Vec SFT | 314888 | 🔄 Running | 314664 |
 
 ### Scripts Created
 - `egs/audioset/sweep_layerwise.sh` - Layerwise merge sweep
@@ -596,8 +630,29 @@ With base model: merged = base + (F_mae·τ_mae + F_con·τ_con) / (F_mae + F_co
 
 ---
 
+## Cluster Notes
+
+### Known Problematic Nodes
+| Node | Issue | Status |
+|------|-------|--------|
+| **mlcbm005** | CUDA detection fails (`torch.cuda.is_available()` returns False), jobs run on CPU | CRITICAL - Always exclude |
+| **mlcbm012** | Intermittent GPU issues | Exclude recommended |
+
+**Always add to GPU job scripts:**
+```bash
+#SBATCH --exclude=mlcbm005,mlcbm012
+```
+
+---
+
 ## Changelog
 
+- **2026-01-21 15:45**: Launched Fisher Task-Vec SFT experiment:
+  - Job 314746 failed - ran on CPU due to broken CUDA on mlcbm005
+  - Relaunched as Job 314888 with `--exclude=mlcbm005,mlcbm012`
+  - Now running on mlcbm009 with CUDA
+  - Added cluster notes documenting problematic nodes
+  - Created `run_sft_fisher_taskvec.sh` script
 - **2026-01-20 12:30**: Launched Layerwise and Fisher merge experiments:
   - Layerwise merge completed (Job 314655): Created 2 models (`merged_layerwise_block.pth`, `merged_layerwise_param.pth`)
   - Fisher estimation running (Jobs 314662, 314663): Estimating Fisher diagonals for MAE and Contrastive models
