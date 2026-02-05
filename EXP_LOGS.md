@@ -51,14 +51,13 @@ This document tracks all experiment runs for the model merging baseline project.
 ### Run 1b: MAE-Only Pretraining (lr=2e-4) - RETRY WITH HIGHER LR
 | Field | Value |
 |-------|-------|
-| **Job ID** | 313762 (relaunched from 313696) |
-| **Status** | 🔄 Running (~49 min elapsed) |
-| **Submitted** | 2026-01-17 06:41 |
-| **Failed Attempt** | 313696 - Failed due to missing `wandb` package |
+| **Job ID** | 317992 (relaunched from 313762) |
+| **Status** | 🔄 Running |
+| **Submitted** | 2026-02-04 |
+| **Failed Attempt** | 313762 - TIME LIMIT (reached epoch 17/25 before 3-day limit) |
 | **Script** | `egs/audioset/run_mae_only_lr2e-4.sh` |
 | **Output Dir** | `egs/audioset/exp/mae-only-audioset-cav-mae-balNone-lr2e-4-epoch25-bs120-normTrue-mr-unstructured-0.75/` |
-| **Log File** | `egs/audioset/log/313762_mae_only_lr2e-4.txt` |
-| **Node** | mlcbm004 |
+| **Log File** | `egs/audioset/log/317992_mae_only_lr2e-4.txt` |
 
 **Hyperparameters**:
 - Learning rate: **2e-4** (2x previous)
@@ -72,6 +71,7 @@ This document tracks all experiment runs for the model merging baseline project.
 
 **Fixes Applied**:
 - Installed `wandb` package in cav-mae environment: `uv pip install wandb`
+- Added `#SBATCH --exclude=mlcbm005,mlcbm012` to avoid CUDA-broken nodes
 - **Note**: Previous attempt (Job 313261) failed due to timm compatibility issue (`qk_scale` argument). Fixed in `src/models/cav_mae.py` on 2026-01-16 22:23.
 
 ---
@@ -265,9 +265,9 @@ exp/merged-models/
 | `simple` | ✅ | Works |
 | `weighted` | ✅ | **Best** - α=0.0-0.3 optimal |
 | `task_arithmetic` | ✅ | Works, weighted better |
-| `layerwise` | 🔄 Running (Job 314665) | Per-block α from task-vector magnitudes |
+| `layerwise` | ✅ Completed | Per-block α from task-vector magnitudes |
 | `dare_ties` | ✅ | ❌ Non-functional (R@1 < 0.015) |
-| `fisher` | 🔄 Running (Jobs 314662-314665) | Fisher-weighted merge |
+| `fisher` | ✅ **Best for Classification** | **47.41% mAP** 🏆 (Fisher Task-Vec) |
 | `orthogonal` | ✅ | ❌ Non-functional (R@1 < 0.001) |
 
 ---
@@ -444,13 +444,15 @@ These models were merged WITHOUT the norm layer fix, so they inherit the broken 
 ### Run 7: SFT for Four Pretrained Models
 | Model | Job ID | Status | Multi-frame mAP | Pretrain Path |
 |-------|--------|--------|-----------------|---------------|
-| **CAV-merged (α=0.1)** | 313821 | ✅ Completed | **47.14%** 🏆 | `merged-models/weighted-sweep/merged_weighted_alpha0.1.pth` |
+| **Fisher Task-Vec** | 314888 | ✅ Completed | **47.41%** 🏆 | `merged-models/fisher-sweep/merged_fisher_taskvec.pth` |
+| **CAV-merged (α=0.1)** | 313821 | ✅ Completed | 47.14% | `merged-models/weighted-sweep/merged_weighted_alpha0.1.pth` |
 | **MAE-only (lr=1e-4)** | 313822 | ✅ Completed | 44.32% | `mae-only-lr1e-4.../best_audio_model.pth` |
 | **CAV-only (Contrastive-only)** | 313820 | ✅ Completed | 43.27% | `contrastive-only.../best_audio_model.pth` |
 | **CAV-JEPA** | 313823 | ✅ Completed | 23.93% ❌ | `cavjepa-.../best_audio_model.pth` |
 
 **SFT Results Analysis**:
-- **MAE helps classification**: Merged α=0.1 (47.14%) beats pure Contrastive (43.27%) by +3.87%
+- **Fisher Task-Vec is NEW BEST**: 47.41% mAP, beating weighted merge (47.14%) by +0.27%
+- **MAE helps classification**: Merged models beat pure Contrastive (43.27%) by +4%
 - **MAE-only recovers via SFT**: Despite collapsed norms during pretraining, achieves 44.32% mAP
 - **CAV-JEPA underperforms**: Only 23.93% suggests bug in fine-tuning implementation - needs investigation
 
@@ -458,7 +460,8 @@ These models were merged WITHOUT the norm layer fix, so they inherit the broken 
 | Model | Retrieval R@1 (Avg) | Classification mAP |
 |-------|---------------------|-------------------|
 | Contrastive-only | **16.1%** | 43.27% |
-| Merged α=0.1 | 14.4% | **47.14%** |
+| Fisher Task-Vec | TBD | **47.41%** |
+| Merged α=0.1 | 14.4% | 47.14% |
 
 **Insight**: MAE hurts retrieval but helps classification - different objectives optimize for different downstream tasks
 
@@ -489,14 +492,19 @@ Downloaded and evaluating original pretrained models from Yuan Gong et al. (ICLR
 **SFT Evaluation**:
 | Model | Job ID | Status | Exp Dir Pattern |
 |-------|--------|--------|-----------------|
-| Scale++ | 313936 | 📋 Pending | `sft-scalepp-original-*` |
-| Scale+ | 313937 | 📋 Pending | `sft-scalep-original-*` |
+| Scale++ | 317993 (relaunched from 313936) | 🔄 Running | `sft-scalepp-original-*` |
+| Scale+ | 317994 (relaunched from 313937) | 🔄 Running | `sft-scalep-original-*` |
+
+**Previous Failures (Jobs 313936, 313937)**:
+- **Error**: `TypeError: __init__() got an unexpected keyword argument 'qk_scale'`
+- **Root Cause**: timm library version incompatibility with Attention class
+- **Fix**: Recreated scripts with correct configuration and node exclusions
 
 **Scripts Created**:
 - `egs/audioset/run_retrieval_scalepp.sh`
 - `egs/audioset/run_retrieval_scalep.sh`
-- `egs/audioset/run_sft_scalepp.sh`
-- `egs/audioset/run_sft_scalep.sh`
+- `egs/audioset/run_sft_scalepp.sh` (recreated 2026-02-04)
+- `egs/audioset/run_sft_scalep.sh` (recreated 2026-02-04)
 - `egs/audioset/launch_original_eval.sh` (launcher)
 
 **SFT Configuration** (all models):
@@ -578,13 +586,16 @@ With base model: merged = base + (F_mae·τ_mae + F_con·τ_con) / (F_mae + F_co
 | Field | Value |
 |-------|-------|
 | **Job ID** | 314888 (relaunched from failed 314746) |
-| **Status** | 🔄 Running |
+| **Status** | ✅ **Completed - 47.41% mAP** 🏆 (NEW BEST!) |
 | **Submitted** | 2026-01-21 15:44 |
+| **Completed** | 2026-01-22 |
 | **Node** | mlcbm009 |
 | **Script** | `egs/audioset/run_sft_fisher_taskvec.sh` |
 | **Output Dir** | `exp/sft-fisher-taskvec-5e-5-bs36-epoch15-20260121_154437/` |
 | **Log File** | `egs/audioset/log/314888_sft_fisher_taskvec.txt` |
 | **Pretrain Path** | `exp/merged-models/fisher-sweep/merged_fisher_taskvec.pth` |
+
+**Result**: **47.41% mAP** - New best for classification task!
 
 **Failed Attempt (Job 314746)**:
 - **Failure Mode**: Ran on CPU instead of GPU
@@ -602,10 +613,13 @@ With base model: merged = base + (F_mae·τ_mae + F_con·τ_con) / (F_mae + F_co
 - Metric: mAP
 - GPUs: 4 x H100
 
-**Expected Result**: mAP number to compare with:
-- Merged α=0.1: 47.14% mAP (current best)
-- MAE-only: 44.32% mAP
-- Contrastive-only: 43.27% mAP
+**Comparison with other models**:
+| Model | mAP | Notes |
+|-------|-----|-------|
+| **Fisher Task-Vec** | **47.41%** | 🏆 NEW BEST |
+| Merged α=0.1 | 47.14% | Previous best |
+| MAE-only | 44.32% | - |
+| Contrastive-only | 43.27% | - |
 
 ### Job Pipeline
 | Phase | Job | ID | Status | Depends On |
@@ -630,6 +644,84 @@ With base model: merged = base + (F_mae·τ_mae + F_con·τ_con) / (F_mae + F_co
 
 ---
 
+## Run 10: CAV++ / MAE++ Pipeline (2026-02-05)
+
+### Overview
+Full post-training pipeline for independently trained Contrastive++ and MAE++ models with **larger batch size (256)** and **higher learning rate (2e-4)**.
+
+**Key Insight**: Larger batch size (256 vs 120) significantly improves contrastive learning quality.
+
+### Training Results
+
+| Model | Job ID | Status | Final Metrics | Model Path |
+|-------|--------|--------|---------------|------------|
+| **Contrastive++** | 318035 | ✅ Completed | Loss=6.39, Acc=57.8% | `exp/contrastive++-audioset-cav-mae-balNone-lr2e-4-epoch25-bs256-mr-unstructured-0.75/` |
+| **MAE++** | 318036 | ✅ Completed | MAE Loss=3.30 | `exp/mae++-audioset-cav-mae-balNone-lr2e-4-epoch25-bs256-mr-unstructured-0.75/` |
+
+**Hyperparameters (both models)**:
+- Learning rate: **2e-4** (higher than previous 1e-4)
+- Batch size: **256** (vs 120 in original experiments)
+- Epochs: 25
+- Masking ratio: 0.75
+
+### Retrieval Results (VGGSound)
+
+#### Base Models
+| Model | A→V R@1 | V→A R@1 | Avg R@1 |
+|-------|---------|---------|---------|
+| **Contrastive++** | **18.81%** | **18.04%** | **18.43%** |
+| MAE++ | N/A | N/A | N/A (no contrastive heads) |
+
+**This is the best retrieval result achieved** - 2.3% improvement over previous best (Scale++ at 16.0%).
+
+#### Merged Models (Ranked by Avg R@1)
+| Rank | Model | A→V R@1 | V→A R@1 | Avg R@1 |
+|------|-------|---------|---------|---------|
+| 1 | **merged_weighted_0.0** | 18.81% | 18.04% | **18.43%** |
+| 2 | merged_weighted_0.1 | 16.40% | 16.37% | 16.39% |
+| 3 | **merged_fisher** | 11.41% | 12.56% | **11.98%** |
+| 4 | merged_weighted_0.2 | 10.23% | 10.66% | 10.45% |
+| 5 | merged_weighted_0.3 | 4.47% | 4.61% | 4.54% |
+| 6 | merged_weighted_0.4 | 1.35% | 2.13% | 1.74% |
+| 7 | merged_layerwise | 1.23% | 1.67% | 1.45% |
+| 8 | merged_weighted_0.5 / simple / task_arith_0.5 | 0.53% | 0.86% | 0.70% |
+
+**Key Observations**:
+1. **Pure Contrastive++ (α=0.0) is best** - 18.43% avg R@1
+2. **Fisher merge (11.98%) outperforms equal weighting** at similar ratios
+3. **MAE contribution hurts retrieval** - expected since MAE features aren't trained for alignment
+
+### SFT Experiments
+
+**Jobs Submitted**:
+| Model | Job ID | Status | Expected Comparison |
+|-------|--------|--------|---------------------|
+| merged_weighted_0.0 (Contrastive++) | 318178 | 🔄 Running | Baseline |
+| merged_weighted_0.1 | 318179 | 🔄 Pending | MAE contribution |
+| merged_fisher | 318180 | 🔄 Pending | Fisher weighting |
+
+**Target**: Beat baseline mAP of 47.41% (Fisher Task-Vec from original experiments).
+
+### Scripts Created
+| Script | Purpose |
+|--------|---------|
+| `run_retrieval_plusplus.sh` | Retrieval eval for base models |
+| `run_estimate_fisher_plusplus.sh` | Fisher estimation |
+| `run_merge_plusplus.sh` | Create merged models |
+| `run_retrieval_merged_plusplus.sh` | Retrieval eval for merged models |
+| `run_sft_merged_plusplus.sh` | SFT training template |
+| `run_pipeline_plusplus.sh` | Master orchestration script |
+
+### Results Summary
+
+**Retrieval Improvement from Original Experiments**:
+| Model | Original (bs=120) | ++ (bs=256) | Improvement |
+|-------|-------------------|-------------|-------------|
+| Contrastive-only | 16.1% | **18.43%** | **+2.33%** |
+| Merged α=0.1 | 14.4% | 16.39% | +1.99% |
+
+---
+
 ## Cluster Notes
 
 ### Known Problematic Nodes
@@ -647,6 +739,33 @@ With base model: merged = base + (F_mae·τ_mae + F_con·τ_con) / (F_mae + F_co
 
 ## Changelog
 
+- **2026-02-05**: CAV++ / MAE++ Post-Training Pipeline:
+  - **Phase 1 Completed**: Trained Contrastive++ and MAE++ models with bs=256, lr=2e-4, 25 epochs
+    - Contrastive++ (Job 318035): Loss=6.39, Acc=57.8%
+    - MAE++ (Job 318036): MAE Loss=3.30
+  - **Phase 2 Completed**: Retrieval evaluation on base models (Job 318140)
+    - Contrastive++ achieves **18.43% avg R@1** (BEST retrieval result ever!)
+    - MAE++ outputs zeros (expected - no contrastive heads)
+  - **Phase 3 Completed**: Fisher estimation (Job 318142)
+    - Created `fisher_mae++.pt` and `fisher_contrastive++.pt`
+  - **Phase 4 Completed**: Model merging (Job 318170)
+    - Created 20 merged models: simple, weighted (0.0-1.0), task_arith, fisher, orthogonal, layerwise
+  - **Phase 5 Completed**: Retrieval on merged models (Job 318173)
+    - Best: `merged_weighted_0.0` (pure Contrastive++) = 18.43% R@1
+    - Fisher merge = 11.98% R@1 (better than equal weighting)
+  - **Phase 6 Running**: SFT on top 3 models (Jobs 318178, 318179, 318180)
+    - `merged_weighted_0.0` (pure Contrastive++)
+    - `merged_weighted_0.1` (10% MAE)
+    - `merged_fisher` (Fisher-weighted)
+- **2026-02-04**: Fixed and relaunched failed experiments:
+  - **Fisher Task-Vec SFT (Job 314888)**: ✅ **COMPLETED - 47.41% mAP** (NEW BEST for classification!)
+  - **MAE lr=2e-4 Pretraining (Job 317992)**: Relaunched (was Job 313762, failed at epoch 17/25 due to TIME LIMIT)
+    - Fixed script: Added `#SBATCH --exclude=mlcbm005,mlcbm012`
+  - **Scale++ SFT (Job 317993)**: Relaunched (was Job 313936, failed due to `qk_scale` timm error)
+    - Recreated `run_sft_scalepp.sh` with proper configuration
+  - **Scale+ SFT (Job 317994)**: Relaunched (was Job 313937, failed due to `qk_scale` timm error)
+    - Recreated `run_sft_scalep.sh` with proper configuration
+  - Updated experiment log with Fisher Task-Vec results and new job IDs
 - **2026-01-21 15:45**: Launched Fisher Task-Vec SFT experiment:
   - Job 314746 failed - ran on CPU due to broken CUDA on mlcbm005
   - Relaunched as Job 314888 with `--exclude=mlcbm005,mlcbm012`

@@ -1,34 +1,35 @@
 #!/bin/bash
-#SBATCH --job-name=mae-only-2e4
+#SBATCH --job-name="cav++"
 #SBATCH --partition=h100-ferranti
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=32
 #SBATCH --mem=256G
-#SBATCH --time=3-00:00:00
+#SBATCH --time=2-00:00:00
 #SBATCH --exclude=mlcbm005,mlcbm012
-#SBATCH --output=./log/%j_mae_only_lr2e-4.txt
-#SBATCH --error=./log/%j_mae_only_lr2e-4.err
+#SBATCH --output=./log/%j_contrastive++.txt
+#SBATCH --error=./log/%j_contrastive++.err
 
-# MAE-only pretraining with higher learning rate (2e-4)
-# Ablation study: testing if MAE needs higher LR without contrastive gradients
+# CAV++ (Contrastive++): Stronger contrastive-only baseline
+# - Batch size: 256 (vs 120 in original)
+# - Learning rate: 2e-4 (vs 1e-4 in original)
+# - Total effective batch: 1024 (256 * 4 GPUs)
+# Goal: Stronger single-objective model for better merged results
 
 set -x
-cd /weka/kuehne/kqr867/code/cav-mae/egs/audioset
 
-# Activate environment
-source /weka/kuehne/kqr867/code/cav-mae/.venv/bin/activate
+# Activate CAV-MAE environment
+source /weka/kuehne/kqr867/code/cav-mae/activate_env.sh
 
 export TORCH_HOME=../../pretrained_models
+cd /weka/kuehne/kqr867/code/cav-mae/egs/audioset
 
 model=cav-mae
 masking_ratio=0.75
 mask_mode=unstructured
-
-# MAE-only: no contrastive loss
-contrast_loss_weight=0.0
-mae_loss_weight=1.0
-
+contrast_loss_weight=1.0  # ENABLED: Contrastive loss only
+mae_loss_weight=0.0       # DISABLED: No MAE reconstruction loss
 tr_pos=False
 norm_pix_loss=True
 
@@ -36,7 +37,7 @@ norm_pix_loss=True
 pretrain_path=/weka/kuehne/kqr867/code/cav-mae/egs/audioset/IN-initial.pth
 
 bal=None
-lr=2e-4  # Higher LR for MAE-only
+lr=2e-4          # Higher LR (was 1e-4)
 epoch=25
 lrscheduler_start=10
 lrscheduler_decay=0.5
@@ -46,7 +47,7 @@ dataset_std=4.4849
 target_length=1024
 noise=True
 mixup=0.0
-batch_size=120
+batch_size=256   # Larger batch (was 120)
 lr_adapt=False
 
 dataset=audioset
@@ -54,11 +55,13 @@ tr_data=/weka/kuehne/kqr867/code/cav-mae/datafiles/audioset_2m_pretrain.json
 te_data=/weka/kuehne/kqr867/code/cav-mae/datafiles/audioset_eval_yuan.json
 label_csv=/weka/kuehne/kqr867/code/cav-mae/src/preprocess/sample_datafiles/class_labels_indices_as.csv
 
-exp_dir=./exp/mae-only-${dataset}-${model}-bal${bal}-lr${lr}-epoch${epoch}-bs${batch_size}-normTrue-mr-${mask_mode}-${masking_ratio}
+exp_dir=./exp/contrastive++-${dataset}-${model}-bal${bal}-lr${lr}-epoch${epoch}-bs${batch_size}-mr-${mask_mode}-${masking_ratio}
 mkdir -p $exp_dir
 
-echo "Starting MAE-only training with lr=${lr}"
-echo "Experiment directory: ${exp_dir}"
+echo "Starting Contrastive++ training"
+echo "  Batch size: ${batch_size} (effective: $((batch_size * 4)))"
+echo "  Learning rate: ${lr}"
+echo "  Experiment directory: ${exp_dir}"
 
 CUDA_CACHE_DISABLE=1 python -W ignore ../../src/run_cavmae_pretrain.py --model ${model} --dataset ${dataset} \
 --data-train ${tr_data} --data-val ${te_data} --exp-dir $exp_dir \
@@ -73,4 +76,4 @@ CUDA_CACHE_DISABLE=1 python -W ignore ../../src/run_cavmae_pretrain.py --model $
 --mae_loss_weight ${mae_loss_weight} --contrast_loss_weight ${contrast_loss_weight} \
 --tr_pos ${tr_pos} --masking_ratio ${masking_ratio} --mask_mode ${mask_mode}
 
-echo "Training completed"
+echo "Contrastive++ training completed"
