@@ -492,8 +492,14 @@ Downloaded and evaluating original pretrained models from Yuan Gong et al. (ICLR
 **SFT Evaluation**:
 | Model | Job ID | Status | Exp Dir Pattern |
 |-------|--------|--------|-----------------|
-| Scale++ | 317993 (relaunched from 313936) | 🔄 Running | `sft-scalepp-original-*` |
-| Scale+ | 317994 (relaunched from 313937) | 🔄 Running | `sft-scalep-original-*` |
+| Scale++ | 317993 (relaunched from 313936) | ✅ Completed | `sft-scalepp-original-5e-5-bs36-epoch15-20260204_140118/` |
+| Scale+ | 317994 (relaunched from 313937) | ✅ Completed | `sft-scalep-original-5e-5-bs36-epoch15-20260204_140051/` |
+
+**SFT Results**:
+| Model | mAP | Notes |
+|-------|-----|-------|
+| **Scale+ (CAV-MAE)** | **49.93%** 🏆 | Best classification overall |
+| **Scale++ (CAV-MAE++)** | **49.85%** | Near-best classification |
 
 **Previous Failures (Jobs 313936, 313937)**:
 - **Error**: `TypeError: __init__() got an unexpected keyword argument 'qk_scale'`
@@ -629,7 +635,7 @@ With base model: merged = base + (F_mae·τ_mae + F_con·τ_con) / (F_mae + F_co
 | **1c** | Fisher Contrastive estimation | 314663 | ✅ Completed | - |
 | **2** | Fisher merge | 314664 | ✅ Completed | 314662, 314663 |
 | **3** | Retrieval evaluation (all 4 models) | 314665 | ✅ Completed | 314664 |
-| **4** | Fisher Task-Vec SFT | 314888 | 🔄 Running | 314664 |
+| **4** | Fisher Task-Vec SFT | 314888 | ✅ Completed (47.41% mAP) | 314664 |
 
 ### Scripts Created
 - `egs/audioset/sweep_layerwise.sh` - Layerwise merge sweep
@@ -694,13 +700,13 @@ Full post-training pipeline for independently trained Contrastive++ and MAE++ mo
 ### SFT Experiments
 
 **Jobs Submitted**:
-| Model | Job ID | Status | Expected Comparison |
-|-------|--------|--------|---------------------|
-| merged_weighted_0.0 (Contrastive++) | 318178 | 🔄 Running | Baseline |
-| merged_weighted_0.1 | 318179 | 🔄 Pending | MAE contribution |
-| merged_fisher | 318180 | 🔄 Pending | Fisher weighting |
+| Model | Job ID | Status | mAP |
+|-------|--------|--------|-----|
+| merged_weighted_0.0 (Contrastive++) | 318178 | ✅ Completed | 44.14% |
+| merged_weighted_0.1 | 318179 | ✅ Completed | 44.61% |
+| merged_fisher | 318180 | ✅ Completed | 44.61% |
 
-**Target**: Beat baseline mAP of 47.41% (Fisher Task-Vec from original experiments).
+**Note**: Did not beat baseline mAP of 47.41% (Fisher Task-Vec from base experiments) or paper checkpoints (~49.9%).
 
 ### Scripts Created
 | Script | Purpose |
@@ -722,6 +728,130 @@ Full post-training pipeline for independently trained Contrastive++ and MAE++ mo
 
 ---
 
+## Run 11: Comprehensive Pareto Analysis & Fine-Grained Experiments (2026-02-05/06)
+
+### Overview
+Systematic evaluation of all models on both **classification (mAP)** and **retrieval (R@1)** to find models that excel at both tasks. Created Pareto frontier plots by training scale.
+
+### Code Review & Norm Fix Rerun
+
+**Issue**: Basic merged models (Jan 16) were created WITHOUT `--use_contrastive_for_norms` flag. MAE norm layers were collapsed.
+
+**Fix Applied**:
+- Regenerated all 10 basic merged models via `merge_models.sh` (now includes the fix)
+- Re-ran retrieval evaluation (Job 318193) ✅ Completed
+- Results unchanged: norm fix is cosmetic for retrieval (L2 normalization cancels uniform scaling)
+- Also fixed copy-paste bug in `run_retrieval_merged.sh`: section 6 (λ=1.0) was outputting to `merged_task_arith_1.5.csv`
+
+### Focused SFT Experiments (Job 318226)
+| Field | Value |
+|-------|-------|
+| **Job ID** | 318226 |
+| **Status** | ✅ Completed |
+| **Submitted** | 2026-02-05 22:10 |
+| **Completed** | 2026-02-06 02:06 |
+| **Script** | `egs/audioset/run_sft_promising.sh` |
+
+**Results (only models with R@1 ≥ 10%)**:
+| Model | Scale | R@1% | mAP% | Status |
+|-------|-------|------|------|--------|
+| Contrastive++ | ++ | 18.81% | 43.97% | ✅ New |
+| Fisher Direct | Base | 12.76% | 46.02% | ✅ New |
+| Merged α=0.2 | ++ | 10.23% | 44.27% | ✅ New |
+
+### Fine-Grained Weighted Sweep (Job 318225)
+| Field | Value |
+|-------|-------|
+| **Job ID** | 318225 |
+| **Status** | ✅ Completed |
+| **Submitted** | 2026-02-05 22:10 |
+| **Script** | `egs/audioset/run_retrieval_finegrained.sh` |
+
+**New Models Created & Evaluated** (Scale++, filling gap between α=0.0 and α=0.2):
+| Model | R@1 (A→V) | R@1 (V→A) | mAP% | Notes |
+|-------|-----------|-----------|------|-------|
+| merged_weighted_0.05 | 17.81% | 17.75% | 44.81% | ✅ New sweet spot |
+| merged_weighted_0.15 | 13.40% | 13.49% | 44.26% | ✅ Complete |
+
+### Dead Ends Identified (R@1 < 10%)
+These methods produce models with poor retrieval and are **not worth further exploration**:
+- **Task Arithmetic** (all λ values): R@1 ≈ 0-1%
+- **Orthogonal merging** (25 variants): R@1 < 0.1%
+- **DARE-TIES** (12 variants): R@1 < 1.5%
+- **Layerwise merging**: R@1 ≈ 1%
+- **Weighted α ≥ 0.3**: R@1 < 5% (retrieval drops off a cliff)
+
+### Complete Pareto Frontier (R@1 ≥ 10%)
+
+| Model | Scale | R@1% | mAP% | Pareto? |
+|-------|-------|------|------|---------|
+| Merged α=0.0 | ++ | 18.81% | 44.14% | ✅ |
+| **Merged α=0.05** | **++** | **17.81%** | **44.81%** | ✅ |
+| Merged α=0.1 | ++ | 16.40% | 44.61% | No |
+| Contrastive Only | Base | 15.99% | 43.00% | No |
+| **CAV-MAE++ (paper)** | **Orig** | **15.29%** | **49.85%** | ✅ |
+| Fisher TaskVec | Base | 15.29% | 45.54% | No |
+| Merged α=0.15 | ++ | 13.40% | 44.26% | No |
+| Merged α=0.1 | Base | 13.70% | 45.26% | No |
+| Fisher Direct | Base | 12.76% | 46.02% | No |
+| CAV-MAE (paper) | Orig | 11.46% | 49.93% | ✅ |
+| Fisher Merge | ++ | 11.41% | 44.61% | No |
+| Merged α=0.2 | ++ | 10.23% | 44.27% | No |
+
+**Key Gap**: 5% mAP gap between our best merged models (~44.8%) and paper checkpoints (~49.9%).
+
+### Plots Generated
+- `exp/pareto_plot.png` / `.pdf` - Combined Pareto plot
+- `exp/pareto_by_scale.png` / `.pdf` - Three subplots by scale
+- `exp/pareto_base.png` / `.pdf` - Base scale individual
+- `exp/pareto_plusplus.png` / `.pdf` - Scale++ individual
+
+---
+
+## Run 12: Sequential Training Experiments (2026-02-06)
+
+### Overview
+**Hypothesis**: Sequential training (one objective then the other) can combine benefits of both MAE and contrastive objectives better than post-hoc model merging.
+
+### Run 12a: MAE → CAV (Sequential)
+| Field | Value |
+|-------|-------|
+| **Job ID** | 318234 |
+| **Status** | 🔄 Running |
+| **Submitted** | 2026-02-06 |
+| **Script** | `egs/audioset/run_sequential_mae_then_cav.sh` |
+| **Start Model** | MAE++ pretrained (bs=256, lr=2e-4) |
+| **Training** | 5 epochs contrastive-only (mae_loss=0, contrast_loss=1.0) |
+| **Learning Rate** | 1e-4 |
+| **Batch Size** | 256 |
+
+**Hypothesis**: MAE gives rich features for classification; adding contrastive training adds cross-modal alignment for retrieval without destroying feature quality.
+
+### Run 12b: CAV → MAE (Sequential)
+| Field | Value |
+|-------|-------|
+| **Job ID** | 318235 |
+| **Status** | 🔄 Running |
+| **Submitted** | 2026-02-06 |
+| **Script** | `egs/audioset/run_sequential_cav_then_mae.sh` |
+| **Start Model** | Contrastive++ pretrained (bs=256, lr=2e-4) |
+| **Training** | 5 epochs MAE-only (mae_loss=1.0, contrast_loss=0) |
+| **Learning Rate** | 1e-4 |
+| **Batch Size** | 256 |
+
+**Hypothesis**: Contrastive gives alignment (should preserve retrieval); adding MAE training adds feature richness for classification.
+
+### Expected Outcomes
+- **MAE→CAV**: Should gain retrieval (from ~0% → something meaningful). If mAP stays near 44-45%, this bridges the gap.
+- **CAV→MAE**: Should gain mAP while losing some retrieval. Key question: how much of each?
+
+### Next Steps After Completion
+1. Run retrieval evaluation on both resulting models
+2. If R@1 ≥ 10%, run SFT for classification
+3. If promising, try more epochs (10, 15) and different LRs (5e-5, 2e-4)
+
+---
+
 ## Cluster Notes
 
 ### Known Problematic Nodes
@@ -739,6 +869,22 @@ Full post-training pipeline for independently trained Contrastive++ and MAE++ mo
 
 ## Changelog
 
+- **2026-02-06**: Sequential training experiments & Pareto analysis:
+  - **Pareto Analysis**: Comprehensive evaluation of all models on both classification (mAP) and retrieval (R@1)
+    - Created Pareto frontier plots by scale (base, original, scale++)
+    - Identified dead ends: Task Arithmetic, Orthogonal, DARE-TIES, Layerwise (all R@1 < 10%)
+    - Pareto-optimal models: Merged α=0.0 (18.8% R@1), α=0.05 (17.8% R@1, 44.8% mAP), CAV-MAE++ paper (15.3% R@1, 49.9% mAP)
+  - **Fine-Grained Weighted Sweep** (Job 318225): Created α=0.05, 0.15 for Scale++
+    - α=0.05: R@1=17.81%, mAP=44.81% (new Pareto-optimal point)
+    - α=0.15: R@1=13.40%, mAP=44.26%
+  - **Focused SFT** (Job 318226): Only models with R@1 ≥ 10%
+    - Contrastive++: mAP=43.97%, Fisher Direct: mAP=46.02%, Merged α=0.2 (++): mAP=44.27%
+  - **Sequential Training** (Jobs 318234, 318235): New direction
+    - MAE++ → 5ep CAV (lr=1e-4): Running
+    - CAV++ → 5ep MAE (lr=1e-4): Running
+  - Scale+ SFT (Job 317994): ✅ Completed - **49.93% mAP** (best overall)
+  - Scale++ SFT (Job 317993): ✅ Completed - **49.85% mAP**
+  - Regenerated basic merged models with `--use_contrastive_for_norms` fix (Job 318193)
 - **2026-02-05**: CAV++ / MAE++ Post-Training Pipeline:
   - **Phase 1 Completed**: Trained Contrastive++ and MAE++ models with bs=256, lr=2e-4, 25 epochs
     - Contrastive++ (Job 318035): Loss=6.39, Acc=57.8%
