@@ -16,6 +16,10 @@ This document tracks all experiment runs for the model merging baseline project.
 
 ## Active Experiments
 
+*No active experiments. All directions explored or completed. See "Next Directions" below.*
+
+---
+
 ### Run 1: MAE-Only Pretraining (lr=1e-4)
 | Field | Value |
 |-------|-------|
@@ -48,12 +52,13 @@ This document tracks all experiment runs for the model merging baseline project.
 
 ---
 
-### Run 1b: MAE-Only Pretraining (lr=2e-4) - RETRY WITH HIGHER LR
+### Run 1b: MAE-Only Pretraining (lr=2e-4) - NOT WORTH MERGING
 | Field | Value |
 |-------|-------|
 | **Job ID** | 317992 (relaunched from 313762) |
-| **Status** | 🔄 Running |
+| **Status** | ✅ Completed |
 | **Submitted** | 2026-02-04 |
+| **Completed** | 2026-02-06 |
 | **Failed Attempt** | 313762 - TIME LIMIT (reached epoch 17/25 before 3-day limit) |
 | **Script** | `egs/audioset/run_mae_only_lr2e-4.sh` |
 | **Output Dir** | `egs/audioset/exp/mae-only-audioset-cav-mae-balNone-lr2e-4-epoch25-bs120-normTrue-mr-unstructured-0.75/` |
@@ -67,7 +72,10 @@ This document tracks all experiment runs for the model merging baseline project.
 - MAE loss weight: 1.0
 - Contrastive loss weight: 0.0 (disabled)
 
-**Hypothesis**: MAE-only training needs higher LR since it lacks the additional gradient signal from contrastive loss
+**Results**:
+- Eval MAE Loss: **3.308** (vs 3.302 for lr=1e-4 -- nearly identical, 0.2% difference)
+- **Conclusion**: Higher LR does not meaningfully improve MAE-only training. Not worth merging.
+- The issue isn't MAE quality but fundamental incompatibility of feature spaces.
 
 **Fixes Applied**:
 - Installed `wandb` package in cav-mae environment: `uv pip install wandb`
@@ -755,9 +763,12 @@ Systematic evaluation of all models on both **classification (mAP)** and **retri
 **Results (only models with R@1 ≥ 10%)**:
 | Model | Scale | R@1% | mAP% | Status |
 |-------|-------|------|------|--------|
-| Contrastive++ | ++ | 18.81% | 43.97% | ✅ New |
-| Fisher Direct | Base | 12.76% | 46.02% | ✅ New |
-| Merged α=0.2 | ++ | 10.23% | 44.27% | ✅ New |
+| Contrastive++ | ++ | 18.81% | 43.98% | ✅ Complete |
+| Weighted α=0.0 (=CAV base) | Base | 16.09% | 42.81% | ✅ Complete |
+| Fisher Direct | Base | 12.76% | 46.12% | ✅ Complete |
+| Merged α=0.2 | ++ | 10.45% | 44.37% | ✅ Complete |
+| Merged α=0.05 | ++ | 17.78% | **44.82%** | ✅ Complete (Pareto optimal) |
+| Merged α=0.15 | ++ | 13.45% | 44.32% | ✅ Complete |
 
 ### Fine-Grained Weighted Sweep (Job 318225)
 | Field | Value |
@@ -785,20 +796,23 @@ These methods produce models with poor retrieval and are **not worth further exp
 
 | Model | Scale | R@1% | mAP% | Pareto? |
 |-------|-------|------|------|---------|
-| Merged α=0.0 | ++ | 18.81% | 44.14% | ✅ |
-| **Merged α=0.05** | **++** | **17.81%** | **44.81%** | ✅ |
-| Merged α=0.1 | ++ | 16.40% | 44.61% | No |
-| Contrastive Only | Base | 15.99% | 43.00% | No |
-| **CAV-MAE++ (paper)** | **Orig** | **15.29%** | **49.85%** | ✅ |
-| Fisher TaskVec | Base | 15.29% | 45.54% | No |
-| Merged α=0.15 | ++ | 13.40% | 44.26% | No |
-| Merged α=0.1 | Base | 13.70% | 45.26% | No |
-| Fisher Direct | Base | 12.76% | 46.02% | No |
-| CAV-MAE (paper) | Orig | 11.46% | 49.93% | ✅ |
-| Fisher Merge | ++ | 11.41% | 44.61% | No |
-| Merged α=0.2 | ++ | 10.23% | 44.27% | No |
+| **Merged α=0.0** | **++** | **18.43%** | **44.15%** | ✅ (best retrieval) |
+| **Merged α=0.05** | **++** | **17.78%** | **44.82%** | ✅ (best merged trade-off) |
+| Merged α=0.1 | ++ | 16.39% | 44.63% | No |
+| Contrastive Only | Base | 16.09% | 43.02% | No |
+| Weighted α=0.0 (base) | Base | 16.09% | 42.81% | No |
+| **CAV-MAE++ (paper)** | **Orig** | **16.00%** | **49.87%** | ✅ (best joint-trained) |
+| Fisher TaskVec | Base | 15.37% | 45.56% | No |
+| Weighted α=0.1 (base) | Base | 14.34% | 45.52% | No |
+| Merged α=0.15 | ++ | 13.45% | 44.32% | No |
+| Fisher Direct | Base | 13.35% | 46.12% | No |
+| **CAV-MAE (paper)** | **Orig** | **12.79%** | **50.02%** | ✅ (best classification) |
+| Fisher Merge | ++ | 11.98% | 44.62% | No |
+| Merged α=0.2 | ++ | 10.45% | 44.37% | No |
 
-**Key Gap**: 5% mAP gap between our best merged models (~44.8%) and paper checkpoints (~49.9%).
+**Key Gap**: ~5% mAP gap between our best merged models (~44.8%) and paper checkpoints (~49.9%).
+
+**Conclusion**: Post-hoc merging has a ceiling of ~45% mAP. Only joint training achieves ~50%. New directions needed (see EXPERIMENT_PLAN.md).
 
 ### Plots Generated
 - `exp/pareto_plot.png` / `.pdf` - Combined Pareto plot
@@ -808,16 +822,18 @@ These methods produce models with poor retrieval and are **not worth further exp
 
 ---
 
-## Run 12: Sequential Training Experiments (2026-02-06)
+## Run 12: Sequential Training Experiments (2026-02-06) - FAILED
 
 ### Overview
 **Hypothesis**: Sequential training (one objective then the other) can combine benefits of both MAE and contrastive objectives better than post-hoc model merging.
+
+**Result**: **BOTH DIRECTIONS FAILED** - Sequential training does not work for these objectives.
 
 ### Run 12a: MAE → CAV (Sequential)
 | Field | Value |
 |-------|-------|
 | **Job ID** | 318234 |
-| **Status** | 🔄 Running |
+| **Status** | ❌ Cancelled (loss stuck) |
 | **Submitted** | 2026-02-06 |
 | **Script** | `egs/audioset/run_sequential_mae_then_cav.sh` |
 | **Start Model** | MAE++ pretrained (bs=256, lr=2e-4) |
@@ -825,30 +841,30 @@ These methods produce models with poor retrieval and are **not worth further exp
 | **Learning Rate** | 1e-4 |
 | **Batch Size** | 256 |
 
-**Hypothesis**: MAE gives rich features for classification; adding contrastive training adds cross-modal alignment for retrieval without destroying feature quality.
+**Result**: Contrastive loss stuck at **16.6** throughout training, never decreased. The MAE-pretrained features are too specialized for reconstruction to learn cross-modal alignment. Cancelled.
 
 ### Run 12b: CAV → MAE (Sequential)
 | Field | Value |
 |-------|-------|
 | **Job ID** | 318235 |
-| **Status** | 🔄 Running |
+| **Status** | ✅ Completed (but FAILED to improve) |
 | **Submitted** | 2026-02-06 |
+| **Completed** | 2026-02-07 |
 | **Script** | `egs/audioset/run_sequential_cav_then_mae.sh` |
 | **Start Model** | Contrastive++ pretrained (bs=256, lr=2e-4) |
 | **Training** | 5 epochs MAE-only (mae_loss=1.0, contrast_loss=0) |
 | **Learning Rate** | 1e-4 |
 | **Batch Size** | 256 |
 
-**Hypothesis**: Contrastive gives alignment (should preserve retrieval); adding MAE training adds feature richness for classification.
+**Result**: Eval MAE loss **flat at 7.578** across all 5 epochs -- no improvement. The contrastive features cannot transition to reconstruction.
 
-### Expected Outcomes
-- **MAE→CAV**: Should gain retrieval (from ~0% → something meaningful). If mAP stays near 44-45%, this bridges the gap.
-- **CAV→MAE**: Should gain mAP while losing some retrieval. Key question: how much of each?
+### Analysis
+Sequential training fails because MAE and contrastive objectives create **fundamentally incompatible feature spaces**:
+- MAE: Low-level reconstruction features (pixel/spectrogram prediction)
+- Contrastive: High-level semantic alignment features (cross-modal matching)
+- Neither can transition to the other's feature space without destroying its own
 
-### Next Steps After Completion
-1. Run retrieval evaluation on both resulting models
-2. If R@1 ≥ 10%, run SFT for classification
-3. If promising, try more epochs (10, 15) and different LRs (5e-5, 2e-4)
+This is consistent with the merging results: any mixture of MAE and contrastive weights degrades both tasks.
 
 ---
 
@@ -869,6 +885,21 @@ These methods produce models with poor retrieval and are **not worth further exp
 
 ## Changelog
 
+- **2026-02-07**: Final results update, new experiment directions:
+  - **Sequential Training FAILED** (both directions):
+    - MAE→CAV (Job 318234): Contrastive loss stuck at 16.6, cancelled
+    - CAV→MAE (Job 318235): Eval MAE loss flat at 7.578 across 5 epochs
+  - **MAE lr=2e-4 COMPLETED** (Job 317992): Eval loss 3.308 (vs 3.302 for lr=1e-4) -- not worth merging
+  - **Fine-Grained SFT Results**:
+    - α=0.05 (++): **44.82% mAP** with 17.78% R@1 (new Pareto-optimal merged model)
+    - α=0.15 (++): 44.32% mAP with 13.45% R@1
+    - Contrastive++ SFT: 43.98% mAP
+    - Weighted α=0.2 (++) SFT: 44.37% mAP
+    - Fisher Direct (base) SFT: 46.12% mAP with 13.35% R@1
+    - Weighted α=0.0 (base, = pure contrastive) SFT: 42.81% mAP
+  - **Updated Pareto plots**: `exp/pareto_combined.png/pdf`, `exp/pareto_by_scale.png/pdf`
+  - **New experiment directions proposed**: Per-block CKA alpha, earlier checkpoint merging, joint training with tuned loss weights, merge + continued joint training
+  - **Conclusion**: Post-hoc merging has ~45% mAP ceiling; ~5% gap to joint training (~50%) remains
 - **2026-02-06**: Sequential training experiments & Pareto analysis:
   - **Pareto Analysis**: Comprehensive evaluation of all models on both classification (mAP) and retrieval (R@1)
     - Created Pareto frontier plots by scale (base, original, scale++)
