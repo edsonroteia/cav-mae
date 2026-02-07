@@ -32,6 +32,39 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 
 ## Active Experiments
 
+### Run 4: 2026-02-07 Priority Sweep Relaunch (Main Checkout on `cav-jepa`)
+| Field | Value |
+|-------|-------|
+| **Branch (main checkout)** | `cav-jepa` |
+| **Launcher Script** | `egs/audioset/launch_cavjepa_priority_sweeps.sh` |
+| **Ablation Script** | `egs/audioset/run_cavjepa_ablations.sh <ID>` |
+| **Retrieval Eval Script** | `egs/audioset/run_retrieval_cavjepa_checkpoints.sh [EXP_DIR] 5 25 5` |
+| **Submitted (UTC)** | 2026-02-07 23:49 to 23:51 |
+
+**Submitted Jobs (state snapshot at 2026-02-07 23:51 UTC)**:
+
+| Experiment | Job ID | State | Notes |
+|------------|--------|-------|-------|
+| A1 | 318878 | ❌ FAILED | exited quickly (code 1) |
+| A2a | 318879 | ❌ FAILED | exited quickly (code 1) |
+| A2b | 318880 | ❌ FAILED | exited quickly (code 1) |
+| D1 | 318881 | ❌ FAILED | exited quickly (code 1) |
+| M1 | 318882 | ❌ FAILED | exited quickly (code 1) |
+| M2 | 318883 | ❌ FAILED | exited quickly (code 1) |
+| C1 | 318884 | ❌ FAILED | exited quickly (code 1) |
+| C2 | 318885 | ❌ FAILED | exited quickly (code 1) |
+| E2a | 318886 | ❌ FAILED | exited quickly (code 1) |
+| E2b | 318887 | ❌ FAILED | exited quickly (code 1) |
+| E3b | 318888 | 🔄 PENDING | waiting for resources |
+| Retrieval eval (baseline JEPA ckpts 5:25:5) | 318889 | ❌ FAILED | exited quickly (code 1) |
+
+**Failure signature (318878-318887, 318889)**:
+```text
+/weka/kuehne/kqr867/code/cav-mae/activate_env.sh: line 10: LD_LIBRARY_PATH: unbound variable
+```
+
+---
+
 ### Run 2: CAV-JEPA v2 Ablation - E1c (Random Init, 100 Epochs)
 | Field | Value |
 |-------|-------|
@@ -220,10 +253,10 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 | E1b | MAE init, 100 ep, v2 sched | Pending | - |
 | **E1c** | **Random init, 100 ep, v2 sched** | 🔄 Pending | 314648 |
 | E1d | Random init, 300 ep, v2 sched | Pending | - |
-| E2a | Random init, v1 scheduler | Pending | - |
-| E2b | Random init, v2 scheduler | Pending | - |
+| E2a | Random init, v1 scheduler | ❌ Failed fast (env bootstrap) | 318886 |
+| E2b | Random init, v2 scheduler | ❌ Failed fast (env bootstrap) | 318887 |
 | **E3a** | **Random init, no target norm** | 🔄 Pending | 314649 |
-| E3b | Random init, with target norm | Pending | - |
+| E3b | Random init, with target norm | 🔄 Pending | 318888 |
 
 ### Phase 5: SOTA-Focused Experiments (New)
 
@@ -296,6 +329,10 @@ source activate_env.sh
 
 ## Changelog
 
+- **2026-02-07**: Switched main checkout to branch `cav-jepa` (worktree now uses `cav-jepa` as primary branch).
+- **2026-02-07**: Submitted priority sweep launcher `launch_cavjepa_priority_sweeps.sh` (A1, A2a, A2b, D1, M1, M2, C1, C2, E2a, E2b, E3b) with Job IDs 318878-318888.
+- **2026-02-07**: Submitted checkpoint retrieval eval `run_retrieval_cavjepa_checkpoints.sh ... 5 25 5` as Job 318889.
+- **2026-02-07**: Jobs 318878-318887 and 318889 failed at environment bootstrap with `activate_env.sh: line 10: LD_LIBRARY_PATH: unbound variable`; Job 318888 remained pending at last check.
 - **2026-01-20**: Cancelled Jobs 314640/314641 - mlcbm005 had CUDA detection issue (torch.cuda.is_available()=False)
 - **2026-01-20**: Added `--exclude=mlcbm005` to ablation script to avoid problematic node
 - **2026-01-20**: Re-submitted E1c (Job 314648) and E3a (Job 314649) with node exclusion
