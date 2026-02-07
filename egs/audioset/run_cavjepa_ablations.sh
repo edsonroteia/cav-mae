@@ -6,6 +6,7 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=256G
 #SBATCH --time=3-00:00:00
+#SBATCH --exclude=mlcbm005
 #SBATCH --job-name="cavjepa-ablation"
 #SBATCH --output=./log/%j_cavjepa_ablation.txt
 #SBATCH --error=./log/%j_cavjepa_ablation.err
@@ -33,9 +34,18 @@
 #
 # === NEW SOTA-FOCUSED EXPERIMENTS ===
 #   A1:  Higher contrastive weight (0.1) - stronger alignment signal
+#   A2a: Contrastive sweep (0.03)
+#   A2b: Contrastive sweep (0.05)
+#   A2c: Contrastive sweep (0.20)
+#   A2d: Contrastive sweep (0.50)
 #   B1:  Multiblock masking - semantic-level prediction
 #   C1:  Deeper predictor (6 layers) - more prediction capacity
+#   C2:  Deeper + wider predictor (6 layers, dim 512)
+#   D1:  Higher momentum schedule (0.999 -> 0.9999)
+#   M1:  Lower mask ratio (0.60)
+#   M2:  Higher mask ratio (0.85)
 
+set -euo pipefail
 set -x
 
 # Get experiment ID from argument
@@ -168,6 +178,42 @@ case $EXPERIMENT in
         contrast_loss_weight=0.1  # 10x increase from default 0.01
         exp_name="A1-high_contrast_weight"
         ;;
+    A2a)
+        # Contrastive weight sweep: light increase
+        init_mode=random
+        epoch=100
+        use_v2_scheduler=True
+        normalize_targets=True
+        contrast_loss_weight=0.03
+        exp_name="A2a-contrast_sweep_0.03"
+        ;;
+    A2b)
+        # Contrastive weight sweep: moderate increase
+        init_mode=random
+        epoch=100
+        use_v2_scheduler=True
+        normalize_targets=True
+        contrast_loss_weight=0.05
+        exp_name="A2b-contrast_sweep_0.05"
+        ;;
+    A2c)
+        # Contrastive weight sweep: high contrastive dominance
+        init_mode=random
+        epoch=100
+        use_v2_scheduler=True
+        normalize_targets=True
+        contrast_loss_weight=0.2
+        exp_name="A2c-contrast_sweep_0.2"
+        ;;
+    A2d)
+        # Contrastive weight sweep: near contrastive-only regime
+        init_mode=random
+        epoch=100
+        use_v2_scheduler=True
+        normalize_targets=True
+        contrast_loss_weight=0.5
+        exp_name="A2d-contrast_sweep_0.5"
+        ;;
     B1)
         # Multiblock masking for semantic-level prediction
         # Hypothesis: Better semantic representations via structured masking
@@ -190,6 +236,44 @@ case $EXPERIMENT in
         predictor_depth=6  # Increased from default 4
         exp_name="C1-deeper_predictor"
         ;;
+    C2)
+        # Deeper + wider predictor
+        init_mode=random
+        epoch=100
+        use_v2_scheduler=True
+        normalize_targets=True
+        predictor_depth=6
+        predictor_dim=512
+        exp_name="C2-deeper_wider_predictor"
+        ;;
+    D1)
+        # Higher momentum schedule for more stable targets
+        init_mode=random
+        epoch=100
+        use_v2_scheduler=True
+        normalize_targets=True
+        momentum_start=0.999
+        momentum_end=0.9999
+        exp_name="D1-high_momentum"
+        ;;
+    M1)
+        # Lower mask ratio: easier prediction target
+        init_mode=random
+        epoch=100
+        use_v2_scheduler=True
+        normalize_targets=True
+        masking_ratio=0.60
+        exp_name="M1-mask_ratio_0.60"
+        ;;
+    M2)
+        # Higher mask ratio: harder prediction target
+        init_mode=random
+        epoch=100
+        use_v2_scheduler=True
+        normalize_targets=True
+        masking_ratio=0.85
+        exp_name="M2-mask_ratio_0.85"
+        ;;
 
     # === Experiment 4: Quick test run ===
     TEST)
@@ -205,7 +289,7 @@ case $EXPERIMENT in
         echo "Unknown experiment: $EXPERIMENT"
         echo "Available experiments:"
         echo "  Ablations: E1a, E1b, E1c, E1d, E2a, E2b, E3a, E3b"
-        echo "  SOTA-focused: A1, B1, C1"
+        echo "  SOTA-focused: A1, A2a, A2b, A2c, A2d, B1, C1, C2, D1, M1, M2"
         echo "  Debug: TEST"
         exit 1
         ;;
@@ -288,9 +372,16 @@ if [ "$use_v2_scheduler" = "False" ]; then
     )
 fi
 
-CUDA_CACHE_DISABLE=1 python -W ignore ../../src/run_cavjepa_pretrain.py "${cmd_args[@]}"
-
-echo "============================================"
-echo "Ablation $EXPERIMENT completed!"
-echo "Results saved to: $exp_dir"
-echo "============================================"
+if CUDA_CACHE_DISABLE=1 python -W ignore ../../src/run_cavjepa_pretrain.py "${cmd_args[@]}"; then
+    echo "============================================"
+    echo "Ablation $EXPERIMENT completed!"
+    echo "Results saved to: $exp_dir"
+    echo "============================================"
+else
+    rc=$?
+    echo "============================================"
+    echo "Ablation $EXPERIMENT FAILED (exit code: $rc)"
+    echo "Check logs in: ./log"
+    echo "============================================"
+    exit $rc
+fi
