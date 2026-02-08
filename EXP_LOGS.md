@@ -32,36 +32,34 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 
 ## Active Experiments
 
-### Run 4: 2026-02-07 Priority Sweep Relaunch (Main Checkout on `cav-jepa`)
+### Run 4: 2026-02-07 Priority Sweep (Main Checkout on `cav-jepa`)
 | Field | Value |
 |-------|-------|
 | **Branch (main checkout)** | `cav-jepa` |
 | **Launcher Script** | `egs/audioset/launch_cavjepa_priority_sweeps.sh` |
 | **Ablation Script** | `egs/audioset/run_cavjepa_ablations.sh <ID>` |
 | **Retrieval Eval Script** | `egs/audioset/run_retrieval_cavjepa_checkpoints.sh [EXP_DIR] 5 25 5` |
-| **Submitted (UTC)** | 2026-02-07 23:49 to 23:51 |
+| **Initial Submit (UTC)** | 2026-02-07 23:49 to 23:51 |
+| **Relaunch (UTC)** | 2026-02-08 (after env fix) |
 
-**Submitted Jobs (state snapshot at 2026-02-07 23:51 UTC)**:
+**Initial attempt (Jobs 318878-318889)**: All failed immediately with `activate_env.sh: line 10: LD_LIBRARY_PATH: unbound variable`. Root cause: `$LD_LIBRARY_PATH` referenced before being set under `set -u`. Fixed with bash parameter expansion: `${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}`.
+
+**Relaunched Jobs (2026-02-08, after env fix)**:
 
 | Experiment | Job ID | State | Notes |
 |------------|--------|-------|-------|
-| A1 | 318878 | ❌ FAILED | exited quickly (code 1) |
-| A2a | 318879 | ❌ FAILED | exited quickly (code 1) |
-| A2b | 318880 | ❌ FAILED | exited quickly (code 1) |
-| D1 | 318881 | ❌ FAILED | exited quickly (code 1) |
-| M1 | 318882 | ❌ FAILED | exited quickly (code 1) |
-| M2 | 318883 | ❌ FAILED | exited quickly (code 1) |
-| C1 | 318884 | ❌ FAILED | exited quickly (code 1) |
-| C2 | 318885 | ❌ FAILED | exited quickly (code 1) |
-| E2a | 318886 | ❌ FAILED | exited quickly (code 1) |
-| E2b | 318887 | ❌ FAILED | exited quickly (code 1) |
-| E3b | 318888 | 🔄 PENDING | waiting for resources |
-| Retrieval eval (baseline JEPA ckpts 5:25:5) | 318889 | ❌ FAILED | exited quickly (code 1) |
-
-**Failure signature (318878-318887, 318889)**:
-```text
-/weka/kuehne/kqr867/code/cav-mae/activate_env.sh: line 10: LD_LIBRARY_PATH: unbound variable
-```
+| A1 | 319012 | 🔄 SUBMITTED | contrast_weight=0.1 (10x) |
+| A2a | 319013 | 🔄 SUBMITTED | contrast_weight=0.05 |
+| A2b | 319014 | 🔄 SUBMITTED | contrast_weight=0.5 |
+| D1 | 319015 | 🔄 SUBMITTED | momentum 0.999→0.9999 |
+| M1 | 319016 | 🔄 SUBMITTED | multiblock masking |
+| M2 | 319017 | 🔄 SUBMITTED | multiblock + high contrast |
+| C1 | 319018 | 🔄 SUBMITTED | predictor_depth=6 |
+| C2 | 319019 | 🔄 SUBMITTED | predictor_depth=8 |
+| E2a | 319020 | 🔄 SUBMITTED | random init, v1 scheduler |
+| E2b | 319021 | 🔄 SUBMITTED | random init, v2 scheduler |
+| E3b | 319022 | 🔄 SUBMITTED | random init, with target norm |
+| Retrieval eval (baseline JEPA ckpts 5:25:5) | 319023 | 🔄 SUBMITTED | epochs 5-25, step 5 |
 
 ---
 
@@ -253,10 +251,10 @@ This document tracks all experiment runs for the CAV-JEPA project (replacing MAE
 | E1b | MAE init, 100 ep, v2 sched | Pending | - |
 | **E1c** | **Random init, 100 ep, v2 sched** | 🔄 Pending | 314648 |
 | E1d | Random init, 300 ep, v2 sched | Pending | - |
-| E2a | Random init, v1 scheduler | ❌ Failed fast (env bootstrap) | 318886 |
-| E2b | Random init, v2 scheduler | ❌ Failed fast (env bootstrap) | 318887 |
+| E2a | Random init, v1 scheduler | 🔄 Submitted | 319020 (prev: 318886 failed env) |
+| E2b | Random init, v2 scheduler | 🔄 Submitted | 319021 (prev: 318887 failed env) |
 | **E3a** | **Random init, no target norm** | 🔄 Pending | 314649 |
-| E3b | Random init, with target norm | 🔄 Pending | 318888 |
+| E3b | Random init, with target norm | 🔄 Submitted | 319022 (prev: 318888 pending) |
 
 ### Phase 5: SOTA-Focused Experiments (New)
 
@@ -329,6 +327,8 @@ source activate_env.sh
 
 ## Changelog
 
+- **2026-02-08**: Fixed `activate_env.sh` unbound `LD_LIBRARY_PATH` variable (used `${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}` parameter expansion).
+- **2026-02-08**: Relaunched all 11 training experiments (Jobs 319012-319022) and retrieval eval (Job 319023) after env fix.
 - **2026-02-07**: Switched main checkout to branch `cav-jepa` (worktree now uses `cav-jepa` as primary branch).
 - **2026-02-07**: Submitted priority sweep launcher `launch_cavjepa_priority_sweeps.sh` (A1, A2a, A2b, D1, M1, M2, C1, C2, E2a, E2b, E3b) with Job IDs 318878-318888.
 - **2026-02-07**: Submitted checkpoint retrieval eval `run_retrieval_cavjepa_checkpoints.sh ... 5 25 5` as Job 318889.
